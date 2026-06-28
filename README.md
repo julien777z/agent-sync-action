@@ -79,18 +79,6 @@ Lists the skills.sh skills to vendor into `.agents/skills/<name>/`:
 
 Each refresh installs the skill with the `skills` CLI into a scratch directory and vendors the result into `.agents/skills/<name>/`, replacing it. For skills whose `SKILL.md` lives at the repo root (so the CLI cannot carry their sibling assets), the missing files are completed from the repo tarball.
 
-## Local development
-
-The package lives in `src/agent_sync`. Run the same tooling against a checkout:
-
-```bash
-PYTHONPATH=src python -m agent_sync sync --root /path/to/repo            # disperse .agents -> mirrors
-PYTHONPATH=src python -m agent_sync refresh --root /path/to/repo         # refresh external skills
-PYTHONPATH=src python -m agent_sync sync --root /path/to/repo --dry-run  # preview only
-```
-
-Run the tests with `python -m pytest`.
-
 ## Versioning
 
 Consumers pin `@v1` (a moving major tag). Immutable releases are tagged `vX.Y.Z` to match `VERSION`.

@@ -45,24 +45,30 @@ runs:
       shell: bash
       run: |
         set -uo pipefail
+        enabled=false
         if [ "${{ inputs.refresh-external-skills }}" = "true" ]; then
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
-        elif [ "${{ github.event_name }}" = "push" ] && \
-             git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null \
-               | grep -qx "${{ inputs.agents-dir }}/skills.json"; then
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          enabled=true
+        elif [ "${{ github.event_name }}" = "push" ]; then
+          before="${{ github.event.before }}"
+          if [ -n "$before" ] && ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            git fetch --depth=1 origin "$before" 2>/dev/null || true
+          fi
+          if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
+             && git diff --name-only "$before" "${{ github.sha }}" \
+                  | grep -qx "${{ inputs.agents-dir }}/skills.json"; then
+            enabled=true
+          fi
         fi
+        echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
 
     - name: Refresh external skills
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync refresh --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.external_skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync sync --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Persist changes
       if: ${{ inputs.dry-run != 'true' }}
@@ -98,22 +104,11 @@ runs:
           fi
         else
           git commit -m "chore: run agent sync"
-
-          # Integrate any commits that landed during the run, then regenerate the
-          # mirrors against the rebased sources so the pushed tree stays consistent.
           git pull --rebase origin "${{ github.ref_name }}"
-          PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync sync --root . --agents-dir "${{ inputs.agents-dir }}"
-          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.override.md; do
-            if [ -e "$path" ]; then git add -A -- "$path"; fi
-          done
-          if ! git diff --cached --quiet; then
-            git commit --amend --no-edit
-          fi
-
           git push origin "HEAD:${{ github.ref_name }}"
         fi
 
     - name: Verify sync idempotence
       if: ${{ inputs.dry-run != 'true' && inputs.mode == 'commit' }}
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync sync --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run
+      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run

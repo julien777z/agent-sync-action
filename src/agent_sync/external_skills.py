@@ -1,3 +1,4 @@
+import argparse
 import io
 import json
 import shutil
@@ -8,54 +9,30 @@ import urllib.request
 from pathlib import Path
 from typing import Final
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import ValidationError
 
-from rich.panel import Panel
-from rich.table import Table
-
+from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.utils import fs
-from agent_sync.utils.console import console, logger
-from agent_sync.utils.slugs import SAFE_SLUG_PATTERN
+from agent_sync.utils.console import configure_logging, logger
 
 SKILLS_CLI_VERSION: Final[str] = "1.5.13"
 REGISTRY_FILENAME: Final[str] = "skills.json"
 INSTALL_AGENT: Final[str] = "claude-code"
 CODELOAD_URL: Final[str] = "https://codeload.github.com/{repo}/tar.gz/{ref}"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
-    {".git", ".github", ".gitignore", ".gitattributes", "node_modules", ".DS_Store"}
+    {
+        "node_modules",
+        "dist",
+        "build",
+        "__pycache__",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "tsconfig.json",
+        "Makefile",
+    }
 )
-
-
-class ExternalSkill(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    name: str
-    repo: str
-    skill: str | None = None
-    managed: bool = True
-
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, value: str) -> str:
-        """Reject names that would not be a safe skill directory slug."""
-
-        if not SAFE_SLUG_PATTERN.match(value):
-            raise ValueError(f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})")
-
-        return value
-
-    @property
-    def upstream_skill(self) -> str:
-        """Return the skill slug to request from the source repo (defaults to the local name)."""
-
-        return self.skill or self.name
-
-
-class SkillsRegistry(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    version: int = 1
-    skills: list[ExternalSkill] = Field(default_factory=list)
 
 
 def run_refresh(dry_run: bool) -> int:
@@ -64,13 +41,13 @@ def run_refresh(dry_run: bool) -> int:
     registry_path = fs.agents_dir() / REGISTRY_FILENAME
     registry = load_registry(registry_path)
     if registry is None:
-        console.print(f"[dim]No external-skill registry at {registry_path}; nothing to refresh.[/dim]")
+        logger.info("No external-skill registry at %s; nothing to refresh.", registry_path)
 
         return 0
 
     managed = [skill for skill in registry.skills if skill.managed]
     if not managed:
-        console.print("[dim]No managed external skills in registry; nothing to refresh.[/dim]")
+        logger.info("No managed external skills in registry; nothing to refresh.")
 
         return 0
 
@@ -110,7 +87,7 @@ def load_registry(path: Path) -> SkillsRegistry | None:
 def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
     """Install one external skill into a temp dir and vendor it into .agents/skills/<name>, returning whether it changed."""
 
-    logger.info("Refreshing [bold]%s[/bold] from %s", skill.name, skill.repo)
+    logger.info("Refreshing %s from %s", skill.name, skill.repo)
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as tmp:
         tmp_path = Path(tmp)
@@ -198,7 +175,7 @@ def supplement_root_level_assets(skill: ExternalSkill, dest_dir: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="agent-sync-tar-") as tmp:
         extract_root = download_and_extract_tarball(skill.repo, tmp)
         for entry in sorted(extract_root.iterdir()):
-            if entry.name in TARBALL_EXCLUDES:
+            if entry.name.startswith(".") or entry.name in TARBALL_EXCLUDES:
                 continue
             target = dest_dir / entry.name
             if entry.is_dir():
@@ -246,22 +223,36 @@ def trees_differ(source: Path, dest: Path) -> bool:
 
 
 def report_results(results: list[tuple[ExternalSkill, bool]], dry_run: bool) -> None:
-    """Print a summary table of which external skills changed."""
-
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("Skill")
-    table.add_column("Source")
-    table.add_column("Status")
+    """Log a summary of which external skills changed."""
 
     for skill, changed in results:
         if changed:
-            status = "[yellow]would update[/yellow]" if dry_run else "[green]updated[/green]"
+            status = "would update" if dry_run else "updated"
         else:
-            status = "[dim]unchanged[/dim]"
-        table.add_row(skill.name, skill.repo, status)
-
-    console.print(table)
+            status = "unchanged"
+        logger.info("  %s (%s): %s", skill.name, skill.repo, status)
 
     changed_count = sum(1 for _, changed in results if changed)
     verb = "would change" if dry_run else "changed"
-    console.print(Panel(f"{changed_count} of {len(results)} external skill(s) {verb}.", style="green"))
+    logger.info("%d of %d external skill(s) %s.", changed_count, len(results), verb)
+
+
+def main() -> int:
+    """Refresh registered external skills into the .agents/skills source directory."""
+
+    parser = argparse.ArgumentParser(
+        prog="agent_sync.external_skills",
+        description="Install/update external skills from the registry.",
+    )
+    fs.add_root_arguments(parser)
+    parser.add_argument("--dry-run", action="store_true", help="Report changes without writing.")
+    args = parser.parse_args()
+
+    configure_logging()
+    fs.set_root_from_args(args)
+
+    return run_refresh(dry_run=args.dry_run)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -9,7 +9,6 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2,<3",
     "pyyaml>=6",
-    "rich>=14",
 ]
 
 [dependency-groups]

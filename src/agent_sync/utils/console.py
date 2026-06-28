@@ -1,19 +1,16 @@
 import logging
 
-from rich.console import Console
-from rich.logging import RichHandler
-
-console = Console()
 logger = logging.getLogger("agent_sync")
 
 
 def configure_logging(level: int = logging.INFO) -> None:
-    """Attach a Rich log handler once so library output stays consistent."""
+    """Attach a stream log handler to the agent_sync logger once."""
 
     if logger.handlers:
         return
 
-    handler = RichHandler(console=console, show_time=False, show_path=False, markup=True)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False

@@ -5,13 +5,12 @@ import pytest
 from pydantic import ValidationError
 
 from agent_sync.external_skills import (
-    ExternalSkill,
-    SkillsRegistry,
     load_registry,
     read_skill_path,
     snapshot_tree,
     trees_differ,
 )
+from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.utils import fs
 
 
