@@ -4,7 +4,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from external_skills import ExternalSkill, SkillsRegistry, load_registry, snapshot_tree, trees_differ
+from external_skills import (
+    ExternalSkill,
+    SkillsRegistry,
+    load_registry,
+    read_skill_path,
+    snapshot_tree,
+    trees_differ,
+)
 from utils import fs
 
 
@@ -78,6 +85,32 @@ class TestLoadRegistry:
 
         with pytest.raises(ValueError):
             load_registry(path)
+
+
+class TestReadSkillPath:
+    """Test resolving the upstream skillPath from a temp install's skills-lock.json."""
+
+    def test_returns_sole_entry_regardless_of_key(self, tmp_path: Path) -> None:
+        """Test that the single lock entry's skillPath is returned even when its key differs from the local name."""
+
+        fs.set_root(tmp_path)
+        (tmp_path / "skills-lock.json").write_text(
+            json.dumps({"skills": {"upstream-slug": {"skillPath": "skills/x/SKILL.md"}}}),
+            encoding="utf-8",
+        )
+
+        assert read_skill_path(tmp_path) == "skills/x/SKILL.md"
+
+    def test_root_level_skill_path_reported(self, tmp_path: Path) -> None:
+        """Test that a repo-root skillPath (no slash) is reported so asset supplementation can trigger."""
+
+        fs.set_root(tmp_path)
+        (tmp_path / "skills-lock.json").write_text(
+            json.dumps({"skills": {"security-audit": {"skillPath": "SKILL.md"}}}),
+            encoding="utf-8",
+        )
+
+        assert read_skill_path(tmp_path) == "SKILL.md"
 
 
 class TestTreeComparison:

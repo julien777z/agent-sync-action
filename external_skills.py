@@ -128,7 +128,7 @@ def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
         run_cli_install(skill, tmp_path)
 
         installed = locate_installed_skill(tmp_path, skill.name)
-        skill_path = read_skill_path(tmp_path, skill.name)
+        skill_path = read_skill_path(tmp_path)
         if skill_path is not None and "/" not in skill_path:
             supplement_root_level_assets(skill, installed)
 
@@ -183,22 +183,21 @@ def locate_installed_skill(cwd: Path, name: str) -> Path:
     )
 
 
-def read_skill_path(cwd: Path, name: str) -> str | None:
-    """Return the upstream skillPath recorded in skills-lock.json for a skill, if present."""
+def read_skill_path(cwd: Path) -> str | None:
+    """Return the skillPath of the single skill recorded in skills-lock.json, if present."""
 
-    lock_path = cwd / "skills-lock.json"
-    raw = fs.read_text(lock_path)
+    raw = fs.read_text(cwd / "skills-lock.json")
     if raw is None:
         return None
 
-    data = json.loads(raw)
-    entry = data.get("skills", {}).get(name)
-    if isinstance(entry, dict):
-        skill_path = entry.get("skillPath")
-        if isinstance(skill_path, str):
-            return skill_path
+    entries = json.loads(raw).get("skills", {})
+    if len(entries) != 1:
+        return None
 
-    return None
+    entry = next(iter(entries.values()))
+    skill_path = entry.get("skillPath") if isinstance(entry, dict) else None
+
+    return skill_path if isinstance(skill_path, str) else None
 
 
 def supplement_root_level_assets(skill: ExternalSkill, dest_dir: Path) -> None:

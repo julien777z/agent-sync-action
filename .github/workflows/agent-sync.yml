@@ -24,10 +24,6 @@ on:
         description: "Token used to push or open PRs. Defaults to the job's GITHUB_TOKEN."
         required: false
 
-concurrency:
-  group: agent-sync-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   agent-sync:
     name: Agent Sync
@@ -92,7 +88,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add -A -- .claude .cursor .codex "${{ inputs.agents_dir }}" AGENTS.override.md 2>/dev/null || git add -A
+          for path in .claude .cursor .codex "${{ inputs.agents_dir }}" AGENTS.override.md; do
+            if [ -e "$path" ]; then
+              git add -A -- "$path"
+            fi
+          done
 
           if git diff --cached --quiet; then
             echo "No changes to commit."

@@ -594,7 +594,8 @@ def compute_stale_paths(
                 stale_paths.add(path)
 
     settings_path = fs.root() / ".claude" / "settings.json"
-    if "claude" in platform_settings and settings_path.exists() and settings_path not in expected_paths:
+    claude_source = settings_dir() / "claude.json"
+    if settings_path.exists() and settings_path not in expected_paths and ("claude" in platform_settings or not claude_source.exists()):
         stale_paths.add(settings_path)
 
     for platform in ("codex", "claude", "cursor"):

@@ -110,3 +110,22 @@ class TestComputeStalePaths:
 
         assert orphan_dir in stale_paths
         assert patch_sync_dirs / ".claude" / "skills" / "security-audit" not in stale_paths
+
+    def test_orphan_settings_removed_only_when_source_absent(self, patch_sync_dirs: Path) -> None:
+        """Test that .claude/settings.json is stale when its source is gone but kept when the source still exists."""
+
+        settings_path = patch_sync_dirs / ".claude" / "settings.json"
+        settings_path.parent.mkdir(parents=True)
+        settings_path.write_text("{}\n", encoding="utf-8")
+
+        stale_without_source = agent_sync.compute_stale_paths([], {})
+
+        assert settings_path in stale_without_source
+
+        source = patch_sync_dirs / ".agents" / "settings" / "claude.json"
+        source.parent.mkdir(parents=True)
+        source.write_text("{ invalid", encoding="utf-8")
+
+        stale_with_unparsed_source = agent_sync.compute_stale_paths([], {})
+
+        assert settings_path not in stale_with_unparsed_source
