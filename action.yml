@@ -109,6 +109,6 @@ runs:
         fi
 
     - name: Verify sync idempotence
-      if: ${{ inputs.dry-run != 'true' && inputs.mode == 'commit' }}
+      if: ${{ inputs.dry-run != 'true' }}
       shell: bash
       run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run
