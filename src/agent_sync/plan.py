@@ -1,12 +1,14 @@
 import difflib
+import logging
 from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER, MAX_DIFF_LINES
 from agent_sync.loaders import settings_dir
 from agent_sync.models.outputs import DiffEntry, OutputFile
 from agent_sync.utils import fs
-from agent_sync.utils.console import logger
 from agent_sync.utils.slugs import NUMBERED_COPY_PATTERN
+
+logger = logging.getLogger(__name__)
 
 
 def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:

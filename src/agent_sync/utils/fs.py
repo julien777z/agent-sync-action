@@ -3,20 +3,28 @@ import os
 import shutil
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
 TEXT_CACHE: dict[Path, str | None] = {}
 
 DEFAULT_AGENTS_DIRNAME = ".agents"
 
-_root: Path = Path.cwd()
-_agents_dirname: str = DEFAULT_AGENTS_DIRNAME
+
+class SyncContext(BaseModel):
+    """Mutable holder for the configured repository root and source directory name."""
+
+    path: Path = Field(default_factory=Path.cwd)
+    agents_dirname: str = DEFAULT_AGENTS_DIRNAME
+
+
+CONTEXT = SyncContext()
 
 
 def set_root(path: Path, agents_dirname: str = DEFAULT_AGENTS_DIRNAME) -> None:
     """Point the sync at a repository root, set the source dir name, and reset the read cache."""
 
-    global _root, _agents_dirname
-    _root = Path(path).resolve()
-    _agents_dirname = agents_dirname or DEFAULT_AGENTS_DIRNAME
+    CONTEXT.path = Path(path).resolve()
+    CONTEXT.agents_dirname = agents_dirname or DEFAULT_AGENTS_DIRNAME
 
     TEXT_CACHE.clear()
 
@@ -24,13 +32,13 @@ def set_root(path: Path, agents_dirname: str = DEFAULT_AGENTS_DIRNAME) -> None:
 def root() -> Path:
     """Return the configured repository root."""
 
-    return _root
+    return CONTEXT.path
 
 
 def agents_dir() -> Path:
     """Return the source-of-truth agents directory under the configured root."""
 
-    return _root / _agents_dirname
+    return CONTEXT.path / CONTEXT.agents_dirname
 
 
 def add_root_arguments(parser: argparse.ArgumentParser) -> None:

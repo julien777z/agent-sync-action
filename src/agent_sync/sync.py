@@ -1,10 +1,12 @@
 import argparse
+import logging
 
 from agent_sync.generate import generate_outputs
 from agent_sync.loaders import load_agent_model_overrides, load_platform_settings
 from agent_sync.plan import compute_diffs, compute_stale_paths, dedupe_outputs, report_diffs
 from agent_sync.utils import fs
-from agent_sync.utils.console import configure_logging, logger
+
+logger = logging.getLogger(__name__)
 
 
 def run_sync(dry_run: bool) -> int:
@@ -62,7 +64,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Report diffs without writing.")
     args = parser.parse_args()
 
-    configure_logging()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     fs.set_root_from_args(args)
 
     return run_sync(dry_run=args.dry_run)

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from agent_sync.constants import CODEX_RULE_MARKER
 from agent_sync.loaders import parse_markdown_file, resolve_agent_model, settings_dir
@@ -10,7 +11,6 @@ from agent_sync.models.front_matter import (
 )
 from agent_sync.models.outputs import OutputFile
 from agent_sync.utils import fs
-from agent_sync.utils.console import logger
 from agent_sync.utils.markdown import (
     assemble_codex_skill,
     assemble_cursor_rule,
@@ -21,6 +21,8 @@ from agent_sync.utils.markdown import (
     render_front_matter,
 )
 from agent_sync.utils.slugs import SAFE_SLUG_PATTERN, slug_to_codex_name, validate_slug
+
+logger = logging.getLogger(__name__)
 
 
 def generate_outputs(

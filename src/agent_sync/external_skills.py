@@ -1,6 +1,7 @@
 import argparse
 import io
 import json
+import logging
 import shutil
 import subprocess
 import tarfile
@@ -13,7 +14,8 @@ from pydantic import ValidationError
 
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.utils import fs
-from agent_sync.utils.console import configure_logging, logger
+
+logger = logging.getLogger(__name__)
 
 SKILLS_CLI_VERSION: Final[str] = "1.5.13"
 REGISTRY_FILENAME: Final[str] = "skills.json"
@@ -248,7 +250,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Report changes without writing.")
     args = parser.parse_args()
 
-    configure_logging()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     fs.set_root_from_args(args)
 
     return run_refresh(dry_run=args.dry_run)

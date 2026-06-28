@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 import yaml
@@ -6,9 +7,10 @@ from pydantic import BaseModel, ValidationError
 
 from agent_sync.models.front_matter import AgentModelOverride, PlatformSettings
 from agent_sync.utils import fs
-from agent_sync.utils.console import logger
 from agent_sync.utils.markdown import nonempty_str, normalize_text
 from agent_sync.utils.slugs import validate_slug
+
+logger = logging.getLogger(__name__)
 
 
 def settings_dir() -> Path:
