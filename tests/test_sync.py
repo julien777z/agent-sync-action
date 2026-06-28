@@ -1,22 +1,9 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from agent_sync import generate, plan
-from agent_sync.models.outputs import OutputFile
+from agent_sync.models.outputs import OutputFile, OutputKind
 from agent_sync.utils import fs
-
-
-def write_skill(root: Path, slug: str, body: str = "Body text.") -> Path:
-    """Create a minimal .agents/skills/<slug>/SKILL.md under root and return its path."""
-
-    skill_dir = root / ".agents" / "skills" / slug
-    skill_dir.mkdir(parents=True)
-    source = skill_dir / "SKILL.md"
-    source.write_text(
-        f"---\nname: {slug}\ndescription: Does a thing.\n---\n\n# {slug}\n\n{body}\n",
-        encoding="utf-8",
-    )
-
-    return source
 
 
 class TestGenerateHookOutputs:
@@ -39,35 +26,53 @@ class TestGenerateHookOutputs:
 class TestGenerateSkillOutputs:
     """Test that skill sources disperse into the expected Claude/Cursor/Codex files."""
 
-    def test_generate_skill_outputs_targets_codex_skill_md(self, patch_sync_dirs: Path) -> None:
+    def test_generate_skill_outputs_targets_codex_skill_md(
+        self, patch_sync_dirs: Path, skill_file_factory: Callable[..., Path]
+    ) -> None:
         """Test that a skill source is written to .codex/skills/<name>/SKILL.md with name/description front matter."""
 
-        write_skill(patch_sync_dirs, "my-skill")
+        skill_file_factory("my-skill")
 
         outputs = generate.generate_skill_outputs()
-        codex_output = next(output for output in outputs if output.kind == "codex_skill")
+        codex_output = next(output for output in outputs if output.kind == OutputKind.CODEX_SKILL)
 
         assert codex_output.target_path == patch_sync_dirs / ".codex" / "skills" / "my-skill" / "SKILL.md"
         assert 'name: "my-skill"' in codex_output.content
         assert 'description: "Does a thing."' in codex_output.content
         assert "# my-skill" in codex_output.content
 
-    def test_generate_skill_outputs_copies_nested_assets(self, patch_sync_dirs: Path) -> None:
+    def test_generate_skill_outputs_copies_nested_assets(
+        self, patch_sync_dirs: Path, skill_file_factory: Callable[..., Path]
+    ) -> None:
         """Test that nested skill assets (a references/ file) disperse to every platform skill dir."""
 
-        write_skill(patch_sync_dirs, "vendored")
+        skill_file_factory("vendored")
         references = patch_sync_dirs / ".agents" / "skills" / "vendored" / "references"
         references.mkdir()
         (references / "details.md").write_text("Detail content.\n", encoding="utf-8")
 
         outputs = generate.generate_skill_outputs()
-        asset_targets = {
-            output.target_path for output in outputs if output.kind.endswith("_skill_asset")
-        }
+        asset_targets = {output.target_path for output in outputs if output.kind.endswith("_skill_asset")}
 
         for platform in ("claude", "cursor", "codex"):
             base = patch_sync_dirs / f".{platform}" / "skills" / "vendored"
             assert base / "references" / "details.md" in asset_targets
+
+    def test_binary_skill_asset_kept_as_bytes(
+        self, patch_sync_dirs: Path, skill_file_factory: Callable[..., Path]
+    ) -> None:
+        """Test that a non-UTF-8 skill asset is carried as bytes instead of crashing dispersal."""
+
+        skill_file_factory("vendored")
+        asset = patch_sync_dirs / ".agents" / "skills" / "vendored" / "logo.png"
+        payload = b"\x89PNG\r\n\x1a\n\xff\xfe\x00"
+        asset.write_bytes(payload)
+
+        outputs = generate.generate_skill_outputs()
+        binary_outputs = [output for output in outputs if output.source_path == asset]
+
+        assert binary_outputs
+        assert all(output.content == payload for output in binary_outputs)
 
 
 class TestComputeStalePaths:
@@ -86,7 +91,7 @@ class TestComputeStalePaths:
         expected_output = OutputFile(
             target_path=managed_rule,
             content="managed\n",
-            kind="claude_rule",
+            kind=OutputKind.CLAUDE_RULE,
             slug="managed",
             source_path=None,
         )
@@ -95,14 +100,16 @@ class TestComputeStalePaths:
         assert orphan_rule in stale_paths
         assert managed_rule not in stale_paths
 
-    def test_vendored_skill_dir_is_not_stale(self, patch_sync_dirs: Path) -> None:
+    def test_vendored_skill_dir_is_not_stale(
+        self, patch_sync_dirs: Path, skill_file_factory: Callable[..., Path]
+    ) -> None:
         """Test that a mirror skill dir backed by a .agents/skills source is kept while an orphan dir is stale."""
 
-        write_skill(patch_sync_dirs, "security-audit")
+        skill_file_factory("security-audit")
         outputs = generate.generate_skill_outputs()
 
         for output in outputs:
-            fs.write_text(output.target_path, output.content)
+            fs.write(output.target_path, output.content)
 
         orphan_dir = patch_sync_dirs / ".claude" / "skills" / "left-over"
         orphan_dir.mkdir(parents=True)
