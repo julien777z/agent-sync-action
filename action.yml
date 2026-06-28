@@ -82,6 +82,11 @@ runs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
+        # Drive git (not just gh) with the provided token so pushes use it; the
+        # checkout's stored header would otherwise override the remote URL creds.
+        git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+        git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
         for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.override.md; do
           if [ -e "$path" ]; then
             git add -A -- "$path"
