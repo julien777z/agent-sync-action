@@ -1,6 +1,28 @@
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
+
+
+class OutputKind(StrEnum):
+    """The category of a generated mirror file, used for stale detection and reporting."""
+
+    CURSOR_SKILL = "cursor_skill"
+    CLAUDE_SKILL = "claude_skill"
+    CODEX_SKILL = "codex_skill"
+    CURSOR_SKILL_ASSET = "cursor_skill_asset"
+    CLAUDE_SKILL_ASSET = "claude_skill_asset"
+    CODEX_SKILL_ASSET = "codex_skill_asset"
+    CLAUDE_COMMAND = "claude_command"
+    CURSOR_COMMAND = "cursor_command"
+    CLAUDE_AGENT = "claude_agent"
+    CURSOR_AGENT = "cursor_agent"
+    CLAUDE_RULE = "claude_rule"
+    CURSOR_RULE = "cursor_rule"
+    CODEX_RULE = "codex_rule"
+    CLAUDE_HOOK = "claude_hook"
+    CURSOR_HOOK = "cursor_hook"
+    CLAUDE_SETTINGS = "claude_settings"
 
 
 class OutputFile(BaseModel):
@@ -9,8 +31,8 @@ class OutputFile(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     target_path: Path
-    content: str
-    kind: str
+    content: str | bytes
+    kind: OutputKind
     slug: str
     source_path: Path | None
 
@@ -21,4 +43,4 @@ class DiffEntry(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     output: OutputFile
-    existing: str | None
+    existing: str | bytes | None

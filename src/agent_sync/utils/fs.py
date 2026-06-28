@@ -76,16 +76,29 @@ def read_text(path: Path) -> str | None:
     return content
 
 
-def write_text(path: Path, content: str) -> None:
-    """Write content to a file, creating parents, applying the exec bit, and updating the cache."""
+def read_bytes(path: Path) -> bytes | None:
+    """Read a file as raw bytes, returning None when it does not exist."""
+
+    if not path.exists():
+        return None
+
+    return path.read_bytes()
+
+
+def write(path: Path, content: str | bytes) -> None:
+    """Write text or bytes to a file, creating parents, applying the exec bit, and updating the cache."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+
+    if isinstance(content, bytes):
+        path.write_bytes(content)
+        TEXT_CACHE.pop(path, None)
+    else:
+        path.write_text(content, encoding="utf-8")
+        TEXT_CACHE[path] = content
 
     if is_executable_output(path, content):
         path.chmod(0o755)
-
-    TEXT_CACHE[path] = content
 
 
 def delete_path(path: Path) -> None:
@@ -106,7 +119,9 @@ def delete_path(path: Path) -> None:
     TEXT_CACHE.pop(path, None)
 
 
-def is_executable_output(path: Path, content: str) -> bool:
+def is_executable_output(path: Path, content: str | bytes) -> bool:
     """Report whether an output should carry the exec bit (shell scripts and shebang files)."""
 
-    return path.suffix == ".sh" or content.startswith("#!")
+    shebang = b"#!" if isinstance(content, bytes) else "#!"
+
+    return path.suffix == ".sh" or content.startswith(shebang)

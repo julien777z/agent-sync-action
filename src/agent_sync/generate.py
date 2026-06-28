@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER
 from agent_sync.loaders import parse_markdown_file, resolve_agent_model, settings_dir
@@ -9,7 +10,7 @@ from agent_sync.models.front_matter import (
     RuleFrontMatter,
     SkillFrontMatter,
 )
-from agent_sync.models.outputs import OutputFile
+from agent_sync.models.outputs import OutputFile, OutputKind
 from agent_sync.utils import fs
 from agent_sync.utils.markdown import (
     assemble_codex_skill,
@@ -87,7 +88,7 @@ def generate_skill_outputs() -> list[OutputFile]:
                 OutputFile(
                     target_path=fs.root() / f".{platform}" / "skills" / dir_name / "SKILL.md",
                     content=skill_md_content[platform],
-                    kind=f"{platform}_skill",
+                    kind=OutputKind(f"{platform}_skill"),
                     slug=slug,
                     source_path=source_path,
                 )
@@ -96,7 +97,7 @@ def generate_skill_outputs() -> list[OutputFile]:
         for asset_path in sorted(skill_dir.rglob("*")):
             if not asset_path.is_file() or asset_path.name == "SKILL.md":
                 continue
-            asset_content = fs.read_text(asset_path)
+            asset_content = read_skill_asset(asset_path)
             if asset_content is None:
                 continue
             relative = asset_path.relative_to(skill_dir)
@@ -104,14 +105,27 @@ def generate_skill_outputs() -> list[OutputFile]:
                 outputs.append(
                     OutputFile(
                         target_path=fs.root() / f".{platform}" / "skills" / dir_name / relative,
-                        content=ensure_trailing_newline(asset_content),
-                        kind=f"{platform}_skill_asset",
+                        content=asset_content,
+                        kind=OutputKind(f"{platform}_skill_asset"),
                         slug=slug,
                         source_path=asset_path,
                     )
                 )
 
     return outputs
+
+
+def read_skill_asset(path: Path) -> str | bytes | None:
+    """Read a skill sibling asset, decoding UTF-8 text (newline-normalized) or keeping binary verbatim."""
+
+    raw = fs.read_bytes(path)
+    if raw is None:
+        return None
+
+    try:
+        return ensure_trailing_newline(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return raw
 
 
 def generate_command_outputs() -> list[OutputFile]:
@@ -142,7 +156,7 @@ def generate_command_outputs() -> list[OutputFile]:
             OutputFile(
                 target_path=fs.root() / ".claude" / "commands" / f"{slug}.md",
                 content=claude_output,
-                kind="claude_command",
+                kind=OutputKind.CLAUDE_COMMAND,
                 slug=slug,
                 source_path=path,
             )
@@ -151,7 +165,7 @@ def generate_command_outputs() -> list[OutputFile]:
             OutputFile(
                 target_path=fs.root() / ".cursor" / "commands" / f"{slug}.md",
                 content=ensure_trailing_newline(cursor_body),
-                kind="cursor_command",
+                kind=OutputKind.CURSOR_COMMAND,
                 slug=slug,
                 source_path=path,
             )
@@ -188,7 +202,7 @@ def generate_agent_outputs(
                 OutputFile(
                     target_path=fs.root() / f".{platform}" / "agents" / f"{slug}.md",
                     content=agent_content,
-                    kind=f"{platform}_agent",
+                    kind=OutputKind(f"{platform}_agent"),
                     slug=slug,
                     source_path=path,
                 )
@@ -213,7 +227,7 @@ def generate_rule_outputs() -> list[OutputFile]:
                 OutputFile(
                     target_path=fs.root() / ".claude" / "rules" / f"{slug}.md",
                     content=ensure_trailing_newline(body),
-                    kind="claude_rule",
+                    kind=OutputKind.CLAUDE_RULE,
                     slug=slug,
                     source_path=path,
                 )
@@ -222,7 +236,7 @@ def generate_rule_outputs() -> list[OutputFile]:
                 OutputFile(
                     target_path=fs.root() / ".cursor" / "rules" / f"{slug}.mdc",
                     content=assemble_cursor_rule(body, always_apply=True),
-                    kind="cursor_rule",
+                    kind=OutputKind.CURSOR_RULE,
                     slug=slug,
                     source_path=path,
                 )
@@ -235,7 +249,7 @@ def generate_rule_outputs() -> list[OutputFile]:
                 OutputFile(
                     target_path=fs.root() / ".codex" / "rules" / f"{slug}.rules",
                     content=ensure_trailing_newline(content),
-                    kind="codex_rule",
+                    kind=OutputKind.CODEX_RULE,
                     slug=slug,
                     source_path=path,
                 )
@@ -263,7 +277,7 @@ def generate_hook_outputs() -> list[OutputFile]:
                 OutputFile(
                     target_path=fs.root() / f".{platform}" / "hooks" / path.name,
                     content=ensure_trailing_newline(content),
-                    kind=f"{platform}_hook",
+                    kind=OutputKind(f"{platform}_hook"),
                     slug=path.stem,
                     source_path=path,
                 )
@@ -284,7 +298,7 @@ def generate_settings_outputs(platform_settings: dict[str, dict]) -> list[Output
         OutputFile(
             target_path=fs.root() / ".claude" / "settings.json",
             content=ensure_trailing_newline(json.dumps(claude_settings, indent=2)),
-            kind="claude_settings",
+            kind=OutputKind.CLAUDE_SETTINGS,
             slug="claude",
             source_path=settings_dir() / "claude.json",
         )

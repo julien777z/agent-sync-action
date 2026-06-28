@@ -37,3 +37,12 @@ class SkillsRegistry(BaseModel):
 
     version: int = 1
     skills: list[ExternalSkill] = Field(default_factory=list)
+
+
+class VendorResult(BaseModel):
+    """The outcome of vendoring one external skill into .agents/skills/."""
+
+    model_config = ConfigDict(frozen=True)
+
+    skill: ExternalSkill
+    changed: bool

@@ -12,7 +12,7 @@ from typing import Final
 
 from pydantic import ValidationError
 
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.models.registry import ExternalSkill, SkillsRegistry, VendorResult
 from agent_sync.utils import fs
 
 logger = logging.getLogger(__name__)
@@ -52,14 +52,14 @@ def run_refresh(dry_run: bool) -> int:
         return 0
 
     skills_dir = fs.agents_dir() / "skills"
-    results: list[tuple[ExternalSkill, bool]] = []
+    results: list[VendorResult] = []
     for skill in managed:
         changed = vendor_skill(skill, skills_dir, dry_run=dry_run)
-        results.append((skill, changed))
+        results.append(VendorResult(skill=skill, changed=changed))
 
     report_results(results, dry_run=dry_run)
 
-    changed_count = sum(1 for _, changed in results if changed)
+    changed_count = sum(1 for result in results if result.changed)
     if dry_run and changed_count:
         return 1
 
@@ -222,17 +222,17 @@ def trees_differ(source: Path, dest: Path) -> bool:
     return snapshot_tree(source) != snapshot_tree(dest)
 
 
-def report_results(results: list[tuple[ExternalSkill, bool]], dry_run: bool) -> None:
+def report_results(results: list[VendorResult], dry_run: bool) -> None:
     """Log a summary of which external skills changed."""
 
-    for skill, changed in results:
-        if changed:
+    for result in results:
+        if result.changed:
             status = "would update" if dry_run else "updated"
         else:
             status = "unchanged"
-        logger.info("  %s (%s): %s", skill.name, skill.repo, status)
+        logger.info("  %s (%s): %s", result.skill.name, result.skill.repo, status)
 
-    changed_count = sum(1 for _, changed in results if changed)
+    changed_count = sum(1 for result in results if result.changed)
     verb = "would change" if dry_run else "changed"
     logger.info("%d of %d external skill(s) %s.", changed_count, len(results), verb)
 

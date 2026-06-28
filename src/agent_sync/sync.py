@@ -34,7 +34,7 @@ def run_sync(dry_run: bool) -> int:
         return 1
 
     for diff in diffs:
-        fs.write_text(diff.output.target_path, diff.output.content)
+        fs.write(diff.output.target_path, diff.output.content)
         status = "created" if diff.existing is None else "updated"
         logger.info("%s: %s", status, diff.output.target_path)
 

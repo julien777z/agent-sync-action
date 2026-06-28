@@ -4,11 +4,15 @@ from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER, MAX_DIFF_LINES
 from agent_sync.loaders import settings_dir
-from agent_sync.models.outputs import DiffEntry, OutputFile
+from agent_sync.models.outputs import DiffEntry, OutputFile, OutputKind
 from agent_sync.utils import fs
 from agent_sync.utils.slugs import NUMBERED_COPY_PATTERN
 
 logger = logging.getLogger(__name__)
+
+SKILL_DIR_KINDS: frozenset[OutputKind] = frozenset(
+    {OutputKind.CURSOR_SKILL, OutputKind.CLAUDE_SKILL, OutputKind.CODEX_SKILL}
+)
 
 
 def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:
@@ -16,8 +20,12 @@ def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:
 
     diffs: list[DiffEntry] = []
     for output in outputs:
-        existing = fs.read_text(output.target_path)
-        if existing is None or existing != output.content or missing_exec_bit(output):
+        existing: str | bytes | None = (
+            fs.read_bytes(output.target_path)
+            if isinstance(output.content, bytes)
+            else fs.read_text(output.target_path)
+        )
+        if existing != output.content or missing_exec_bit(output):
             diffs.append(DiffEntry(output=output, existing=existing))
 
     return diffs
@@ -41,9 +49,7 @@ def compute_stale_paths(
 
     expected_paths = {output.target_path for output in outputs}
     expected_skill_dirs = {
-        output.target_path.parent
-        for output in outputs
-        if output.kind in {"codex_skill", "claude_skill", "cursor_skill"}
+        output.target_path.parent for output in outputs if output.kind in SKILL_DIR_KINDS
     }
     stale_paths: set[Path] = set()
 
@@ -119,10 +125,14 @@ def report_diffs(diffs: list[DiffEntry], stale_paths: list[Path]) -> None:
 
 
 def diff_summary(diff: DiffEntry) -> str:
-    """Produce a unified diff between existing and expected content."""
+    """Produce a unified diff between existing and expected content, or note a binary change."""
 
-    existing = diff.existing or ""
+    existing = diff.existing
     expected = diff.output.content
+    if isinstance(existing, bytes) or isinstance(expected, bytes):
+        return "(binary file)"
+
+    existing = existing or ""
     lines = list(
         difflib.unified_diff(
             existing.splitlines(),
