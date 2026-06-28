@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 SKILLS_CLI_VERSION: Final[str] = "1.5.13"
 REGISTRY_FILENAME: Final[str] = "skills.json"
-INSTALL_AGENT: Final[str] = "claude-code"
-CODELOAD_URL: Final[str] = "https://codeload.github.com/{repo}/tar.gz/{ref}"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "node_modules",
@@ -122,7 +120,7 @@ def run_cli_install(skill: ExternalSkill, cwd: Path) -> None:
         "--skill",
         skill.upstream_skill,
         "-a",
-        INSTALL_AGENT,
+        "claude-code",
         "-y",
         "--copy",
     ]
@@ -189,7 +187,7 @@ def supplement_root_level_assets(skill: ExternalSkill, dest_dir: Path) -> None:
 def download_and_extract_tarball(repo: str, dest: str) -> Path:
     """Download a GitHub repo tarball via codeload and extract it, returning the single extracted root dir."""
 
-    url = CODELOAD_URL.format(repo=repo, ref="HEAD")
+    url = f"https://codeload.github.com/{repo}/tar.gz/HEAD"
     request = urllib.request.Request(url, headers={"User-Agent": "agent-sync"})
     with urllib.request.urlopen(request, timeout=60) as response:
         payload = response.read()
