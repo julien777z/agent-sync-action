@@ -88,10 +88,9 @@ runs:
         fi
 
         if [ "$MODE" = "pull-request" ]; then
-          branch="agent-sync/refresh-${{ github.run_id }}"
-          git checkout -b "$branch"
+          branch="agent-sync/${{ github.ref_name }}"
           git commit -m "chore: run agent sync"
-          git push --force-with-lease origin "$branch"
+          git push --force origin "HEAD:$branch"
           if ! gh pr view "$branch" >/dev/null 2>&1; then
             gh pr create --base "${{ github.ref_name }}" --head "$branch" \
               --title "chore: agent sync" \
@@ -99,8 +98,21 @@ runs:
           fi
         else
           git commit -m "chore: run agent sync"
-          git pull --rebase origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              exit 0
+            fi
+            echo "Push rejected; rebasing, re-syncing, and retrying (attempt ${attempt})."
+            git pull --rebase origin "${{ github.ref_name }}"
+            PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync sync --root . --agents-dir "${{ inputs.agents-dir }}"
+            for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.override.md; do
+              if [ -e "$path" ]; then git add -A -- "$path"; fi
+            done
+            git commit --amend --no-edit
+          done
+
+          echo "Failed to push agent sync changes after retries." >&2
+          exit 1
         fi
 
     - name: Verify sync idempotence
