@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from utils import fs
+from agent_sync.utils import fs
 
 
 @pytest.fixture

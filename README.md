@@ -1,17 +1,15 @@
-# agent-sync-action
+# Agent Sync Action
 
-A shared GitHub workflow that keeps AI-agent configuration in sync from a single source of truth.
-
-It does two things on every run:
+A GitHub Action that keeps AI-agent configuration in sync from a single source of truth. On each run it:
 
 1. **Disperses** your `.agents/` source folder (skills, rules, agents, commands, hooks, settings) into the per-tool mirror folders `.claude/`, `.cursor/`, and `.codex/`.
 2. **Refreshes external skills** from [skills.sh](https://www.skills.sh/) listed in `.agents/skills.json`, so vendored third-party skills stay up to date automatically.
 
-The mirror folders are build artifacts — edit `.agents/`, never the mirrors.
+Edit `.agents/`, never the mirrors — they are build artifacts the action regenerates.
 
-## Usage
+## Quick start
 
-Add `.github/workflows/agent-sync.yml` to a consumer repo:
+Add a workflow to your repo:
 
 ```yaml
 name: Agent Sync
@@ -28,28 +26,37 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: agent-sync-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   sync:
-    uses: julien777z/agent-sync-action/.github/workflows/agent-sync.yml@v1
-    with:
-      # Force a full refresh on the weekly schedule. A push that edits
-      # skills.json also refreshes automatically; other pushes just disperse.
-      refresh_external_skills: ${{ github.event_name == 'schedule' }}
-    secrets: inherit
+    name: Agent Sync
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: julien777z/agent-sync-action@v1
+        with:
+          # Force a full refresh weekly; a push that edits skills.json also
+          # refreshes automatically. Other pushes just disperse .agents.
+          refresh-external-skills: ${{ github.event_name == 'schedule' }}
 ```
 
-That's the whole integration: one workflow file plus a `.agents/skills.json` registry. The workflow checks out this action at the same ref you pinned (`@v1`), so the dispersal script and the consumer always run the same version.
+`fetch-depth: 0` lets the action detect a `skills.json` change on push. The `if:` guard stops the bot's own commit from re-triggering the workflow.
 
 ## Inputs
 
-| input | type | default | purpose |
-|---|---|---|---|
-| `refresh_external_skills` | boolean | `false` | Force a full reinstall of external skills from the registry before dispersal (set true on `schedule`). A push that modifies `<agents_dir>/skills.json` refreshes automatically even when this is false. |
-| `mode` | string | `commit` | `commit` pushes changes to the branch; `pull-request` opens/updates a PR instead. |
-| `agents_dir` | string | `.agents` | Source-of-truth directory name. The registry is read from `<agents_dir>/skills.json`. |
-| `dry_run` | boolean | `false` | Report changes without writing or committing; the job fails if anything is out of sync (useful for PR checks). |
-
-Optional secret `token` overrides the default `GITHUB_TOKEN` (use a PAT/App token when commits must trigger downstream workflows).
+| input | default | purpose |
+|---|---|---|
+| `github-token` | `${{ github.token }}` | Token used to commit and push (or open a PR). Supply a PAT/App token when commits must trigger downstream workflows. |
+| `refresh-external-skills` | `false` | Force a full reinstall of external skills from the registry before dispersal (set true on `schedule`). A push that modifies `<agents-dir>/skills.json` refreshes automatically even when this is `false`. |
+| `mode` | `commit` | `commit` pushes changes to the branch; `pull-request` opens/updates a PR instead. |
+| `agents-dir` | `.agents` | Source-of-truth directory name. The registry is read from `<agents-dir>/skills.json`. |
+| `dry-run` | `false` | Report changes without writing or committing; the job fails if anything is out of sync (useful for PR checks). |
 
 ## External-skill registry — `.agents/skills.json`
 
@@ -74,14 +81,16 @@ Each refresh installs the skill with the `skills` CLI into a scratch directory a
 
 ## Local development
 
-Run the same tooling locally against a checkout:
+The package lives in `src/agent_sync`. Run the same tooling against a checkout:
 
 ```bash
-python agent_sync.py --root /path/to/repo            # disperse .agents -> mirrors
-python external_skills.py --root /path/to/repo       # refresh external skills
-python agent_sync.py --root /path/to/repo --dry-run  # preview only
+PYTHONPATH=src python -m agent_sync sync --root /path/to/repo            # disperse .agents -> mirrors
+PYTHONPATH=src python -m agent_sync refresh --root /path/to/repo         # refresh external skills
+PYTHONPATH=src python -m agent_sync sync --root /path/to/repo --dry-run  # preview only
 ```
+
+Run the tests with `python -m pytest`.
 
 ## Versioning
 
-Consumers pin `@v1` (a moving major tag). Immutable releases are tagged `vX.Y.Z`.
+Consumers pin `@v1` (a moving major tag). Immutable releases are tagged `vX.Y.Z` to match `VERSION`.

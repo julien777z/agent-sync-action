@@ -1,9 +1,7 @@
-import argparse
 import io
 import json
 import shutil
 import subprocess
-import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -15,9 +13,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from rich.panel import Panel
 from rich.table import Table
 
-from utils.console import configure_logging, console, logger
-from utils import fs
-from utils.slugs import SAFE_SLUG_PATTERN
+from agent_sync.utils import fs
+from agent_sync.utils.console import console, logger
+from agent_sync.utils.slugs import SAFE_SLUG_PATTERN
 
 SKILLS_CLI_VERSION: Final[str] = "1.5.13"
 REGISTRY_FILENAME: Final[str] = "skills.json"
@@ -60,17 +58,8 @@ class SkillsRegistry(BaseModel):
     skills: list[ExternalSkill] = Field(default_factory=list)
 
 
-def main() -> int:
+def run_refresh(dry_run: bool) -> int:
     """Refresh registered external skills into the .agents/skills source directory."""
-
-    parser = argparse.ArgumentParser(description="Install/update external (skills.sh) skills into .agents/skills.")
-    fs.add_root_arguments(parser)
-    parser.add_argument("--dry-run", action="store_true", help="Report changes without writing.")
-    args = parser.parse_args()
-
-    configure_logging()
-
-    fs.set_root_from_args(args)
 
     registry_path = fs.agents_dir() / REGISTRY_FILENAME
     registry = load_registry(registry_path)
@@ -88,13 +77,13 @@ def main() -> int:
     skills_dir = fs.agents_dir() / "skills"
     results: list[tuple[ExternalSkill, bool]] = []
     for skill in managed:
-        changed = vendor_skill(skill, skills_dir, dry_run=args.dry_run)
+        changed = vendor_skill(skill, skills_dir, dry_run=dry_run)
         results.append((skill, changed))
 
-    report_results(results, dry_run=args.dry_run)
+    report_results(results, dry_run=dry_run)
 
     changed_count = sum(1 for _, changed in results if changed)
-    if args.dry_run and changed_count:
+    if dry_run and changed_count:
         return 1
 
     return 0
@@ -275,7 +264,3 @@ def report_results(results: list[tuple[ExternalSkill, bool]], dry_run: bool) -> 
     changed_count = sum(1 for _, changed in results if changed)
     verb = "would change" if dry_run else "changed"
     console.print(Panel(f"{changed_count} of {len(results)} external skill(s) {verb}.", style="green"))
-
-
-if __name__ == "__main__":
-    sys.exit(main())

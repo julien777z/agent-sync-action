@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from external_skills import (
+from agent_sync.external_skills import (
     ExternalSkill,
     SkillsRegistry,
     load_registry,
@@ -12,7 +12,7 @@ from external_skills import (
     snapshot_tree,
     trees_differ,
 )
-from utils import fs
+from agent_sync.utils import fs
 
 
 class TestExternalSkillModel:

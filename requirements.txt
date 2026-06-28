@@ -1,0 +1,3 @@
+pydantic>=2,<3
+pyyaml>=6
+rich>=14

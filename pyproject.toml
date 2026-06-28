@@ -1,18 +1,28 @@
 [project]
 name = "agent-sync-action"
-version = "1.0.0"
-description = "Shared agent sync: disperse .agents into Claude/Cursor/Codex folders and refresh skills.sh skills."
-requires-python = ">=3.13"
+version = "0.0.0"
+description = "Disperse .agents into Claude/Cursor/Codex folders and refresh skills.sh skills."
+authors = [{ name = "julien777z" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12"
 dependencies = [
-  "pydantic>=2.0.0,<3",
-  "pyyaml>=6.0.0",
-  "rich>=14.0.0",
+    "pydantic>=2,<3",
+    "pyyaml>=6",
+    "rich>=14",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.poetry]
+packages = [{ include = "agent_sync", from = "src" }]
+
+[build-system]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
-addopts = "-q"
+pythonpath = ["src"]
+addopts = "-ra"

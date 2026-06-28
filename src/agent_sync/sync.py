@@ -1,7 +1,5 @@
-import argparse
 import difflib
 import json
-import sys
 from pathlib import Path
 from typing import Final
 
@@ -11,9 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from rich.panel import Panel
 from rich.table import Table
 
-from utils.console import configure_logging, console
-from utils import fs
-from utils.markdown import (
+from agent_sync.utils import fs
+from agent_sync.utils.console import console
+from agent_sync.utils.markdown import (
     assemble_codex_skill,
     assemble_cursor_rule,
     derive_description,
@@ -22,7 +20,7 @@ from utils.markdown import (
     normalize_text,
     render_front_matter,
 )
-from utils.slugs import (
+from agent_sync.utils.slugs import (
     NUMBERED_COPY_PATTERN,
     SAFE_SLUG_PATTERN,
     slug_to_codex_name,
@@ -93,17 +91,8 @@ class RuleFrontMatter(BaseModel):
     starlark: str | None = None
 
 
-def main() -> int:
-    """Resolve the repository root then sync .agents into the Claude/Cursor/Codex folders."""
-
-    parser = argparse.ArgumentParser(description="Sync .agents into Claude/Cursor/Codex folders.")
-    fs.add_root_arguments(parser)
-    parser.add_argument("--dry-run", action="store_true", help="Report diffs without writing.")
-    args = parser.parse_args()
-
-    configure_logging()
-
-    fs.set_root_from_args(args)
+def run_sync(dry_run: bool) -> int:
+    """Sync .agents into the Claude/Cursor/Codex folders for the configured root."""
 
     if not fs.agents_dir().exists():
         console.print(f"[red]Error:[/red] Missing agents directory: {fs.agents_dir()}")
@@ -121,7 +110,7 @@ def main() -> int:
 
         return 0
 
-    if args.dry_run:
+    if dry_run:
         report_diffs(diffs, stale_paths)
 
         return 1
@@ -692,7 +681,3 @@ def dedupe_directory(directory: Path) -> None:
         if path.is_file() and NUMBERED_COPY_PATTERN.search(path.stem):
             path.unlink(missing_ok=True)
             fs.TEXT_CACHE.pop(path, None)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

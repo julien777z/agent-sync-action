@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import agent_sync
+from agent_sync import sync
 
 
 def write_skill(root: Path, slug: str, body: str = "Body text.") -> Path:
@@ -28,8 +28,8 @@ class TestGenerateHookOutputs:
         stale_file = cursor_hooks_dir / "orphan.sh"
         stale_file.write_text("#!/usr/bin/env bash\necho stale\n", encoding="utf-8")
 
-        outputs = agent_sync.generate_hook_outputs()
-        stale_paths = agent_sync.compute_stale_paths(outputs, {})
+        outputs = sync.generate_hook_outputs()
+        stale_paths = sync.compute_stale_paths(outputs, {})
 
         assert stale_file in stale_paths
 
@@ -42,7 +42,7 @@ class TestGenerateSkillOutputs:
 
         write_skill(patch_sync_dirs, "my-skill")
 
-        outputs = agent_sync.generate_skill_outputs()
+        outputs = sync.generate_skill_outputs()
         codex_output = next(output for output in outputs if output.kind == "codex_skill")
 
         assert codex_output.target_path == patch_sync_dirs / ".codex" / "skills" / "my-skill" / "SKILL.md"
@@ -58,7 +58,7 @@ class TestGenerateSkillOutputs:
         references.mkdir()
         (references / "details.md").write_text("Detail content.\n", encoding="utf-8")
 
-        outputs = agent_sync.generate_skill_outputs()
+        outputs = sync.generate_skill_outputs()
         asset_targets = {
             output.target_path for output in outputs if output.kind.endswith("_skill_asset")
         }
@@ -81,14 +81,14 @@ class TestComputeStalePaths:
         managed_rule = claude_rules_dir / "managed.md"
         managed_rule.write_text("managed\n", encoding="utf-8")
 
-        expected_output = agent_sync.OutputFile(
+        expected_output = sync.OutputFile(
             target_path=managed_rule,
             content="managed\n",
             kind="claude_rule",
             slug="managed",
             source_path=None,
         )
-        stale_paths = agent_sync.compute_stale_paths([expected_output], {})
+        stale_paths = sync.compute_stale_paths([expected_output], {})
 
         assert orphan_rule in stale_paths
         assert managed_rule not in stale_paths
@@ -97,16 +97,16 @@ class TestComputeStalePaths:
         """Test that a mirror skill dir backed by a .agents/skills source is kept while an orphan dir is stale."""
 
         write_skill(patch_sync_dirs, "security-audit")
-        outputs = agent_sync.generate_skill_outputs()
+        outputs = sync.generate_skill_outputs()
 
         for output in outputs:
-            agent_sync.fs.write_text(output.target_path, output.content)
+            sync.fs.write_text(output.target_path, output.content)
 
         orphan_dir = patch_sync_dirs / ".claude" / "skills" / "left-over"
         orphan_dir.mkdir(parents=True)
         (orphan_dir / "SKILL.md").write_text("stale\n", encoding="utf-8")
 
-        stale_paths = agent_sync.compute_stale_paths(outputs, {})
+        stale_paths = sync.compute_stale_paths(outputs, {})
 
         assert orphan_dir in stale_paths
         assert patch_sync_dirs / ".claude" / "skills" / "security-audit" not in stale_paths
@@ -118,7 +118,7 @@ class TestComputeStalePaths:
         settings_path.parent.mkdir(parents=True)
         settings_path.write_text("{}\n", encoding="utf-8")
 
-        stale_without_source = agent_sync.compute_stale_paths([], {})
+        stale_without_source = sync.compute_stale_paths([], {})
 
         assert settings_path in stale_without_source
 
@@ -126,6 +126,6 @@ class TestComputeStalePaths:
         source.parent.mkdir(parents=True)
         source.write_text("{ invalid", encoding="utf-8")
 
-        stale_with_unparsed_source = agent_sync.compute_stale_paths([], {})
+        stale_with_unparsed_source = sync.compute_stale_paths([], {})
 
         assert settings_path not in stale_with_unparsed_source
