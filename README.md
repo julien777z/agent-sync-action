@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: julien777z/agent-sync-action@v1
+      - uses: julien777z/agent-sync-action@v0
         with:
           # Force a full refresh weekly; a push that edits skills.json also
           # refreshes automatically. Other pushes just disperse .agents.
@@ -81,4 +81,4 @@ Each refresh installs the skill with the `skills` CLI into a scratch directory a
 
 ## Versioning
 
-Consumers pin `@v1` (a moving major tag). Immutable releases are tagged `vX.Y.Z` to match `VERSION`.
+Consumers pin `@v0` (a moving major tag). Immutable releases are tagged `vX.Y.Z` to match `VERSION`.
