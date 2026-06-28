@@ -27,7 +27,6 @@ on:
 jobs:
   agent-sync:
     name: Agent Sync
-    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
