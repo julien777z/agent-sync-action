@@ -1,0 +1,18 @@
+[project]
+name = "agent-sync-action"
+version = "1.0.0"
+description = "Reusable agent sync: disperse .agents into Claude/Cursor/Codex folders and refresh skills.sh skills."
+requires-python = ">=3.13"
+dependencies = [
+  "pydantic>=2.0.0,<3",
+  "pyyaml>=6.0.0",
+  "rich>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
