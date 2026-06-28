@@ -32,7 +32,8 @@ jobs:
   sync:
     uses: julien777z/agent-sync-action/.github/workflows/agent-sync.yml@v1
     with:
-      # Refresh external skills only on the weekly schedule; plain pushes just disperse .agents.
+      # Force a full refresh on the weekly schedule. A push that edits
+      # skills.json also refreshes automatically; other pushes just disperse.
       refresh_external_skills: ${{ github.event_name == 'schedule' }}
     secrets: inherit
 ```
@@ -43,7 +44,7 @@ That's the whole integration: one workflow file plus a `.agents/skills.json` reg
 
 | input | type | default | purpose |
 |---|---|---|---|
-| `refresh_external_skills` | boolean | `false` | Reinstall external skills from the registry before dispersal. Set true on the `schedule` event. |
+| `refresh_external_skills` | boolean | `false` | Force a full reinstall of external skills from the registry before dispersal (set true on `schedule`). A push that modifies `<agents_dir>/skills.json` refreshes automatically even when this is false. |
 | `mode` | string | `commit` | `commit` pushes changes to the branch; `pull-request` opens/updates a PR instead. |
 | `agents_dir` | string | `.agents` | Source-of-truth directory name. The registry is read from `<agents_dir>/skills.json`. |
 | `dry_run` | boolean | `false` | Report changes without writing or committing; the job fails if anything is out of sync (useful for PR checks). |
