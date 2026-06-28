@@ -1,6 +1,6 @@
 # agent-sync-action
 
-A reusable GitHub workflow that keeps AI-agent configuration in sync from a single source of truth.
+A shared GitHub workflow that keeps AI-agent configuration in sync from a single source of truth.
 
 It does two things on every run:
 

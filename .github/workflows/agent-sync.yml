@@ -1,4 +1,4 @@
-name: Agent Sync (reusable)
+name: Agent Sync
 
 on:
   workflow_call:
