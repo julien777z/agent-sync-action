@@ -125,6 +125,7 @@ def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
         changed = trees_differ(installed, dest)
         if changed and not dry_run:
             fs.delete_path(dest)
+            dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(installed, dest)
 
     return changed
