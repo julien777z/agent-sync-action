@@ -1,0 +1,30 @@
+name: Agent Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".agents/**"
+      - ".github/workflows/agent-sync.yml"
+  schedule:
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: agent-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Agent Sync
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./
+        with:
+          refresh-external-skills: ${{ github.event_name == 'schedule' }}
