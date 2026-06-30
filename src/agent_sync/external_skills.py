@@ -2,6 +2,7 @@ import argparse
 import io
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tarfile
@@ -91,12 +92,18 @@ def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as tmp:
         tmp_path = Path(tmp)
-        run_cli_install(skill, tmp_path)
+        revision = resolve_repo_revision(skill.repo)
+        source_root = download_and_extract_tarball(
+            skill.repo,
+            revision,
+            str(tmp_path / "source"),
+        )
+        run_cli_install(skill, tmp_path, source_root)
 
         installed = locate_installed_skill(tmp_path, skill.name)
         skill_path = read_skill_path(tmp_path)
         if skill_path is not None and "/" not in skill_path:
-            supplement_root_level_assets(skill, installed)
+            supplement_root_level_assets(skill, installed, source_root)
 
         dest = skills_dir / skill.name
         changed = trees_differ(installed, dest)
@@ -108,7 +115,22 @@ def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
     return changed
 
 
-def run_cli_install(skill: ExternalSkill, cwd: Path) -> None:
+def resolve_repo_revision(repo: str) -> str:
+    """Resolve the repository's current HEAD so every source read uses one revision."""
+
+    command = ["git", "ls-remote", f"https://github.com/{repo}.git", "HEAD"]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    revision = result.stdout.split(maxsplit=1)[0] if result.stdout.strip() else ""
+    if result.returncode != 0 or re.fullmatch(r"[0-9a-fA-F]{40}", revision) is None:
+        raise RuntimeError(
+            f"`git ls-remote {repo} HEAD` failed (exit {result.returncode}):\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+
+    return revision
+
+
+def run_cli_install(skill: ExternalSkill, cwd: Path, source_root: Path) -> None:
     """Install a single skill into cwd/.claude/skills via the skills CLI, raising on failure."""
 
     command = [
@@ -116,7 +138,7 @@ def run_cli_install(skill: ExternalSkill, cwd: Path) -> None:
         "--yes",
         f"skills@{SKILLS_CLI_VERSION}",
         "add",
-        skill.repo,
+        str(source_root),
         "--skill",
         skill.upstream_skill,
         "-a",
@@ -167,27 +189,29 @@ def read_skill_path(cwd: Path) -> str | None:
     return skill_path if isinstance(skill_path, str) else None
 
 
-def supplement_root_level_assets(skill: ExternalSkill, dest_dir: Path) -> None:
+def supplement_root_level_assets(
+    skill: ExternalSkill,
+    dest_dir: Path,
+    source_root: Path,
+) -> None:
     """Copy sibling assets the CLI drops for a repo-root skill from the source tarball into dest_dir."""
 
     logger.info("  Supplementing root-level assets for %s from %s tarball", skill.name, skill.repo)
 
-    with tempfile.TemporaryDirectory(prefix="agent-sync-tar-") as tmp:
-        extract_root = download_and_extract_tarball(skill.repo, tmp)
-        for entry in sorted(extract_root.iterdir()):
-            if entry.name.startswith(".") or entry.name in TARBALL_EXCLUDES:
-                continue
-            target = dest_dir / entry.name
-            if entry.is_dir():
-                shutil.copytree(entry, target, dirs_exist_ok=True)
-            else:
-                shutil.copy2(entry, target)
+    for entry in sorted(source_root.iterdir()):
+        if entry.name.startswith(".") or entry.name in TARBALL_EXCLUDES:
+            continue
+        target = dest_dir / entry.name
+        if entry.is_dir():
+            shutil.copytree(entry, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(entry, target)
 
 
-def download_and_extract_tarball(repo: str, dest: str) -> Path:
+def download_and_extract_tarball(repo: str, revision: str, dest: str) -> Path:
     """Download a GitHub repo tarball via codeload and extract it, returning the single extracted root dir."""
 
-    url = f"https://codeload.github.com/{repo}/tar.gz/HEAD"
+    url = f"https://codeload.github.com/{repo}/tar.gz/{revision}"
     request = urllib.request.Request(url, headers={"User-Agent": "agent-sync"})
     with urllib.request.urlopen(request, timeout=60) as response:
         payload = response.read()

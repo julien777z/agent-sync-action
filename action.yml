@@ -109,7 +109,25 @@ runs:
           fi
         else
           git commit -m "chore: run agent sync"
+          pre_rebase_head="$(git rev-parse HEAD)"
           git pull --rebase origin "${{ github.ref_name }}"
+
+          if ! git diff --quiet "$pre_rebase_head" HEAD -- "${{ inputs.agents-dir }}/skills.json"; then
+            PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.external_skills \
+              --root . --agents-dir "${{ inputs.agents-dir }}"
+          fi
+          PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync \
+            --root . --agents-dir "${{ inputs.agents-dir }}"
+
+          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.override.md; do
+            if [ -e "$path" ]; then
+              git add -A -- "$path"
+            fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit --amend --no-edit
+          fi
+
           git push origin "HEAD:${{ github.ref_name }}"
         fi
 
