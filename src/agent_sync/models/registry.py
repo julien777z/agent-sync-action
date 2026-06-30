@@ -19,7 +19,9 @@ class ExternalSkill(BaseModel):
         """Reject names that would not be a safe skill directory slug."""
 
         if not SAFE_SLUG_PATTERN.match(value):
-            raise ValueError(f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})")
+            raise ValueError(
+                f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})"
+            )
 
         return value
 

@@ -13,6 +13,7 @@ from typing import Final
 
 from pydantic import ValidationError
 
+from agent_sync.loaders import load_json_value
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry, VendorResult
 from agent_sync.utils import fs
 
@@ -70,14 +71,9 @@ def run_refresh(dry_run: bool) -> int:
 def load_registry(path: Path) -> SkillsRegistry | None:
     """Load and validate the external-skill registry, returning None when it is absent."""
 
-    raw = fs.read_text(path)
-    if raw is None:
+    data = load_json_value(path)
+    if data is None:
         return None
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
     try:
         return SkillsRegistry.model_validate(data)
@@ -86,7 +82,7 @@ def load_registry(path: Path) -> SkillsRegistry | None:
 
 
 def vendor_skill(skill: ExternalSkill, skills_dir: Path, dry_run: bool) -> bool:
-    """Install one external skill into a temp dir and vendor it into .agents/skills/<name>, returning whether it changed."""
+    """Install an external skill and report whether its vendored copy changed."""
 
     logger.info("Refreshing %s from %s", skill.name, skill.repo)
 
@@ -162,7 +158,11 @@ def locate_installed_skill(cwd: Path, name: str) -> Path:
         return expected
 
     installed_root = cwd / ".claude" / "skills"
-    candidates = [path for path in installed_root.glob("*") if path.is_dir()] if installed_root.exists() else []
+    candidates = (
+        [path for path in installed_root.glob("*") if path.is_dir()]
+        if installed_root.exists()
+        else []
+    )
     if len(candidates) == 1:
         return candidates[0]
 
@@ -194,9 +194,13 @@ def supplement_root_level_assets(
     dest_dir: Path,
     source_root: Path,
 ) -> None:
-    """Copy sibling assets the CLI drops for a repo-root skill from the source tarball into dest_dir."""
+    """Copy repo-root sibling assets omitted by the skills CLI."""
 
-    logger.info("  Supplementing root-level assets for %s from %s tarball", skill.name, skill.repo)
+    logger.info(
+        "  Supplementing root-level assets for %s from %s tarball",
+        skill.name,
+        skill.repo,
+    )
 
     for entry in sorted(source_root.iterdir()):
         if entry.name.startswith(".") or entry.name in TARBALL_EXCLUDES:
@@ -209,7 +213,7 @@ def supplement_root_level_assets(
 
 
 def download_and_extract_tarball(repo: str, revision: str, dest: str) -> Path:
-    """Download a GitHub repo tarball via codeload and extract it, returning the single extracted root dir."""
+    """Download and extract a GitHub tarball, returning its root directory."""
 
     url = f"https://codeload.github.com/{repo}/tar.gz/{revision}"
     request = urllib.request.Request(url, headers={"User-Agent": "agent-sync"})

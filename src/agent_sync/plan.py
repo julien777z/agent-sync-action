@@ -4,6 +4,7 @@ from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER, MAX_DIFF_LINES
 from agent_sync.loaders import settings_dir
+from agent_sync.models.json_types import JsonObject
 from agent_sync.models.outputs import DiffEntry, OutputFile, OutputKind
 from agent_sync.utils import fs
 from agent_sync.utils.slugs import NUMBERED_COPY_PATTERN
@@ -32,7 +33,7 @@ def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:
 
 
 def missing_exec_bit(output: OutputFile) -> bool:
-    """Report whether an executable output exists on disk without its exec bit, so write re-applies chmod."""
+    """Report whether an executable output is missing its executable bit."""
 
     target = output.target_path
     if not fs.is_executable_output(target, output.content):
@@ -41,9 +42,10 @@ def missing_exec_bit(output: OutputFile) -> bool:
     return target.exists() and not target.stat().st_mode & 0o111
 
 
+# pylint: disable-next=too-many-branches
 def compute_stale_paths(
     outputs: list[OutputFile],
-    platform_settings: dict[str, dict],
+    platform_settings: dict[str, JsonObject],
 ) -> list[Path]:
     """Find generated files/directories that no longer map to .agents sources."""
 
@@ -160,7 +162,7 @@ def dedupe_outputs() -> None:
 
 
 def dedupe_directory(directory: Path) -> None:
-    """Remove OS-created duplicate files whose name ends with a space and a number (e.g. "name 2.md")."""
+    """Remove duplicate files whose stem ends with a space and a number."""
 
     if not directory.exists():
         return

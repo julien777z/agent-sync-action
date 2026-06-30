@@ -79,6 +79,92 @@ Lists the skills.sh skills to vendor into `.agents/skills/<name>/`:
 
 Each refresh installs the skill with the `skills` CLI into a scratch directory and vendors the result into `.agents/skills/<name>/`, replacing it. For skills whose `SKILL.md` lives at the repo root (so the CLI cannot carry their sibling assets), the missing files are completed from the repo tarball.
 
+## MCP servers — `.agents/mcp.json`
+
+Define shared MCP servers once and Agent Sync generates each client's native
+project configuration:
+
+- Claude: `.mcp.json`
+- Cursor: `.cursor/mcp.json`
+- Codex: an Agent Sync-managed block in `.codex/config.toml`
+
+The Codex generator preserves everything outside its marked block. Project
+Codex configuration is loaded only for repositories the user has trusted.
+
+OAuth is the simplest configuration that works across all three clients:
+
+```json
+{
+  "version": 1,
+  "servers": {
+    "agent-tools": {
+      "type": "http",
+      "url": "https://mcp.example.com/agent-tools/mcp",
+      "auth": { "type": "oauth" },
+      "platforms": ["claude", "cursor", "codex"]
+    }
+  }
+}
+```
+
+For headless Claude and Codex runs, reference a short-lived bearer token by
+environment-variable name:
+
+```json
+{
+  "version": 1,
+  "servers": {
+    "agent-tools": {
+      "type": "http",
+      "url": "https://mcp.example.com/agent-tools/mcp",
+      "auth": {
+        "type": "bearer-env",
+        "env": "AGENT_MCP_GATEWAY_TOKEN"
+      },
+      "envHeaders": {
+        "X-Workspace": "AGENT_MCP_WORKSPACE"
+      },
+      "platforms": ["claude", "codex"]
+    }
+  }
+}
+```
+
+Local stdio servers use the same environment-name-only approach:
+
+```json
+{
+  "version": 1,
+  "servers": {
+    "context": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@example/context-mcp"],
+      "env": ["CONTEXT_API_KEY"],
+      "platforms": ["claude", "codex"]
+    }
+  }
+}
+```
+
+`platforms` defaults to all three clients. Agent Sync rejects literal
+credentials, credential-bearing arguments or URLs, unknown fields, insecure
+remote HTTP URLs, and invalid environment-variable names. Cursor must be
+excluded from env-backed definitions because its project MCP format does not
+document a portable secret-reference syntax; configure hosted Cursor secrets
+in Cursor's dashboard instead.
+
+Missing environment variables are intentionally not resolved by the sync
+action. Claude expands `${VAR}` when loading `.mcp.json`, and Codex receives
+the variable name through `env_vars`, `bearer_token_env_var`, or
+`env_http_headers`. Generated Codex servers are marked `required = true`, so a
+missing secret or unavailable server fails initialization rather than silently
+removing tools.
+
+For a shared gateway that keeps upstream credentials away from agent runtimes,
+see the optional, platform-neutral
+[ContextForge reference deployment](deploy/contextforge/README.md).
+
 ## Versioning
 
 Consumers pin `@v0` (a moving major tag). Immutable releases are tagged `vX.Y.Z` to match `VERSION`.

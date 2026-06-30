@@ -1,5 +1,7 @@
 import yaml
 
+from agent_sync.models.json_types import JsonObject
+
 
 def ensure_trailing_newline(text: str) -> str:
     """Return text with a guaranteed single trailing newline."""
@@ -48,7 +50,7 @@ def yaml_quote(value: str) -> str:
     return f'"{escaped}"'
 
 
-def render_front_matter(front_matter: dict, body: str) -> str:
+def render_front_matter(front_matter: JsonObject, body: str) -> str:
     """Serialize a dict as YAML front matter wrapped in --- delimiters above the body."""
 
     if front_matter:
@@ -80,6 +82,11 @@ def assemble_cursor_rule(body: str, always_apply: bool) -> str:
 def assemble_codex_skill(body: str, name: str, description: str) -> str:
     """Build a Codex SKILL.md file with name/description front matter."""
 
-    front_matter = "---\n" f"name: {yaml_quote(name)}\n" f"description: {yaml_quote(description)}\n" "---\n\n"
+    front_matter = (
+        "---\n"
+        f"name: {yaml_quote(name)}\n"
+        f"description: {yaml_quote(description)}\n"
+        "---\n\n"
+    )
 
     return front_matter + ensure_trailing_newline(body)

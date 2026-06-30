@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_sync.models.json_types import JsonObject
 from agent_sync.models.registry import SkillsRegistry
 from agent_sync.utils import fs
 
@@ -20,6 +21,7 @@ def patch_sync_dirs(tmp_path: Path) -> Iterator[Path]:
 
 
 @pytest.fixture
+# pylint: disable-next=redefined-outer-name
 def skill_file_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
     """Create a .agents/skills/<slug>/SKILL.md under the configured root and return its path."""
 
@@ -38,6 +40,7 @@ def skill_file_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
 
 
 @pytest.fixture
+# pylint: disable-next=redefined-outer-name
 def registry_file_factory(patch_sync_dirs: Path) -> Callable[[SkillsRegistry], Path]:
     """Write a skills.json registry from a SkillsRegistry model and return its path."""
 
@@ -51,6 +54,7 @@ def registry_file_factory(patch_sync_dirs: Path) -> Callable[[SkillsRegistry], P
 
 
 @pytest.fixture
+# pylint: disable-next=redefined-outer-name
 def skills_lock_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
     """Write a skills-lock.json with a single skill entry and return the lock file's directory."""
 
@@ -61,6 +65,21 @@ def skills_lock_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
         )
 
         return patch_sync_dirs
+
+    return _build
+
+
+@pytest.fixture
+# pylint: disable-next=redefined-outer-name
+def mcp_file_factory(patch_sync_dirs: Path) -> Callable[[JsonObject], Path]:
+    """Write canonical .agents/mcp.json and return its path."""
+
+    def _build(data: JsonObject) -> Path:
+        path = patch_sync_dirs / ".agents" / "mcp.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        return path
 
     return _build
 

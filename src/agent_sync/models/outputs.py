@@ -23,6 +23,9 @@ class OutputKind(StrEnum):
     CLAUDE_HOOK = "claude_hook"
     CURSOR_HOOK = "cursor_hook"
     CLAUDE_SETTINGS = "claude_settings"
+    CLAUDE_MCP = "claude_mcp"
+    CURSOR_MCP = "cursor_mcp"
+    CODEX_MCP = "codex_mcp"
 
 
 class OutputFile(BaseModel):

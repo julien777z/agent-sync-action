@@ -2,7 +2,13 @@ import argparse
 import logging
 
 from agent_sync.generate import generate_outputs
-from agent_sync.loaders import load_agent_model_overrides, load_platform_settings
+from agent_sync.loaders import (
+    McpConfigError,
+    load_agent_model_overrides,
+    load_mcp_config,
+    load_platform_settings,
+)
+from agent_sync.mcp import McpGenerationError
 from agent_sync.plan import compute_diffs, compute_stale_paths, dedupe_outputs, report_diffs
 from agent_sync.utils import fs
 
@@ -19,7 +25,13 @@ def run_sync(dry_run: bool) -> int:
 
     platform_settings = load_platform_settings()
     agent_model_overrides = load_agent_model_overrides()
-    outputs = generate_outputs(platform_settings, agent_model_overrides)
+    try:
+        mcp_config = load_mcp_config()
+        outputs = generate_outputs(platform_settings, agent_model_overrides, mcp_config)
+    except (McpConfigError, McpGenerationError) as exc:
+        logger.error("%s", exc)
+
+        return 2
     diffs = compute_diffs(outputs)
     stale_paths = compute_stale_paths(outputs, platform_settings)
 

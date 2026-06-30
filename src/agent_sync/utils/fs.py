@@ -2,12 +2,13 @@ import argparse
 import os
 import shutil
 from pathlib import Path
+from typing import Final
 
 from pydantic import BaseModel, Field
 
-TEXT_CACHE: dict[Path, str | None] = {}
+TEXT_CACHE: Final[dict[Path, str | None]] = {}
 
-DEFAULT_AGENTS_DIRNAME = ".agents"
+DEFAULT_AGENTS_DIRNAME: Final[str] = ".agents"
 
 
 class SyncContext(BaseModel):
@@ -17,7 +18,7 @@ class SyncContext(BaseModel):
     agents_dirname: str = DEFAULT_AGENTS_DIRNAME
 
 
-CONTEXT = SyncContext()
+CONTEXT: Final[SyncContext] = SyncContext()
 
 
 def set_root(path: Path, agents_dirname: str = DEFAULT_AGENTS_DIRNAME) -> None:
@@ -44,7 +45,11 @@ def agents_dir() -> Path:
 def add_root_arguments(parser: argparse.ArgumentParser) -> None:
     """Register the shared --root / --agents-dir options on an argument parser."""
 
-    parser.add_argument("--root", default=None, help="Repository root (default: $AGENT_SYNC_ROOT or cwd).")
+    parser.add_argument(
+        "--root",
+        default=None,
+        help="Repository root (default: $AGENT_SYNC_ROOT or cwd).",
+    )
     parser.add_argument(
         "--agents-dir",
         default=None,
@@ -56,7 +61,11 @@ def set_root_from_args(args: argparse.Namespace) -> None:
     """Resolve --root/--agents-dir (then env, then defaults) and point the sync at that root."""
 
     resolved_root = args.root or os.environ.get("AGENT_SYNC_ROOT") or os.getcwd()
-    agents_dirname = args.agents_dir or os.environ.get("AGENT_SYNC_AGENTS_DIR") or DEFAULT_AGENTS_DIRNAME
+    agents_dirname = (
+        args.agents_dir
+        or os.environ.get("AGENT_SYNC_AGENTS_DIR")
+        or DEFAULT_AGENTS_DIRNAME
+    )
     set_root(Path(resolved_root), agents_dirname)
 
 
@@ -86,7 +95,7 @@ def read_bytes(path: Path) -> bytes | None:
 
 
 def write(path: Path, content: str | bytes) -> None:
-    """Write text or bytes to a file, creating parents, applying the exec bit, and updating the cache."""
+    """Write a file, update its cache entry, and apply the executable bit."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
 

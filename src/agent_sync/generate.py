@@ -4,12 +4,15 @@ from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER
 from agent_sync.loaders import parse_markdown_file, resolve_agent_model, settings_dir
+from agent_sync.mcp import generate_claude_mcp, generate_codex_config, generate_cursor_mcp
 from agent_sync.models.front_matter import (
     AgentFrontMatter,
     CommandFrontMatter,
     RuleFrontMatter,
     SkillFrontMatter,
 )
+from agent_sync.models.json_types import JsonObject
+from agent_sync.models.mcp import McpConfig
 from agent_sync.models.outputs import OutputFile, OutputKind
 from agent_sync.utils import fs
 from agent_sync.utils.markdown import (
@@ -27,8 +30,9 @@ logger = logging.getLogger(__name__)
 
 
 def generate_outputs(
-    platform_settings: dict[str, dict],
+    platform_settings: dict[str, JsonObject],
     agent_model_overrides: dict[str, dict[str, str]],
+    mcp_config: McpConfig | None = None,
 ) -> list[OutputFile]:
     """Generate all output files from .agents sources."""
 
@@ -39,12 +43,14 @@ def generate_outputs(
     outputs.extend(generate_rule_outputs())
     outputs.extend(generate_hook_outputs())
     outputs.extend(generate_settings_outputs(platform_settings))
+    outputs.extend(generate_mcp_outputs(mcp_config))
 
     return outputs
 
 
+# pylint: disable-next=too-many-locals
 def generate_skill_outputs() -> list[OutputFile]:
-    """Sync .agents/skills/<slug>/SKILL.md to .claude/skills/, .cursor/skills/, and .codex/skills/."""
+    """Sync canonical skills to Claude, Cursor, and Codex."""
 
     outputs: list[OutputFile] = []
     skills_dir = fs.agents_dir() / "skills"
@@ -74,7 +80,9 @@ def generate_skill_outputs() -> list[OutputFile]:
             )
             codex_name = slug_to_codex_name(slug)
 
-        codex_description = nonempty_str(front_matter.get("description")) or derive_description(content)
+        codex_description = nonempty_str(
+            front_matter.get("description")
+        ) or derive_description(content)
 
         skill_dirs = (("cursor", slug), ("claude", slug), ("codex", codex_name))
 
@@ -86,7 +94,9 @@ def generate_skill_outputs() -> list[OutputFile]:
         for platform, dir_name in skill_dirs:
             outputs.append(
                 OutputFile(
-                    target_path=fs.root() / f".{platform}" / "skills" / dir_name / "SKILL.md",
+                    target_path=(
+                        fs.root() / f".{platform}" / "skills" / dir_name / "SKILL.md"
+                    ),
                     content=skill_md_content[platform],
                     kind=OutputKind(f"{platform}_skill"),
                     slug=slug,
@@ -104,7 +114,9 @@ def generate_skill_outputs() -> list[OutputFile]:
             for platform, dir_name in skill_dirs:
                 outputs.append(
                     OutputFile(
-                        target_path=fs.root() / f".{platform}" / "skills" / dir_name / relative,
+                        target_path=(
+                            fs.root() / f".{platform}" / "skills" / dir_name / relative
+                        ),
                         content=asset_content,
                         kind=OutputKind(f"{platform}_skill_asset"),
                         slug=slug,
@@ -116,7 +128,7 @@ def generate_skill_outputs() -> list[OutputFile]:
 
 
 def read_skill_asset(path: Path) -> str | bytes | None:
-    """Read a skill sibling asset, decoding UTF-8 text (newline-normalized) or keeping binary verbatim."""
+    """Read a text asset with normalized newlines or keep binary data verbatim."""
 
     raw = fs.read_bytes(path)
     if raw is None:
@@ -175,7 +187,7 @@ def generate_command_outputs() -> list[OutputFile]:
 
 
 def generate_agent_outputs(
-    platform_settings: dict[str, dict],
+    platform_settings: dict[str, JsonObject],
     agent_model_overrides: dict[str, dict[str, str]],
 ) -> list[OutputFile]:
     """Generate Claude and Cursor agent files with per-platform model resolution."""
@@ -212,7 +224,7 @@ def generate_agent_outputs(
 
 
 def generate_rule_outputs() -> list[OutputFile]:
-    """Sync .agents/rules/<name>.md to .claude/rules/*.md, .cursor/rules/*.mdc, and Starlark .codex/rules/*.rules."""
+    """Sync canonical rules into each client's supported rule format."""
 
     outputs: list[OutputFile] = []
     rules_dir = fs.agents_dir() / "rules"
@@ -286,7 +298,7 @@ def generate_hook_outputs() -> list[OutputFile]:
     return outputs
 
 
-def generate_settings_outputs(platform_settings: dict[str, dict]) -> list[OutputFile]:
+def generate_settings_outputs(platform_settings: dict[str, JsonObject]) -> list[OutputFile]:
     """Sync .agents/settings/claude.json verbatim to .claude/settings.json."""
 
     outputs: list[OutputFile] = []
@@ -303,5 +315,46 @@ def generate_settings_outputs(platform_settings: dict[str, dict]) -> list[Output
             source_path=settings_dir() / "claude.json",
         )
     )
+
+    return outputs
+
+
+def generate_mcp_outputs(config: McpConfig | None) -> list[OutputFile]:
+    """Generate native Claude, Cursor, and managed Codex MCP configurations."""
+
+    if config is None:
+        return []
+
+    source_path = fs.agents_dir() / "mcp.json"
+    codex_path = fs.root() / ".codex" / "config.toml"
+    existing_codex = fs.read_text(codex_path)
+    generated_codex = generate_codex_config(config, existing_codex)
+
+    outputs = [
+        OutputFile(
+            target_path=fs.root() / ".mcp.json",
+            content=generate_claude_mcp(config),
+            kind=OutputKind.CLAUDE_MCP,
+            slug="mcp",
+            source_path=source_path,
+        ),
+        OutputFile(
+            target_path=fs.root() / ".cursor" / "mcp.json",
+            content=generate_cursor_mcp(config),
+            kind=OutputKind.CURSOR_MCP,
+            slug="mcp",
+            source_path=source_path,
+        ),
+    ]
+    if generated_codex or existing_codex is not None:
+        outputs.append(
+            OutputFile(
+                target_path=codex_path,
+                content=generated_codex,
+                kind=OutputKind.CODEX_MCP,
+                slug="mcp",
+                source_path=source_path,
+            )
+        )
 
     return outputs

@@ -6,11 +6,17 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from agent_sync.models.front_matter import AgentModelOverride, PlatformSettings
+from agent_sync.models.json_types import JsonObject, JsonValue
+from agent_sync.models.mcp import McpConfig
 from agent_sync.utils import fs
 from agent_sync.utils.markdown import nonempty_str, normalize_text
 from agent_sync.utils.slugs import validate_slug
 
 logger = logging.getLogger(__name__)
+
+
+class McpConfigError(ValueError):
+    """Raised when .agents/mcp.json cannot be parsed or validated safely."""
 
 
 def settings_dir() -> Path:
@@ -25,8 +31,12 @@ def models_dir() -> Path:
     return fs.agents_dir() / "models"
 
 
-def validate_front_matter(data: dict, model: type[BaseModel], source: str) -> dict | None:
-    """Validate front matter data against a Pydantic model, returning None on failure so callers can skip."""
+def validate_front_matter(
+    data: JsonObject,
+    model: type[BaseModel],
+    source: str,
+) -> JsonObject | None:
+    """Validate front matter, returning None on failure so callers can skip it."""
 
     try:
         model.model_validate(data)
@@ -38,18 +48,30 @@ def validate_front_matter(data: dict, model: type[BaseModel], source: str) -> di
     return data
 
 
-def load_json_object(path: Path, model: type[BaseModel]) -> dict | None:
-    """Read a JSON object from path and validate it against model, warning and returning None on failure."""
+def load_json_value(path: Path) -> JsonValue | None:
+    """Read and decode a JSON file, returning None when it is absent."""
 
     raw = fs.read_text(path)
     if raw is None:
         return None
 
     try:
-        data = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.warning("Invalid JSON in %s: %s", path, exc)
+        raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
+
+def load_json_object(path: Path, model: type[BaseModel]) -> JsonObject | None:
+    """Read and validate a JSON object, returning None when absent or invalid."""
+
+    try:
+        data = load_json_value(path)
+    except ValueError as exc:
+        logger.warning("%s", exc)
+
+        return None
+
+    if data is None:
         return None
 
     if not isinstance(data, dict):
@@ -60,10 +82,10 @@ def load_json_object(path: Path, model: type[BaseModel]) -> dict | None:
     return validate_front_matter(data, model, str(path))
 
 
-def load_platform_settings() -> dict[str, dict]:
+def load_platform_settings() -> dict[str, JsonObject]:
     """Load each .agents/settings/<platform>.json, validating its top-level shape."""
 
-    settings: dict[str, dict] = {}
+    settings: dict[str, JsonObject] = {}
     if not settings_dir().exists():
         return settings
 
@@ -91,14 +113,39 @@ def load_agent_model_overrides() -> dict[str, dict[str, str]]:
     return overrides
 
 
-def parse_markdown_file(path: Path, model: type[BaseModel] | None = None) -> tuple[dict, str]:
+def load_mcp_config() -> McpConfig | None:
+    """Load strict canonical MCP configuration, or return None when the source is absent."""
+
+    path = fs.agents_dir() / "mcp.json"
+    raw = fs.read_text(path)
+    if raw is None:
+        return None
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise McpConfigError(f"Invalid JSON in {path}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise McpConfigError(f"{path} must contain a JSON object")
+
+    try:
+        return McpConfig.model_validate(data)
+    except ValidationError as exc:
+        raise McpConfigError(f"Invalid MCP configuration in {path}: {exc}") from exc
+
+
+def parse_markdown_file(
+    path: Path,
+    model: type[BaseModel] | None = None,
+) -> tuple[JsonObject, str]:
     """Parse markdown front matter and body content."""
 
     content = fs.read_text(path)
     if content is None:
         return {}, ""
 
-    front_matter: dict = {}
+    front_matter: JsonObject = {}
     body = content
 
     lines = content.splitlines()
@@ -129,7 +176,7 @@ def parse_markdown_file(path: Path, model: type[BaseModel] | None = None) -> tup
 def resolve_agent_model(
     agent_slug: str,
     platform: str,
-    platform_settings: dict[str, dict],
+    platform_settings: dict[str, JsonObject],
     agent_model_overrides: dict[str, dict[str, str]],
 ) -> str | None:
     """Pick the per-agent override for this platform; fall back to the platform-wide default."""
