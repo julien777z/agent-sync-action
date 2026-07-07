@@ -1,0 +1,30 @@
+[project]
+name = "agent-sync-action"
+version = "0.0.0"
+description = "Disperse .agents into Claude/Cursor/Codex folders and refresh skills.sh skills."
+authors = [{ name = "julien777z" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2,<3",
+    "pyyaml>=6",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.poetry]
+packages = [{ include = "agent_sync", from = "src" }]
+
+[build-system]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.pylint.messages_control]
+disable = ["missing-module-docstring"]
