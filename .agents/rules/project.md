@@ -1,6 +1,6 @@
 ---
-name: project
 description: Project conventions and workflow rules.
+alwaysApply: true
 ---
 
 # Project Rules

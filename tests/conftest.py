@@ -41,6 +41,27 @@ def skill_file_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
 
 @pytest.fixture
 # pylint: disable-next=redefined-outer-name
+def rule_file_factory(patch_sync_dirs: Path) -> Callable[..., Path]:
+    """Create a .agents/rules/<slug>.md under the configured root and return its path."""
+
+    def _build(
+        slug: str,
+        body: str = "# Rule\n\nAlways be ruling.",
+        front_matter: str | None = "name: legacy\ndescription: A rule.",
+    ) -> Path:
+        rules_dir = patch_sync_dirs / ".agents" / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        source = rules_dir / f"{slug}.md"
+        header = f"---\n{front_matter}\n---\n\n" if front_matter else ""
+        source.write_text(f"{header}{body}\n", encoding="utf-8")
+
+        return source
+
+    return _build
+
+
+@pytest.fixture
+# pylint: disable-next=redefined-outer-name
 def registry_file_factory(patch_sync_dirs: Path) -> Callable[[SkillsRegistry], Path]:
     """Write a skills.json registry from a SkillsRegistry model and return its path."""
 

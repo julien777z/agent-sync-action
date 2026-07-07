@@ -1,5 +1,6 @@
 import difflib
 import logging
+import os
 from pathlib import Path
 
 from agent_sync.constants import CODEX_RULE_MARKER, MAX_DIFF_LINES
@@ -17,10 +18,17 @@ SKILL_DIR_KINDS: frozenset[OutputKind] = frozenset(
 
 
 def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:
-    """Compare generated outputs against on-disk files and return entries that differ."""
+    """Compare generated outputs and symlinks against on-disk state and return differing entries."""
 
     diffs: list[DiffEntry] = []
     for output in outputs:
+        if output.link_target is not None:
+            expected_link = expected_link_text(output)
+            existing_link = fs.read_link(output.target_path)
+            if existing_link != expected_link:
+                diffs.append(DiffEntry(output=output, existing=existing_link))
+            continue
+
         existing: str | bytes | None = (
             fs.read_bytes(output.target_path)
             if isinstance(output.content, bytes)
@@ -30,6 +38,14 @@ def compute_diffs(outputs: list[OutputFile]) -> list[DiffEntry]:
             diffs.append(DiffEntry(output=output, existing=existing))
 
     return diffs
+
+
+def expected_link_text(output: OutputFile) -> str:
+    """Return the relative symlink text a link output should carry on disk."""
+
+    assert output.link_target is not None
+
+    return os.path.relpath(output.link_target, output.target_path.parent)
 
 
 def missing_exec_bit(output: OutputFile) -> bool:
@@ -50,8 +66,15 @@ def compute_stale_paths(
     """Find generated files/directories that no longer map to .agents sources."""
 
     expected_paths = {output.target_path for output in outputs}
-    expected_skill_dirs = {
-        output.target_path.parent for output in outputs if output.kind in SKILL_DIR_KINDS
+    linked_dirs = {
+        output.target_path
+        for output in outputs
+        if output.link_target is not None and output.kind in SKILL_DIR_KINDS
+    }
+    expected_skill_dirs = linked_dirs | {
+        output.target_path.parent
+        for output in outputs
+        if output.kind in SKILL_DIR_KINDS and output.link_target is None
     }
     stale_paths: set[Path] = set()
 
@@ -74,7 +97,9 @@ def compute_stale_paths(
             continue
 
         for path in directory.glob(pattern):
-            if path.is_file() and path not in expected_paths:
+            if any(linked in path.parents for linked in linked_dirs):
+                continue
+            if (path.is_file() or path.is_symlink()) and path not in expected_paths:
                 stale_paths.add(path)
 
     codex_rules_dir = fs.root() / ".codex" / "rules"
@@ -100,7 +125,7 @@ def compute_stale_paths(
         if not skills_subdir.exists():
             continue
         for path in skills_subdir.iterdir():
-            if path.is_dir() and path not in expected_skill_dirs:
+            if (path.is_dir() or path.is_symlink()) and path not in expected_skill_dirs:
                 stale_paths.add(path)
 
     return sorted(stale_paths, key=str)
@@ -116,7 +141,12 @@ def report_diffs(diffs: list[DiffEntry], stale_paths: list[Path]) -> None:
         logger.info("  [%s] %s (%s)", status, diff.output.target_path, diff.output.kind)
 
     for stale_path in stale_paths:
-        kind = "directory" if stale_path.is_dir() else "generated"
+        if stale_path.is_symlink():
+            kind = "symlink"
+        elif stale_path.is_dir():
+            kind = "directory"
+        else:
+            kind = "generated"
         logger.info("  [stale] %s (%s)", stale_path, kind)
 
     for diff in diffs:
@@ -128,6 +158,9 @@ def report_diffs(diffs: list[DiffEntry], stale_paths: list[Path]) -> None:
 
 def diff_summary(diff: DiffEntry) -> str:
     """Produce a unified diff between existing and expected content, or note a binary change."""
+
+    if diff.output.link_target is not None:
+        return f"symlink -> {expected_link_text(diff.output)}"
 
     existing = diff.existing
     expected = diff.output.content

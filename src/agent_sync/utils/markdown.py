@@ -1,6 +1,21 @@
 import yaml
 
-from agent_sync.models.json_types import JsonObject
+from agent_sync.models.json_types import JsonObject, JsonValue
+
+
+class FrontMatterDumper(yaml.SafeDumper):
+    """SafeDumper variant that renders multiline strings as literal blocks."""
+
+
+def represent_multiline_str(dumper: yaml.SafeDumper, value: str) -> yaml.ScalarNode:
+    """Render strings containing newlines with literal block style."""
+
+    style = "|" if "\n" in value else None
+
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+
+FrontMatterDumper.add_representer(str, represent_multiline_str)
 
 
 def ensure_trailing_newline(text: str) -> str:
@@ -54,8 +69,9 @@ def render_front_matter(front_matter: JsonObject, body: str) -> str:
     """Serialize a dict as YAML front matter wrapped in --- delimiters above the body."""
 
     if front_matter:
-        front = yaml.safe_dump(
+        front = yaml.dump(
             front_matter,
+            Dumper=FrontMatterDumper,
             sort_keys=False,
             default_flow_style=False,
             width=10_000,
@@ -71,12 +87,27 @@ def render_front_matter(front_matter: JsonObject, body: str) -> str:
     return ensure_trailing_newline(output)
 
 
-def assemble_cursor_rule(body: str, always_apply: bool) -> str:
-    """Build a Cursor .mdc file with alwaysApply front matter."""
+def normalize_rule_source(front_matter: JsonObject, body: str) -> str:
+    """Rebuild a rule source file with unified, deterministically ordered front matter."""
 
-    front_matter = "---\n" + f"alwaysApply: {str(always_apply).lower()}" + "\n---\n\n"
+    normalized: JsonObject = {}
+    for key in ("description", "globs"):
+        value: JsonValue = front_matter.get(key)
+        if value:
+            normalized[key] = value
 
-    return front_matter + ensure_trailing_newline(body)
+    always_apply = front_matter.get("alwaysApply")
+    normalized["alwaysApply"] = always_apply if isinstance(always_apply, bool) else True
+
+    starlark = front_matter.get("starlark")
+    if isinstance(starlark, str) and starlark.strip():
+        normalized["starlark"] = starlark
+
+    known_keys = {"name", "description", "globs", "alwaysApply", "starlark"}
+    for key in sorted(set(front_matter) - known_keys):
+        normalized[key] = front_matter[key]
+
+    return render_front_matter(normalized, body)
 
 
 def assemble_codex_skill(body: str, name: str, description: str) -> str:

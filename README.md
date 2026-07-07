@@ -7,6 +7,17 @@ A GitHub Action that keeps AI-agent configuration in sync from a single source o
 
 Edit `.agents/`, never the mirrors — they are build artifacts the action regenerates.
 
+## Mirror layout
+
+Rules and skills are mirrored as **committed relative symlinks** into `.agents/`, so the content exists once on disk and materializes on every `git clone`:
+
+- `.claude/rules/<slug>.md` and `.cursor/rules/<slug>.mdc` → `../../.agents/rules/<slug>.md`
+- `.claude/skills/<slug>` and `.cursor/skills/<slug>` → `../../.agents/skills/<slug>` (directory links)
+
+Because one canonical file serves every client, rule sources are normalized in place with unified front matter — `alwaysApply: true` is injected when absent, the redundant `name:` key is dropped, and `description`/`globs` pass through. Outputs that require per-tool transformation stay regular generated copies: Codex skills and rules, commands, agents, hooks, settings, and MCP configuration.
+
+Checkouts with `core.symlinks=false` (mostly Windows) materialize the links as plain text files containing the target path; use a symlink-capable checkout for local agent tooling.
+
 ## Quick start
 
 Add a workflow to your repo:

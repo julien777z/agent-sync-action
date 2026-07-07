@@ -1,7 +1,8 @@
 from enum import StrEnum
 from pathlib import Path
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class OutputKind(StrEnum):
@@ -17,6 +18,7 @@ class OutputKind(StrEnum):
     CURSOR_COMMAND = "cursor_command"
     CLAUDE_AGENT = "claude_agent"
     CURSOR_AGENT = "cursor_agent"
+    AGENTS_RULE = "agents_rule"
     CLAUDE_RULE = "claude_rule"
     CURSOR_RULE = "cursor_rule"
     CODEX_RULE = "codex_rule"
@@ -29,7 +31,7 @@ class OutputKind(StrEnum):
 
 
 class OutputFile(BaseModel):
-    """A generated mirror file destined for a Claude/Cursor/Codex path."""
+    """A generated mirror file or relative symlink destined for an agent-config path."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -38,6 +40,16 @@ class OutputFile(BaseModel):
     kind: OutputKind
     slug: str
     source_path: Path | None
+    link_target: Path | None = None
+
+    @model_validator(mode="after")
+    def validate_link_has_no_content(self) -> Self:
+        """Reject symlink outputs that also carry file content."""
+
+        if self.link_target is not None and self.content:
+            raise ValueError("Symlink outputs must not define content.")
+
+        return self
 
 
 class DiffEntry(BaseModel):

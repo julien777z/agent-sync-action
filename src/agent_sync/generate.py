@@ -17,10 +17,10 @@ from agent_sync.models.outputs import OutputFile, OutputKind
 from agent_sync.utils import fs
 from agent_sync.utils.markdown import (
     assemble_codex_skill,
-    assemble_cursor_rule,
     derive_description,
     ensure_trailing_newline,
     nonempty_str,
+    normalize_rule_source,
     normalize_text,
     render_front_matter,
 )
@@ -48,9 +48,8 @@ def generate_outputs(
     return outputs
 
 
-# pylint: disable-next=too-many-locals
 def generate_skill_outputs() -> list[OutputFile]:
-    """Sync canonical skills to Claude, Cursor, and Codex."""
+    """Link Claude and Cursor skill directories to .agents and render Codex skill copies."""
 
     outputs: list[OutputFile] = []
     skills_dir = fs.agents_dir() / "skills"
@@ -68,7 +67,6 @@ def generate_skill_outputs() -> list[OutputFile]:
             continue
 
         front_matter, content = parse_markdown_file(source_path, SkillFrontMatter)
-        source_content = fs.read_text(source_path) or ""
 
         codex_name = nonempty_str(front_matter.get("name")) or slug_to_codex_name(slug)
         if not SAFE_SLUG_PATTERN.match(codex_name):
@@ -84,25 +82,27 @@ def generate_skill_outputs() -> list[OutputFile]:
             front_matter.get("description")
         ) or derive_description(content)
 
-        skill_dirs = (("cursor", slug), ("claude", slug), ("codex", codex_name))
-
-        skill_md_content = {
-            "cursor": ensure_trailing_newline(source_content),
-            "claude": ensure_trailing_newline(source_content),
-            "codex": assemble_codex_skill(content, codex_name, codex_description),
-        }
-        for platform, dir_name in skill_dirs:
+        for platform in ("claude", "cursor"):
             outputs.append(
                 OutputFile(
-                    target_path=(
-                        fs.root() / f".{platform}" / "skills" / dir_name / "SKILL.md"
-                    ),
-                    content=skill_md_content[platform],
+                    target_path=fs.root() / f".{platform}" / "skills" / slug,
+                    content="",
                     kind=OutputKind(f"{platform}_skill"),
                     slug=slug,
                     source_path=source_path,
+                    link_target=skill_dir,
                 )
             )
+
+        outputs.append(
+            OutputFile(
+                target_path=fs.root() / ".codex" / "skills" / codex_name / "SKILL.md",
+                content=assemble_codex_skill(content, codex_name, codex_description),
+                kind=OutputKind.CODEX_SKILL,
+                slug=slug,
+                source_path=source_path,
+            )
+        )
 
         for asset_path in sorted(skill_dir.rglob("*")):
             if not asset_path.is_file() or asset_path.name == "SKILL.md":
@@ -111,18 +111,15 @@ def generate_skill_outputs() -> list[OutputFile]:
             if asset_content is None:
                 continue
             relative = asset_path.relative_to(skill_dir)
-            for platform, dir_name in skill_dirs:
-                outputs.append(
-                    OutputFile(
-                        target_path=(
-                            fs.root() / f".{platform}" / "skills" / dir_name / relative
-                        ),
-                        content=asset_content,
-                        kind=OutputKind(f"{platform}_skill_asset"),
-                        slug=slug,
-                        source_path=asset_path,
-                    )
+            outputs.append(
+                OutputFile(
+                    target_path=fs.root() / ".codex" / "skills" / codex_name / relative,
+                    content=asset_content,
+                    kind=OutputKind.CODEX_SKILL_ASSET,
+                    slug=slug,
+                    source_path=asset_path,
                 )
+            )
 
     return outputs
 
@@ -224,7 +221,7 @@ def generate_agent_outputs(
 
 
 def generate_rule_outputs() -> list[OutputFile]:
-    """Sync canonical rules into each client's supported rule format."""
+    """Normalize rule sources and link each client's rule path to the canonical file."""
 
     outputs: list[OutputFile] = []
     rules_dir = fs.agents_dir() / "rules"
@@ -237,22 +234,24 @@ def generate_rule_outputs() -> list[OutputFile]:
         if body.strip():
             outputs.append(
                 OutputFile(
-                    target_path=fs.root() / ".claude" / "rules" / f"{slug}.md",
-                    content=ensure_trailing_newline(body),
-                    kind=OutputKind.CLAUDE_RULE,
+                    target_path=path,
+                    content=normalize_rule_source(front_matter, body),
+                    kind=OutputKind.AGENTS_RULE,
                     slug=slug,
                     source_path=path,
                 )
             )
-            outputs.append(
-                OutputFile(
-                    target_path=fs.root() / ".cursor" / "rules" / f"{slug}.mdc",
-                    content=assemble_cursor_rule(body, always_apply=True),
-                    kind=OutputKind.CURSOR_RULE,
-                    slug=slug,
-                    source_path=path,
+            for platform, filename in (("claude", f"{slug}.md"), ("cursor", f"{slug}.mdc")):
+                outputs.append(
+                    OutputFile(
+                        target_path=fs.root() / f".{platform}" / "rules" / filename,
+                        content="",
+                        kind=OutputKind(f"{platform}_rule"),
+                        slug=slug,
+                        source_path=path,
+                        link_target=path,
+                    )
                 )
-            )
 
         starlark = front_matter.get("starlark")
         if isinstance(starlark, str) and starlark.strip():

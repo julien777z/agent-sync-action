@@ -99,6 +99,9 @@ def write(path: Path, content: str | bytes) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
+    if path.is_symlink():
+        path.unlink()
+
     if isinstance(content, bytes):
         path.write_bytes(content)
         TEXT_CACHE.pop(path, None)
@@ -110,8 +113,34 @@ def write(path: Path, content: str | bytes) -> None:
         path.chmod(0o755)
 
 
+def write_symlink(path: Path, target: Path) -> None:
+    """Create a relative symlink at path pointing to target, replacing any existing entry."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink() or path.exists():
+        delete_path(path)
+
+    path.symlink_to(os.path.relpath(target, path.parent))
+    TEXT_CACHE.pop(path, None)
+
+
+def read_link(path: Path) -> str | None:
+    """Return the symlink target text for path, or None when it is not a symlink."""
+
+    if not path.is_symlink():
+        return None
+
+    return os.readlink(path)
+
+
 def delete_path(path: Path) -> None:
-    """Delete a file or directory and clear any cached text entries."""
+    """Delete a file, directory, or symlink and clear any cached text entries."""
+
+    if path.is_symlink():
+        path.unlink()
+        TEXT_CACHE.pop(path, None)
+
+        return
 
     if not path.exists():
         return

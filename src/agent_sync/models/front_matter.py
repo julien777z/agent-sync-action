@@ -51,6 +51,9 @@ class AgentFrontMatter(BaseModel):
 class RuleFrontMatter(BaseModel):
     """Recognized front matter keys on a rule markdown file."""
 
-    model_config = ConfigDict(extra="allow", strict=True)
+    model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
 
+    description: str | None = None
+    globs: str | list[str] | None = None
+    always_apply: bool = Field(default=True, alias="alwaysApply")
     starlark: str | None = None

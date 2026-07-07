@@ -9,7 +9,13 @@ from agent_sync.loaders import (
     load_platform_settings,
 )
 from agent_sync.mcp import McpGenerationError
-from agent_sync.plan import compute_diffs, compute_stale_paths, dedupe_outputs, report_diffs
+from agent_sync.plan import (
+    compute_diffs,
+    compute_stale_paths,
+    dedupe_outputs,
+    expected_link_text,
+    report_diffs,
+)
 from agent_sync.utils import fs
 
 logger = logging.getLogger(__name__)
@@ -46,9 +52,17 @@ def run_sync(dry_run: bool) -> int:
         return 1
 
     for diff in diffs:
+        if diff.output.link_target is not None:
+            continue
         fs.write(diff.output.target_path, diff.output.content)
         status = "created" if diff.existing is None else "updated"
         logger.info("%s: %s", status, diff.output.target_path)
+
+    for diff in diffs:
+        if diff.output.link_target is None:
+            continue
+        fs.write_symlink(diff.output.target_path, diff.output.link_target)
+        logger.info("linked: %s -> %s", diff.output.target_path, expected_link_text(diff.output))
 
     for stale_path in stale_paths:
         fs.delete_path(stale_path)
