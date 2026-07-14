@@ -9,6 +9,15 @@ class PlatformSettings(BaseModel):
     model: str | None = None
 
 
+class CodexSettings(BaseModel):
+    """Validated canonical settings for generated Codex project configuration."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    model: str | None = None
+    project_doc_max_bytes: int
+
+
 class AgentModelOverride(BaseModel):
     """Per-platform model overrides for a single agent."""
 

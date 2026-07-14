@@ -87,7 +87,7 @@ runs:
         git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-        for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.override.md; do
+        for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
           if [ -e "$path" ]; then
             git add -A -- "$path"
           fi
@@ -119,7 +119,7 @@ runs:
           PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync \
             --root . --agents-dir "${{ inputs.agents-dir }}"
 
-          for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.override.md; do
+          for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
             if [ -e "$path" ]; then
               git add -A -- "$path"
             fi
