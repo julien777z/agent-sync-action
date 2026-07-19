@@ -14,7 +14,10 @@ from one canonical `.agents/` directory.
 - Preserves unmanaged Codex configuration.
 - Supports direct commits, pull requests, and read-only dry runs.
 
-## Quick start
+## Example
+
+Use this workflow to mirror `.agents/` whenever its canonical configuration
+changes on `main`.
 
 ```yaml
 name: Agent Sync
@@ -24,28 +27,16 @@ on:
     branches: [main]
     paths:
       - ".agents/**"
-      - ".github/workflows/agent-sync.yml"
-  schedule:
-    - cron: "0 6 * * 1"
 
 permissions:
   contents: write
 
-concurrency:
-  group: agent-sync-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   sync:
     runs-on: ubuntu-latest
-    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: julien777z/agent-sync-action@v0
-        with:
-          refresh-external-skills: ${{ github.event_name == 'schedule' }}
 ```
 
 ## Canonical layout
