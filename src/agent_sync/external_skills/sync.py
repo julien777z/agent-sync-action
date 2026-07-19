@@ -4,7 +4,9 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
+from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_skills import github, installer
+from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
 from agent_sync.utils import load_json_model, trees_differ
 from agent_sync.workspace import Workspace
@@ -67,6 +69,7 @@ def update_external_skill(
 
         installer.install_skill(skill, working_directory, source_root)
         installed = installer.locate_installed_skill(working_directory, source_root, skill.name)
+        normalize_skill_metadata(installed, skill)
         skill_path = installer.read_skill_path(working_directory)
 
         if skill_path is not None and "/" not in skill_path:
@@ -81,6 +84,18 @@ def update_external_skill(
             shutil.copytree(installed, destination)
 
     return changed
+
+
+def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
+    """Rewrite installed skill metadata for its local canonical directory."""
+
+    document = installed / "SKILL.md"
+    content = document.read_text(encoding="utf-8")
+    front_matter, body = parse_markdown(content, SkillFrontMatter, str(document))
+    document.write_text(
+        render_front_matter(front_matter.model_copy(update={"name": skill.name}), body),
+        encoding="utf-8",
+    )
 
 
 def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:

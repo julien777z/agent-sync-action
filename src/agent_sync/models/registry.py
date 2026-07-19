@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agent_sync.utils import SAFE_SLUG_PATTERN
 
@@ -51,6 +51,18 @@ class SkillsRegistry(BaseModel):
 
     version: int = 1
     skills: list[ExternalSkill] = Field(default_factory=list[ExternalSkill])
+
+    @model_validator(mode="after")
+    def validate_unique_names(self) -> "SkillsRegistry":
+        """Reject entries that would write to the same local skill directory."""
+
+        names = [skill.name for skill in self.skills]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+
+        if duplicates:
+            raise ValueError(f"External skill names must be unique: {', '.join(duplicates)}")
+
+        return self
 
 
 class SkillLockEntry(BaseModel):

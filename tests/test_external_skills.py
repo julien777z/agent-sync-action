@@ -51,6 +51,25 @@ class TestExternalSkillModel:
         with pytest.raises(ValidationError, match="automatic_updates"):
             ExternalSkill.model_validate({"name": "sample", "repo": "example/sample"})
 
+    def test_duplicate_local_skill_names_fail(self) -> None:
+        """Test that entries cannot silently overwrite one local skill directory."""
+
+        with pytest.raises(ValidationError, match="names must be unique"):
+            SkillsRegistry(
+                skills=[
+                    ExternalSkill(
+                        name="sample",
+                        repo="example/first",
+                        automatic_updates=True,
+                    ),
+                    ExternalSkill(
+                        name="sample",
+                        repo="example/second",
+                        automatic_updates=True,
+                    ),
+                ]
+            )
+
 
 class TestExternalSkillBoundaries:
     """Verify immutable GitHub snapshots and installer behavior."""
@@ -206,7 +225,9 @@ class TestExternalSkillBoundaries:
             observed.append(("install", str(source_root)))
             installed = working_directory / ".staging/skills" / installed_skill.name
             installed.mkdir(parents=True)
-            (installed / "SKILL.md").write_text("content\n")
+            (installed / "SKILL.md").write_text(
+                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
+            )
 
         monkeypatch.setattr(installer, "install_skill", fake_install)
 
@@ -238,6 +259,30 @@ class TestExternalSkillBoundaries:
         assert observed[0] == ("snapshot", revision)
         assert observed[1][0] == "install"
         assert observed[2] == ("assets", observed[1][1])
+
+    def test_vendor_renames_upstream_metadata_for_the_local_directory(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Test that a selected upstream slug becomes valid local canonical metadata."""
+
+        installed = tmp_path / "react-best-practices"
+        installed.mkdir()
+        (installed / "SKILL.md").write_text(
+            "---\nname: vercel-react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
+        )
+        skill = ExternalSkill(
+            name="react-best-practices",
+            repo="vercel-labs/agent-skills",
+            skill="vercel-react-best-practices",
+            automatic_updates=True,
+        )
+
+        external_skills.normalize_skill_metadata(installed, skill)
+
+        assert (installed / "SKILL.md").read_text() == (
+            "---\nname: react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
+        )
 
 
 class TestExternalSkillService:
