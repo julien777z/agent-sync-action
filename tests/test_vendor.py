@@ -197,12 +197,12 @@ class TestVendorBoundaries:
 
 
 class TestVendorService:
-    """Verify registry orchestration and dry-run exit behavior."""
+    """Verify registry orchestration and dry-run change reporting."""
 
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
 
-        assert vendor_service.vendor_skills(workspace, dry_run=True) == 0
+        assert vendor_service.vendor_skills(workspace, dry_run=True) is False
 
     def test_dry_run_reports_changes(
         self,
@@ -210,7 +210,7 @@ class TestVendorService:
         workspace: Workspace,
         registry_file_factory: Callable[[SkillsRegistry], Path],
     ) -> None:
-        """Test that changed external skills produce dry-run exit code one."""
+        """Test that changed external skills are reported by a dry run."""
 
         registry_file_factory(
             SkillsRegistry(
@@ -236,7 +236,7 @@ class TestVendorService:
 
         monkeypatch.setattr(vendor_service, "vendor_skill", fake_vendor_skill)
 
-        assert vendor_service.vendor_skills(workspace, dry_run=True) == 1
+        assert vendor_service.vendor_skills(workspace, dry_run=True) is True
 
     def test_disabled_automatic_updates_skip_vendoring(
         self,
@@ -273,7 +273,7 @@ class TestVendorService:
 
         monkeypatch.setattr(vendor_service, "vendor_skill", fail_vendor)
 
-        assert vendor_service.vendor_skills(workspace, dry_run=False) == 0
+        assert vendor_service.vendor_skills(workspace, dry_run=False) is False
         assert local_skill.read_text() == "local\n"
 
 

@@ -76,9 +76,10 @@ if __name__ == "__main__":
     try:
         match parsed.command:
             case "mirror-providers":
-                exit_code = mirror_providers(workspace, parsed.dry_run)
+                differences_found = mirror_providers(workspace, parsed.dry_run)
             case "vendor-skills":
-                exit_code = vendor_skills(workspace, parsed.dry_run)
+                differences_found = vendor_skills(workspace, parsed.dry_run)
+        exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError) as exc:
         logger.error("%s", exc)
         exit_code = 2

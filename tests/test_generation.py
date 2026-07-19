@@ -230,7 +230,7 @@ class TestSettingsGeneration:
         config_path.parent.mkdir()
         config_path.write_text('model_reasoning_effort = "high"\n')
 
-        assert mirror_providers(workspace, dry_run=False) == 0
+        assert mirror_providers(workspace, dry_run=False) is False
 
         instructions = (workspace.root / "AGENTS.md").read_text()
         capacity = len(instructions.encode("utf-8"))
@@ -240,7 +240,7 @@ class TestSettingsGeneration:
         assert canonical["project_doc_max_bytes"] == capacity
         assert native["project_doc_max_bytes"] == capacity
         assert "model_reasoning_effort" not in native
-        assert mirror_providers(workspace, dry_run=True) == 0
+        assert mirror_providers(workspace, dry_run=True) is False
 
     def test_invalid_existing_toml_is_overwritten(self, workspace: Workspace) -> None:
         """Test that existing Codex content never affects generated settings."""
@@ -251,7 +251,7 @@ class TestSettingsGeneration:
         config_path.parent.mkdir()
         config_path.write_text("invalid = [\n")
 
-        assert mirror_providers(workspace, dry_run=False) == 0
+        assert mirror_providers(workspace, dry_run=False) is False
         assert tomllib.loads(config_path.read_text())["project_doc_max_bytes"] > 0
 
 
@@ -269,11 +269,11 @@ class TestMirrorIntegration:
         rule_file_factory("python")
         skill_file_factory("review")
 
-        assert mirror_providers(workspace, dry_run=False) == 0
+        assert mirror_providers(workspace, dry_run=False) is False
         assert os.readlink(workspace.root / ".claude/rules/python.md") == (
             "../../.agents/rules/python.md"
         )
         assert os.readlink(workspace.root / ".codex/skills/review") == (
             "../../.agents/skills/review"
         )
-        assert mirror_providers(workspace, dry_run=True) == 0
+        assert mirror_providers(workspace, dry_run=True) is False

@@ -9,8 +9,8 @@ from agent_sync.workspace import Workspace
 logger = logging.getLogger(__name__)
 
 
-def mirror_providers(workspace: Workspace, dry_run: bool) -> int:
-    """Mirror canonical agent sources into every supported provider layout."""
+def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
+    """Mirror agent sources and report whether a dry run found differences."""
 
     if not workspace.agents_dir.exists():
         raise AgentSyncError(f"Missing agents directory: {workspace.agents_dir}")
@@ -21,12 +21,12 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> int:
     if plan.is_clean:
         logger.info("No differences found.")
 
-        return 0
+        return False
 
     if dry_run:
         report_plan(plan)
 
-        return 1
+        return True
 
     apply_plan(workspace, plan)
     logger.info(
@@ -35,4 +35,4 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> int:
         len(plan.stale_paths),
     )
 
-    return 0
+    return False

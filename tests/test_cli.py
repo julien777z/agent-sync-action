@@ -33,6 +33,16 @@ class TestCli:
 
         assert result.returncode == 0
 
+    def test_mirror_dry_run_returns_exit_code_one_for_differences(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that the CLI maps detected differences to exit code one."""
+
+        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
+
+        assert result.returncode == 1
+
     def test_invalid_source_returns_exit_code_two(self, workspace: Workspace) -> None:
         """Test that invalid canonical input is reported with exit code two."""
 

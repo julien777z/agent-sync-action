@@ -14,21 +14,21 @@ logger = logging.getLogger(__name__)
 REGISTRY_FILENAME: Final[str] = "skills.json"
 
 
-def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
-    """Vendor external skills that have automatic updates enabled."""
+def vendor_skills(workspace: Workspace, dry_run: bool) -> bool:
+    """Vendor external skills and report whether a dry run found changes."""
 
     registry_path = workspace.agents_dir / REGISTRY_FILENAME
     registry = load_json_model(registry_path, SkillsRegistry)
     if registry is None:
         logger.info("No external-skill registry at %s; nothing to vendor.", registry_path)
 
-        return 0
+        return False
 
     updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
     if not updatable_skills:
         logger.info("No external skills have automatic updates enabled; nothing to vendor.")
 
-        return 0
+        return False
 
     skills_dir = workspace.agents_dir / "skills"
     results = [
@@ -40,7 +40,7 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
     ]
     report_results(results, dry_run)
 
-    return 1 if dry_run and any(result.changed for result in results) else 0
+    return dry_run and any(result.changed for result in results)
 
 
 def vendor_skill(

@@ -161,11 +161,11 @@ class TestReconciliation:
         rules_dir.mkdir()
         source = rules_dir / "sample.md"
         source.write_text("# Sample\n")
-        assert mirror_providers(workspace, dry_run=False) == 0
+        assert mirror_providers(workspace, dry_run=False) is False
 
         source.unlink()
 
-        assert mirror_providers(workspace, dry_run=False) == 0
+        assert mirror_providers(workspace, dry_run=False) is False
         assert not (workspace.root / ".claude/rules/sample.md").is_symlink()
         assert not (workspace.root / ".cursor/rules/sample.mdc").is_symlink()
 
