@@ -4,8 +4,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from agent_sync.utils import relative_link_target
-
 
 class Workspace(BaseModel):
     """Describe one repository and its canonical agent source directory."""
@@ -80,7 +78,7 @@ class Workspace(BaseModel):
             self.delete(path)
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.symlink_to(relative_link_target(path, target))
+        path.symlink_to(os.path.relpath(target, path.parent))
 
     def delete(self, path: Path) -> None:
         """Delete a file, directory, or symlink without following links."""

@@ -1,5 +1,6 @@
 import difflib
 import logging
+import os
 from pathlib import Path
 from typing import Final
 
@@ -19,7 +20,6 @@ from agent_sync.models.output import (
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
 from agent_sync.source import load_configuration
-from agent_sync.utils import relative_link_target
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def compare_output(
 
     if isinstance(output, GeneratedLink):
         existing = workspace.read_link(output.target_path)
-        expected = expected_link(output)
+        expected = os.path.relpath(output.link_target, output.target_path.parent)
 
         return None if existing == expected else Change(output=output, existing=existing)
 
@@ -94,12 +94,6 @@ def compare_output(
         return None
 
     return Change(output=output, existing=existing)
-
-
-def expected_link(output: GeneratedLink) -> str:
-    """Return the relative target text for a generated symlink."""
-
-    return relative_link_target(output.target_path, output.link_target)
 
 
 def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
@@ -147,7 +141,11 @@ def apply_plan(workspace: Workspace, plan: ReconciliationPlan) -> None:
         else:
             workspace.replace_link(output.target_path, output.link_target)
 
-            logger.info("linked: %s -> %s", output.target_path, expected_link(output))
+            logger.info(
+                "linked: %s -> %s",
+                output.target_path,
+                os.path.relpath(output.link_target, output.target_path.parent),
+            )
 
 
 def report_plan(plan: ReconciliationPlan) -> None:
@@ -178,7 +176,12 @@ def summarize_change(change: Change) -> str:
     """Render a concise unified diff or symlink target change."""
 
     if isinstance(change.output, GeneratedLink):
-        return f"symlink -> {expected_link(change.output)}"
+        relative_target = os.path.relpath(
+            change.output.link_target,
+            change.output.target_path.parent,
+        )
+
+        return f"symlink -> {relative_target}"
 
     existing = change.existing or ""
     expected = change.output.content

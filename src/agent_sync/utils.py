@@ -1,5 +1,4 @@
 import json
-import os
 import re
 from pathlib import Path
 from typing import Final
@@ -46,12 +45,6 @@ def validate_slug(slug: str, source_path: Path) -> str:
         raise AgentSyncError(f"Invalid slug '{slug}' from {source_path}")
 
     return slug
-
-
-def relative_link_target(target_path: Path, link_target: Path) -> str:
-    """Return a link target relative to the link's parent directory."""
-
-    return os.path.relpath(link_target, target_path.parent)
 
 
 def trees_differ(source: Path, destination: Path) -> bool:
