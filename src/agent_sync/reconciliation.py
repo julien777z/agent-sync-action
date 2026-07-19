@@ -3,7 +3,12 @@ import logging
 from pathlib import Path
 from typing import Final
 
-from agent_sync.generation.registry import ARTIFACT_REGISTRY, owned_provider_directories
+from agent_sync.errors import AgentSyncError
+from agent_sync.generation.registry import (
+    ARTIFACT_REGISTRY,
+    generate_manifest,
+    owned_provider_directories,
+)
 from agent_sync.models.output import (
     Change,
     GeneratedFile,
@@ -13,12 +18,44 @@ from agent_sync.models.output import (
     ReconciliationPlan,
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.source import load_configuration
 from agent_sync.utils import relative_link_target
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
 
 MAX_DIFF_LINES: Final[int] = 20
+
+
+def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
+    """Mirror agent sources and report whether a dry run found differences."""
+
+    if not workspace.agents_dir.exists():
+        raise AgentSyncError(f"Missing agents directory: {workspace.agents_dir}")
+
+    configuration = load_configuration(workspace)
+    manifest = generate_manifest(workspace, configuration)
+    plan = build_plan(workspace, manifest)
+
+    if plan.is_clean:
+        logger.info("No differences found.")
+
+        return False
+
+    if dry_run:
+        report_plan(plan)
+
+        return True
+
+    apply_plan(workspace, plan)
+
+    logger.info(
+        "Mirroring complete. %d output(s) written, %d stale path(s) deleted.",
+        len(plan.changes),
+        len(plan.stale_paths),
+    )
+
+    return False
 
 
 def build_plan(workspace: Workspace, manifest: Manifest) -> ReconciliationPlan:

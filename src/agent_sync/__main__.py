@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.mirror import mirror_providers
+from agent_sync.reconciliation import mirror_providers
 from agent_sync.vendor.vendor import vendor_skills
 from agent_sync.workspace import Workspace
 

@@ -3,9 +3,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.generation.manifest import generate_manifest
-from agent_sync.generation.registry import owned_provider_directories
-from agent_sync.mirror import mirror_providers
+from agent_sync.generation.registry import generate_manifest, owned_provider_directories
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
@@ -14,7 +12,7 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
-from agent_sync.reconciliation import apply_plan, build_plan
+from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_configuration
 from agent_sync.workspace import Workspace
 

@@ -1,0 +1,66 @@
+from agent_sync.document import render_front_matter
+from agent_sync.generation.context import GenerationContext
+from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
+from agent_sync.models.output import Provider
+from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.source import resolve_agent_model
+from agent_sync.utils import ensure_trailing_newline
+
+
+def generate_agents(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Generate one provider's agent files with resolved models."""
+
+    outputs: list[GeneratedOutput] = []
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
+    for source in context.agents:
+        front_matter = source.front_matter.model_copy(
+            update={"model": resolve_agent_model(source.slug, provider, context.configuration)}
+        )
+
+        outputs.append(
+            GeneratedFile(
+                target_path=root / "agents" / f"{source.slug}.md",
+                content=render_front_matter(front_matter, source.body),
+                artifact=ArtifactKind.AGENT,
+                source_path=source.path,
+                provider=provider,
+            )
+        )
+
+    return outputs
+
+
+def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Generate one provider's hook files."""
+
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
+    return [
+        GeneratedFile(
+            target_path=root / "hooks" / source.path.name,
+            content=ensure_trailing_newline(source.content),
+            artifact=ArtifactKind.HOOK,
+            source_path=source.path,
+            provider=provider,
+            executable=source.executable,
+        )
+        for source in context.hooks
+    ]
+
+
+def generate_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Generate one provider's skill links."""
+
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
+    return [
+        GeneratedLink(
+            target_path=root / "skills" / source.slug,
+            link_target=source.directory,
+            artifact=ArtifactKind.SKILL,
+            source_path=source.path,
+            provider=provider,
+        )
+        for source in context.skills
+    ]
