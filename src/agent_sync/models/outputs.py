@@ -25,6 +25,8 @@ class OutputKind(StrEnum):
     CLAUDE_HOOK = "claude_hook"
     CURSOR_HOOK = "cursor_hook"
     CLAUDE_SETTINGS = "claude_settings"
+    AGENTS_INSTRUCTIONS = "agents_instructions"
+    CODEX_SETTINGS = "codex_settings"
     CLAUDE_MCP = "claude_mcp"
     CURSOR_MCP = "cursor_mcp"
     CODEX_MCP = "codex_mcp"

@@ -9,6 +9,7 @@ from agent_sync.loaders import (
     load_platform_settings,
 )
 from agent_sync.mcp import McpGenerationError
+from agent_sync.codex import CodexGenerationError
 from agent_sync.plan import (
     compute_diffs,
     compute_stale_paths,
@@ -17,6 +18,7 @@ from agent_sync.plan import (
     report_diffs,
 )
 from agent_sync.utils import fs
+from agent_sync.validation import AgentSyncValidationError, validate_codex_instruction_capacity
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +34,12 @@ def run_sync(dry_run: bool) -> int:
     platform_settings = load_platform_settings()
     agent_model_overrides = load_agent_model_overrides()
     try:
+        codex_settings = platform_settings.get("codex")
+        if codex_settings is not None:
+            validate_codex_instruction_capacity(codex_settings)
         mcp_config = load_mcp_config()
         outputs = generate_outputs(platform_settings, agent_model_overrides, mcp_config)
-    except (McpConfigError, McpGenerationError) as exc:
+    except (AgentSyncValidationError, CodexGenerationError, McpConfigError, McpGenerationError) as exc:
         logger.error("%s", exc)
 
         return 2

@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from agent_sync.models.front_matter import AgentModelOverride, PlatformSettings
+from agent_sync.models.front_matter import AgentModelOverride, CodexSettings, PlatformSettings
 from agent_sync.models.json_types import JsonObject, JsonValue
 from agent_sync.models.mcp import McpConfig
 from agent_sync.utils import fs
@@ -90,7 +90,8 @@ def load_platform_settings() -> dict[str, JsonObject]:
         return settings
 
     for path in sorted(settings_dir().glob("*.json")):
-        data = load_json_object(path, PlatformSettings)
+        model = CodexSettings if path.stem == "codex" else PlatformSettings
+        data = load_json_object(path, model)
         if data is not None:
             settings[path.stem] = data
 
