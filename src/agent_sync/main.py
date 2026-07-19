@@ -68,7 +68,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(arguments: Sequence[str] | None = None) -> int:
+def run(arguments: Sequence[str] | None = None) -> int:
     """Run one Agent Sync command and return its process exit code."""
 
     parser = create_parser()
@@ -91,4 +91,4 @@ def main(arguments: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())

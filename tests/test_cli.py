@@ -1,4 +1,4 @@
-from agent_sync.main import main
+from agent_sync.main import run
 from agent_sync.workspace import Workspace
 
 
@@ -10,13 +10,13 @@ class TestCli:
 
         arguments = ["mirror-providers", "--root", str(workspace.root)]
 
-        assert main(arguments) == 0
-        assert main([*arguments, "--dry-run"]) == 0
+        assert run(arguments) == 0
+        assert run([*arguments, "--dry-run"]) == 0
 
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 
-        assert main(["vendor-skills", "--root", str(workspace.root), "--dry-run"]) == 0
+        assert run(["vendor-skills", "--root", str(workspace.root), "--dry-run"]) == 0
 
     def test_invalid_source_returns_exit_code_two(self, workspace: Workspace) -> None:
         """Test that invalid canonical input is reported with exit code two."""
@@ -24,4 +24,4 @@ class TestCli:
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "claude.json").write_text("{invalid")
 
-        assert main(["mirror-providers", "--root", str(workspace.root)]) == 2
+        assert run(["mirror-providers", "--root", str(workspace.root)]) == 2
