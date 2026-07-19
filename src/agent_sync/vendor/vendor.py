@@ -15,7 +15,7 @@ REGISTRY_FILENAME: Final[str] = "skills.json"
 
 
 def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
-    """Vendor every managed external skill into the canonical source tree."""
+    """Vendor external skills that have automatic updates enabled."""
 
     registry_path = workspace.agents_dir / REGISTRY_FILENAME
     registry = load_json_model(workspace, registry_path, SkillsRegistry)
@@ -24,9 +24,9 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
 
         return 0
 
-    managed_skills = [skill for skill in registry.skills if skill.managed]
-    if not managed_skills:
-        logger.info("No managed external skills in registry; nothing to vendor.")
+    updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
+    if not updatable_skills:
+        logger.info("No external skills have automatic updates enabled; nothing to vendor.")
 
         return 0
 
@@ -36,7 +36,7 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
             skill=skill,
             changed=vendor_skill(workspace, skill, skills_dir, dry_run),
         )
-        for skill in managed_skills
+        for skill in updatable_skills
     ]
     report_results(results, dry_run)
 

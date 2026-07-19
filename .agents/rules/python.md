@@ -15,7 +15,7 @@ alwaysApply: true
 ## Imports And Modules
 
 - Keep imports at the top, grouped as standard library, third party, then local.
-- Use absolute imports anchored at `agent_sync`; only `__main__.py` and package exports may use explicit relative imports.
+- Use absolute imports anchored at `agent_sync`; only package exports may use explicit relative imports.
 - Do not use leading underscores for module-level symbols or methods. Module boundaries and `__all__` express ownership.
 - Do not create compatibility shims or modules that merely re-export another implementation.
 - Give each module one clear responsibility. If a name joins two separate concepts, create a package with focused topic modules instead.

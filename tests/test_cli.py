@@ -1,4 +1,4 @@
-from agent_sync.cli import main
+from agent_sync.main import main
 from agent_sync.workspace import Workspace
 
 

@@ -114,7 +114,8 @@ Register external skills in `.agents/skills.json`:
     {
       "name": "react-best-practices",
       "repo": "vercel-labs/agent-skills",
-      "skill": "vercel-react-best-practices"
+      "skill": "vercel-react-best-practices",
+      "automatic_updates": true
     }
   ]
 }
@@ -123,7 +124,7 @@ Register external skills in `.agents/skills.json`:
 - `name`: local directory under `.agents/skills/`.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
-- `managed`: set to `false` to disable automatic updates; defaults to `true`.
+- `automatic_updates`: required; controls whether vendoring updates this skill.
 
 ## Local Development
 
@@ -133,8 +134,7 @@ poetry run agent-sync vendor-skills --root .
 poetry run agent-sync mirror-providers --root .
 ```
 
-Both commands support `--agents-dir` and `--dry-run`. The same interface is
-available through `python -m agent_sync`.
+Both commands support `--agents-dir` and `--dry-run`.
 
 ## Versioning
 

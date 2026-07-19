@@ -88,3 +88,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return 2
 
     assert_never(parsed.command)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

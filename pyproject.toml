@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-sync = "agent_sync.cli:main"
+agent-sync = "agent_sync.main:main"
 
 [dependency-groups]
 dev = [

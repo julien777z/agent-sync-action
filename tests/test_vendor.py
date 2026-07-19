@@ -17,7 +17,11 @@ class TestExternalSkillModel:
     def test_upstream_slug_defaults_to_local_name(self) -> None:
         """Test that an omitted upstream slug uses the local skill name."""
 
-        skill = ExternalSkill(name="sample-skill", repo="example/sample-skill")
+        skill = ExternalSkill(
+            name="sample-skill",
+            repo="example/sample-skill",
+            automatic_updates=True,
+        )
 
         assert skill.upstream_skill == "sample-skill"
 
@@ -26,7 +30,13 @@ class TestExternalSkillModel:
         """Test that unsafe external skill names are rejected."""
 
         with pytest.raises(ValidationError):
-            ExternalSkill(name=name, repo="example/sample")
+            ExternalSkill(name=name, repo="example/sample", automatic_updates=True)
+
+    def test_automatic_updates_is_required(self) -> None:
+        """Test that every registry entry chooses its update behavior explicitly."""
+
+        with pytest.raises(ValidationError, match="automatic_updates"):
+            ExternalSkill.model_validate({"name": "sample", "repo": "example/sample"})
 
 
 class TestVendorBoundaries:
@@ -82,7 +92,11 @@ class TestVendorBoundaries:
             return subprocess.CompletedProcess(command, 0, "", "")
 
         monkeypatch.setattr(installer.subprocess, "run", fake_run)
-        skill = ExternalSkill(name="sample", repo="example/repository")
+        skill = ExternalSkill(
+            name="sample",
+            repo="example/repository",
+            automatic_updates=True,
+        )
 
         installer.install_skill(skill, tmp_path, source_root)
 
@@ -97,7 +111,11 @@ class TestVendorBoundaries:
 
         revision = "c" * 40
         observed: list[tuple[str, str]] = []
-        skill = ExternalSkill(name="sample", repo="example/repository")
+        skill = ExternalSkill(
+            name="sample",
+            repo="example/repository",
+            automatic_updates=True,
+        )
 
         def fake_resolve(repository: str) -> str:
             return revision
@@ -169,7 +187,15 @@ class TestVendorService:
         """Test that changed external skills produce dry-run exit code one."""
 
         registry_file_factory(
-            SkillsRegistry(skills=[ExternalSkill(name="sample", repo="example/repository")])
+            SkillsRegistry(
+                skills=[
+                    ExternalSkill(
+                        name="sample",
+                        repo="example/repository",
+                        automatic_updates=True,
+                    )
+                ]
+            )
         )
 
         def fake_vendor_skill(
@@ -183,6 +209,37 @@ class TestVendorService:
         monkeypatch.setattr(vendor_service, "vendor_skill", fake_vendor_skill)
 
         assert vendor_service.vendor_skills(workspace, dry_run=True) == 1
+
+    def test_disabled_automatic_updates_skip_vendoring(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+        registry_file_factory: Callable[[SkillsRegistry], Path],
+    ) -> None:
+        """Test that disabled entries leave existing local skills untouched."""
+
+        registry_file_factory(
+            SkillsRegistry(
+                skills=[
+                    ExternalSkill(
+                        name="sample",
+                        repo="example/repository",
+                        automatic_updates=False,
+                    )
+                ]
+            )
+        )
+        local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
+        local_skill.parent.mkdir(parents=True)
+        local_skill.write_text("local\n")
+
+        def fail_vendor(*args: object, **kwargs: object) -> bool:
+            raise AssertionError("disabled skill must not be vendored")
+
+        monkeypatch.setattr(vendor_service, "vendor_skill", fail_vendor)
+
+        assert vendor_service.vendor_skills(workspace, dry_run=False) == 0
+        assert local_skill.read_text() == "local\n"
 
 
 class TestInstallerState:
