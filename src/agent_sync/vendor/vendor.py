@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Final
 
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry, VendorResult
-from agent_sync.source import load_json_model
+from agent_sync.utils import load_json_model
 from agent_sync.vendor import github, installer
 from agent_sync.workspace import Workspace
 

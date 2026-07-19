@@ -1,8 +1,3 @@
-import json
-from pathlib import Path
-
-from pydantic import BaseModel, ValidationError
-
 from agent_sync.configuration import (
     AgentModelOverride,
     CanonicalConfiguration,
@@ -11,30 +6,8 @@ from agent_sync.configuration import (
 )
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
-from agent_sync.utils import validate_slug
+from agent_sync.utils import load_json_model, validate_slug
 from agent_sync.workspace import Workspace
-
-
-def load_json_model[T: BaseModel](
-    workspace: Workspace,
-    path: Path,
-    model: type[T],
-) -> T | None:
-    """Load a typed JSON source when it exists."""
-
-    raw = workspace.read_text(path)
-    if raw is None:
-        return None
-
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise AgentSyncError(f"Invalid JSON in {path}: {exc}") from exc
-
-    try:
-        return model.model_validate(value)
-    except ValidationError as exc:
-        raise AgentSyncError(f"Invalid canonical source at {path}: {exc}") from exc
 
 
 def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
