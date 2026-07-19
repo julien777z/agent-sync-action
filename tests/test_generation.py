@@ -3,7 +3,6 @@ import os
 import tomllib
 
 import pytest
-from conftest import RuleFileFactory, SkillFileFactory
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
@@ -19,6 +18,12 @@ from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink,
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
+from tests.factories import (
+    RuleFrontMatterFactory,
+    SkillFrontMatterFactory,
+    materialize_rule,
+    materialize_skill,
+)
 
 
 def load_context(workspace: Workspace) -> GenerationContext:
@@ -51,11 +56,12 @@ class TestSkillGeneration:
     def test_links_every_provider_to_the_canonical_directory(
         self,
         workspace: Workspace,
-        skill_file_factory: SkillFileFactory,
     ) -> None:
         """Test that all provider skill paths link to one canonical directory."""
 
-        source = skill_file_factory("sample-skill")
+        front_matter = SkillFrontMatterFactory.build()
+        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
         context = load_context(workspace)
         outputs = [output for provider in Provider for output in generate_skills(context, provider)]
         links = {
@@ -145,11 +151,11 @@ class TestDocumentGeneration:
     def test_rules_normalize_sources_and_generate_links(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that one normalized rule owns both provider links."""
 
-        source = rule_file_factory("python")
+        source = workspace.agents_dir / "rules/python.md"
+        materialize_rule(source, RuleFrontMatterFactory.build(name="removed"))
         context = load_context(workspace)
         outputs = [
             *generate_shared_rule_outputs(context),
@@ -238,11 +244,14 @@ class TestSettingsGeneration:
     def test_codex_capacity_overwrites_existing_toml(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that generated instructions determine Codex document capacity."""
 
-        rule_file_factory("project", body="# Project Rules\n\nKeep changes focused.")
+        materialize_rule(
+            workspace.agents_dir / "rules/project.md",
+            RuleFrontMatterFactory.build(name="removed"),
+            body="# Project Rules\n\nKeep changes focused.",
+        )
 
         workspace.settings_dir.mkdir(parents=True)
         settings_path = workspace.settings_dir / "codex.json"
@@ -284,13 +293,19 @@ class TestMirrorIntegration:
     def test_fresh_mirror_is_idempotent(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
-        skill_file_factory: SkillFileFactory,
     ) -> None:
         """Test that mirroring writes relative links and reaches a clean dry run."""
 
-        rule_file_factory("python")
-        skill_file_factory("review")
+        materialize_rule(
+            workspace.agents_dir / "rules/python.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
+
+        skill_front_matter = SkillFrontMatterFactory.build(name="review")
+        materialize_skill(
+            workspace.agents_dir / "skills/review/SKILL.md",
+            skill_front_matter,
+        )
 
         assert mirror_providers(workspace, dry_run=False) is False
 

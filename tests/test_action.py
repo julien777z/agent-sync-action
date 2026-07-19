@@ -6,6 +6,13 @@ import yaml
 class TestAction:
     """Test that the reusable action and repository workflow keep their contract."""
 
+    def test_uses_unique_marketplace_name(self) -> None:
+        """Test that the action publishes under its complete product name."""
+
+        action = yaml.safe_load(Path("action.yml").read_text(encoding="utf-8"))
+
+        assert action["name"] == "Agent Sync Action"
+
     def test_keeps_the_public_input_contract(self) -> None:
         """Test that action inputs and defaults remain stable through the refactor."""
 

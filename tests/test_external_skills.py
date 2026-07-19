@@ -1,9 +1,7 @@
 import subprocess
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import SkillsLockFactory
 from pydantic import ValidationError
 
 from agent_sync.config import ACTION_CONFIG, ActionConfig
@@ -11,6 +9,14 @@ from agent_sync.external_skills import github, installer
 from agent_sync.external_skills import sync
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.workspace import Workspace
+from tests.factories import (
+    ExternalSkillFactory,
+    SkillLockEntryFactory,
+    SkillsLockFactory,
+    SkillsRegistryFactory,
+    materialize_registry,
+    materialize_skills_lock,
+)
 
 
 class TestExternalSkillModel:
@@ -364,20 +370,12 @@ class TestExternalSkillService:
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
-        registry_file_factory: Callable[[SkillsRegistry], Path],
     ) -> None:
         """Test that changed external skills are reported by a dry run."""
 
-        registry_file_factory(
-            SkillsRegistry(
-                skills=[
-                    ExternalSkill(
-                        name="sample",
-                        repo="example/repository",
-                        automatic_updates=True,
-                    )
-                ]
-            )
+        materialize_registry(
+            workspace.agents_dir / "skills.json",
+            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
         )
 
         def fake_update_external_skill(
@@ -402,20 +400,14 @@ class TestExternalSkillService:
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
-        registry_file_factory: Callable[[SkillsRegistry], Path],
     ) -> None:
         """Test that disabled entries leave existing local skills untouched."""
 
-        registry_file_factory(
-            SkillsRegistry(
-                skills=[
-                    ExternalSkill(
-                        name="sample",
-                        repo="example/repository",
-                        automatic_updates=False,
-                    )
-                ]
-            )
+        materialize_registry(
+            workspace.agents_dir / "skills.json",
+            SkillsRegistryFactory.build(
+                skills=[ExternalSkillFactory.build(automatic_updates=False)]
+            ),
         )
 
         local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
@@ -443,10 +435,14 @@ class TestInstallerState:
 
     def test_reads_the_only_lock_entry(
         self,
-        skills_lock_factory: SkillsLockFactory,
+        tmp_path: Path,
     ) -> None:
         """Test that one lock entry resolves regardless of its key."""
 
-        directory = skills_lock_factory("skills/sample/SKILL.md", key="upstream")
+        lock = SkillsLockFactory.build(
+            skills={"upstream": SkillLockEntryFactory.build(skill_path="skills/sample/SKILL.md")}
+        )
 
-        assert installer.read_skill_path(directory) == "skills/sample/SKILL.md"
+        materialize_skills_lock(tmp_path / "skills-lock.json", lock)
+
+        assert installer.read_skill_path(tmp_path) == "skills/sample/SKILL.md"

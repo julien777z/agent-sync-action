@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from conftest import RuleFileFactory
 from pydantic import ValidationError
 
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
@@ -16,6 +15,7 @@ from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
+from tests.factories import RuleFrontMatterFactory, materialize_rule
 
 
 class TestManifest:
@@ -180,12 +180,14 @@ class TestReconciliation:
     def test_owned_directory_blockers_are_replaced(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
         target_kind: str,
     ) -> None:
         """Test that a non-directory owned path cannot block reconciliation."""
 
-        rule_file_factory("sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         directory = workspace.root / ".claude/rules"
         directory.parent.mkdir(parents=True)
 
@@ -204,11 +206,13 @@ class TestReconciliation:
     def test_provider_root_symlinks_are_replaced_without_touching_their_target(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that provider-root symlinks cannot redirect generated output externally."""
 
-        rule_file_factory("sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         external = workspace.root / "external"
         external.mkdir()
         sentinel = external / "sentinel"
@@ -226,11 +230,13 @@ class TestReconciliation:
     def test_parent_blocker_recreates_an_otherwise_matching_link(
         self,
         workspace: Workspace,
-        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that deleting a blocked provider root still recreates its links."""
 
-        rule_file_factory("sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         external = workspace.root / "external"
         external_rules = external / "rules"
         external_rules.mkdir(parents=True)

@@ -1,4 +1,4 @@
-name: Agent Sync
+name: Agent Sync Action
 description: Mirror canonical agent sources and vendor registered skills.
 author: julien777z
 
