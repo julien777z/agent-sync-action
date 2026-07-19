@@ -104,9 +104,12 @@ Only the directories and files your repository uses are required.
 
 ## External skills
 
-External skills are installed from [skills.sh](https://www.skills.sh/).
+To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
+`.agents/skills.json`. Use its source repository and upstream slug, choose the local skill
+directory name you want, and set `automatic_updates` to keep it current.
 
-Register external skills in `.agents/skills.json`:
+For example, this installs the React best-practices skill as
+`.agents/skills/react-best-practices`:
 
 ```json
 {
