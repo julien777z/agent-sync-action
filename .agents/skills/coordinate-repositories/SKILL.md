@@ -17,7 +17,8 @@ Carry out the caller's task consistently across the selected repository collecti
 4. Carry only the user-authorized task artifacts into each isolated worktree. Do not copy unrelated in-progress changes, generated outputs, credentials, or machine-specific configuration.
 5. Validate each completed repository with the relevant native checks. If the task manages generated files, use its owning generator rather than hand-editing generated outputs.
 6. Before selecting a worktree or reusing a pull request, query the hosting service for the pull request associated with the candidate branch and verify its current state, branch, and task scope. Never infer that a pull request is active from a local branch, remote-tracking branch, remembered URL, or prior task output. Treat a merged, closed, missing, or branch-deleted pull request as absent: create a fresh isolated worktree and a new branch from the current remote default branch, then open a new focused pull request. Never append work to the old branch or push it merely because it remains locally available. Reuse only a verified open pull request for the same active branch and task scope.
-7. Report every repository completed, skipped, or blocked; the applied or gathered result; validation; and all pull-request links created or updated.
+7. Write every commit subject and body from the perspective of the repository receiving that commit. Describe only its local change with generic, repository-independent wording. Never name another repository in a commit message, including the origin, destination, sibling, or comparison repository; treat each repository as an independent change history.
+8. Report every repository completed, skipped, or blocked; the applied or gathered result; validation; and all pull-request links created or updated.
 
 ## Guardrails
 
