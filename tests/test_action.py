@@ -42,7 +42,7 @@ def test_action_uses_the_installed_unified_cli() -> None:
 
     action_text = Path("action.yml").read_text(encoding="utf-8")
 
-    assert "agent-sync mirror-providers" in action_text
-    assert "agent-sync vendor-skills" in action_text
+    assert "python -m agent_sync mirror-providers" in action_text
+    assert "python -m agent_sync vendor-skills" in action_text
     assert "PYTHONPATH=" not in action_text
     assert "requirements.txt" not in action_text

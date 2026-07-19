@@ -130,8 +130,8 @@ Register external skills in `.agents/skills.json`:
 
 ```bash
 poetry install
-poetry run agent-sync vendor-skills --root .
-poetry run agent-sync mirror-providers --root .
+poetry run python -m agent_sync vendor-skills --root .
+poetry run python -m agent_sync mirror-providers --root .
 ```
 
 Both commands support `--agents-dir` and `--dry-run`.

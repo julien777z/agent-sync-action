@@ -1,7 +1,6 @@
 import argparse
 import logging
-from collections.abc import Sequence
-from typing import Literal, assert_never
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -68,27 +67,20 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(arguments: Sequence[str] | None = None) -> int:
-    """Run one Agent Sync command and return its process exit code."""
-
+if __name__ == "__main__":
     parser = create_parser()
-    parsed = CliArguments.model_validate(vars(parser.parse_args(arguments)))
+    parsed = CliArguments.model_validate(vars(parser.parse_args()))
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     workspace = Workspace.resolve(parsed.root, parsed.agents_dir)
 
     try:
         match parsed.command:
             case "mirror-providers":
-                return mirror_providers(workspace, parsed.dry_run)
+                exit_code = mirror_providers(workspace, parsed.dry_run)
             case "vendor-skills":
-                return vendor_skills(workspace, parsed.dry_run)
+                exit_code = vendor_skills(workspace, parsed.dry_run)
     except (AgentSyncError, OSError, RuntimeError) as exc:
         logger.error("%s", exc)
+        exit_code = 2
 
-        return 2
-
-    assert_never(parsed.command)
-
-
-if __name__ == "__main__":
-    raise SystemExit(run())
+    raise SystemExit(exit_code)

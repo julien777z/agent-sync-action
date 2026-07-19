@@ -64,11 +64,11 @@ runs:
     - name: Vendor external skills
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
-      run: agent-sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: python -m agent_sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash
-      run: agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Persist changes
       if: ${{ inputs.dry-run != 'true' }}
@@ -113,9 +113,9 @@ runs:
           git pull --rebase origin "${{ github.ref_name }}"
 
           if ! git diff --quiet "$pre_rebase_head" HEAD -- "${{ inputs.agents-dir }}/skills.json"; then
-            agent-sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}"
+            python -m agent_sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}"
           fi
-          agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}"
+          python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}"
 
           for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
             if [ -e "$path" ]; then
@@ -132,4 +132,4 @@ runs:
     - name: Verify sync idempotence
       if: ${{ inputs.dry-run != 'true' }}
       shell: bash
-      run: agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run
+      run: python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run
