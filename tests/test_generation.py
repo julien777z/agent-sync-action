@@ -1,0 +1,242 @@
+import json
+import os
+import tomllib
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+
+from agent_sync.errors import AgentSyncError
+from agent_sync.generation.agent import generate_agent_outputs
+from agent_sync.generation.command import generate_command_outputs
+from agent_sync.generation.generation import generate_manifest
+from agent_sync.generation.hook import generate_hook_outputs
+from agent_sync.generation.rule import generate_rule_outputs
+from agent_sync.generation.skill import generate_skill_outputs
+from agent_sync.mirror import mirror_providers
+from agent_sync.models.output import GeneratedFile, GeneratedLink, Provider
+from agent_sync.source import load_configuration
+from agent_sync.workspace import Workspace
+
+
+class TestSkillGeneration:
+    """Verify canonical skills become provider directory links."""
+
+    def test_links_every_provider_to_the_canonical_directory(
+        self,
+        workspace: Workspace,
+        skill_file_factory: Callable[..., Path],
+    ) -> None:
+        """Test that all provider skill paths link to one canonical directory."""
+
+        source = skill_file_factory("sample-skill")
+        outputs = generate_skill_outputs(workspace)
+        links = {
+            output.target_path: output.link_target
+            for output in outputs
+            if isinstance(output, GeneratedLink)
+        }
+
+        assert links == {
+            workspace.root / ".claude/skills/sample-skill": source.parent,
+            workspace.root / ".cursor/skills/sample-skill": source.parent,
+            workspace.root / ".codex/skills/sample-skill": source.parent,
+        }
+
+    @pytest.mark.parametrize(
+        "front_matter",
+        [
+            "description: Does a thing.",
+            "name: sample-skill",
+            "name: another-skill\ndescription: Does a thing.",
+            "name: sample-skill\ndescription: '   '",
+        ],
+        ids=["missing-name", "missing-description", "mismatched-name", "blank-description"],
+    )
+    def test_rejects_invalid_metadata(
+        self,
+        workspace: Workspace,
+        front_matter: str,
+    ) -> None:
+        """Test that incomplete or misaligned skill metadata fails generation."""
+
+        skill_dir = workspace.agents_dir / "skills/sample-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            f"---\n{front_matter}\n---\n\n# Sample Skill\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(AgentSyncError):
+            generate_skill_outputs(workspace)
+
+
+class TestDocumentGeneration:
+    """Verify commands, agents, rules, and hooks use their artifact formats."""
+
+    def test_command_variants_and_front_matter_are_provider_specific(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that command variants render in their provider formats."""
+
+        commands_dir = workspace.agents_dir / "commands"
+        commands_dir.mkdir()
+        (commands_dir / "review.md").write_text(
+            "---\nallowed-tools: Read\nvariants:\n  cursor: Cursor body\n---\n\nShared body\n",
+            encoding="utf-8",
+        )
+
+        outputs = generate_command_outputs(workspace)
+        files = {
+            output.provider: output.content
+            for output in outputs
+            if isinstance(output, GeneratedFile)
+        }
+
+        assert "allowed-tools: Read" in files[Provider.CLAUDE]
+        assert files[Provider.CLAUDE].endswith("Shared body\n")
+        assert files[Provider.CURSOR] == "Cursor body\n"
+
+    def test_command_without_metadata_stays_plain(self, workspace: Workspace) -> None:
+        """Test that metadata-free commands do not gain empty front matter."""
+
+        commands_dir = workspace.agents_dir / "commands"
+        commands_dir.mkdir()
+        (commands_dir / "start.md").write_text("Start services.\n")
+
+        outputs = generate_command_outputs(workspace)
+
+        assert all(
+            isinstance(output, GeneratedFile) and output.content == "Start services.\n"
+            for output in outputs
+        )
+
+    def test_agent_model_override_precedes_provider_default(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that agent-specific models override provider-wide settings."""
+
+        agents_dir = workspace.agents_dir / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
+        workspace.settings_dir.mkdir()
+        (workspace.settings_dir / "claude.json").write_text('{"model":"default"}')
+        workspace.models_dir.mkdir()
+        (workspace.models_dir / "review.json").write_text(
+            '{"claude":"override","cursor":"cursor-model"}'
+        )
+
+        configuration = load_configuration(workspace)
+        outputs = generate_agent_outputs(workspace, configuration)
+        files = {
+            output.provider: output.content
+            for output in outputs
+            if isinstance(output, GeneratedFile)
+        }
+
+        assert "model: override" in files[Provider.CLAUDE]
+        assert "model: cursor-model" in files[Provider.CURSOR]
+
+    def test_rules_normalize_sources_and_generate_links(
+        self,
+        workspace: Workspace,
+        rule_file_factory: Callable[..., Path],
+    ) -> None:
+        """Test that one normalized rule owns both provider links."""
+
+        source = rule_file_factory("python")
+        outputs = generate_rule_outputs(workspace)
+        source_output = next(
+            output
+            for output in outputs
+            if isinstance(output, GeneratedFile) and output.target_path == source
+        )
+        links = [output for output in outputs if isinstance(output, GeneratedLink)]
+
+        assert source_output.content.startswith(
+            "---\ndescription: A rule.\nalwaysApply: true\n---\n"
+        )
+        assert "name:" not in source_output.content
+        assert {link.link_target for link in links} == {source}
+        assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
+
+    def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
+        """Test that shell and shebang hooks are marked executable."""
+
+        hooks_dir = workspace.agents_dir / "hooks"
+        hooks_dir.mkdir()
+        (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
+
+        outputs = generate_hook_outputs(workspace)
+
+        assert outputs
+        assert all(isinstance(output, GeneratedFile) and output.executable for output in outputs)
+
+
+class TestSettingsGeneration:
+    """Verify synchronized settings preserve provider-owned configuration."""
+
+    def test_codex_capacity_and_unmanaged_toml_are_preserved(
+        self,
+        workspace: Workspace,
+        rule_file_factory: Callable[..., Path],
+    ) -> None:
+        """Test that generated instructions determine Codex document capacity."""
+
+        rule_file_factory("project", body="# Project Rules\n\nKeep changes focused.")
+        workspace.settings_dir.mkdir(parents=True)
+        settings_path = workspace.settings_dir / "codex.json"
+        settings_path.write_text('{"model":"gpt-5","project_doc_max_bytes":1}')
+        config_path = workspace.root / ".codex/config.toml"
+        config_path.parent.mkdir()
+        config_path.write_text('model_reasoning_effort = "high"\n')
+
+        assert mirror_providers(workspace, dry_run=False) == 0
+
+        instructions = (workspace.root / "AGENTS.md").read_text()
+        capacity = len(instructions.encode("utf-8"))
+        canonical = json.loads(settings_path.read_text())
+        native = tomllib.loads(config_path.read_text())
+
+        assert canonical["project_doc_max_bytes"] == capacity
+        assert native["project_doc_max_bytes"] == capacity
+        assert native["model_reasoning_effort"] == "high"
+        assert mirror_providers(workspace, dry_run=True) == 0
+
+    def test_malformed_managed_markers_fail_before_writes(self, workspace: Workspace) -> None:
+        """Test that malformed Codex ownership markers abort the whole manifest."""
+
+        workspace.settings_dir.mkdir()
+        (workspace.settings_dir / "codex.json").write_text('{"project_doc_max_bytes":1}')
+        config_path = workspace.root / ".codex/config.toml"
+        config_path.parent.mkdir()
+        config_path.write_text("# >>> agent-sync managed Codex settings >>>\n")
+
+        with pytest.raises(AgentSyncError, match="malformed"):
+            generate_manifest(workspace, load_configuration(workspace))
+
+
+class TestMirrorIntegration:
+    """Verify complete mirroring converges on committed relative links."""
+
+    def test_fresh_mirror_is_idempotent(
+        self,
+        workspace: Workspace,
+        rule_file_factory: Callable[..., Path],
+        skill_file_factory: Callable[..., Path],
+    ) -> None:
+        """Test that mirroring writes relative links and reaches a clean dry run."""
+
+        rule_file_factory("python")
+        skill_file_factory("review")
+
+        assert mirror_providers(workspace, dry_run=False) == 0
+        assert os.readlink(workspace.root / ".claude/rules/python.md") == (
+            "../../.agents/rules/python.md"
+        )
+        assert os.readlink(workspace.root / ".codex/skills/review") == (
+            "../../.agents/skills/review"
+        )
+        assert mirror_providers(workspace, dry_run=True) == 0

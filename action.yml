@@ -1,5 +1,5 @@
 name: Agent Sync
-description: Disperse .agents into Claude/Cursor/Codex folders and refresh skills.sh skills.
+description: Mirror canonical agent sources and vendor registered skills.
 author: julien777z
 
 branding:
@@ -11,7 +11,7 @@ inputs:
     description: Token used to commit and push changes (or open a pull request).
     default: ${{ github.token }}
   refresh-external-skills:
-    description: Force reinstalling external skills from the registry before dispersal.
+    description: Force vendoring external skills from the registry before mirroring.
     default: "false"
   mode:
     description: How to persist changes — commit (push to the branch) or pull-request.
@@ -29,16 +29,16 @@ runs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.13"
+        python-version-file: ${{ github.action_path }}/.python-version
 
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version-file: ${{ github.action_path }}/.nvmrc
 
     - name: Install dependencies
       shell: bash
-      run: python -m pip install --disable-pip-version-check -r "$GITHUB_ACTION_PATH/requirements.txt"
+      run: python -m pip install --disable-pip-version-check "$GITHUB_ACTION_PATH"
 
     - name: Decide external-skill refresh
       id: refresh
@@ -61,14 +61,14 @@ runs:
         fi
         echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
 
-    - name: Refresh external skills
+    - name: Vendor external skills
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.external_skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: agent-sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Persist changes
       if: ${{ inputs.dry-run != 'true' }}
@@ -87,7 +87,7 @@ runs:
         git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-        for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
+        for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
           if [ -e "$path" ]; then
             git add -A -- "$path"
           fi
@@ -105,7 +105,7 @@ runs:
           if ! gh pr view "$branch" >/dev/null 2>&1; then
             gh pr create --base "${{ github.ref_name }}" --head "$branch" \
               --title "chore: agent sync" \
-              --body "Automated agent sync (dispersal + external-skill refresh)."
+              --body "Automated Agent Sync update (provider mirroring and skill vendoring)."
           fi
         else
           git commit -m "chore: run agent sync"
@@ -113,13 +113,11 @@ runs:
           git pull --rebase origin "${{ github.ref_name }}"
 
           if ! git diff --quiet "$pre_rebase_head" HEAD -- "${{ inputs.agents-dir }}/skills.json"; then
-            PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.external_skills \
-              --root . --agents-dir "${{ inputs.agents-dir }}"
+            agent-sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}"
           fi
-          PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync \
-            --root . --agents-dir "${{ inputs.agents-dir }}"
+          agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}"
 
-          for path in .claude .cursor .codex .mcp.json "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
+          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" AGENTS.md AGENTS.override.md; do
             if [ -e "$path" ]; then
               git add -A -- "$path"
             fi
@@ -134,4 +132,4 @@ runs:
     - name: Verify sync idempotence
       if: ${{ inputs.dry-run != 'true' }}
       shell: bash
-      run: PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m agent_sync.sync --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run
+      run: agent-sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --dry-run

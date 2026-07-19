@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agent_sync.utils.slugs import SAFE_SLUG_PATTERN
+from agent_sync.slug import SAFE_SLUG_PATTERN
 
 
 class ExternalSkill(BaseModel):
@@ -38,7 +38,23 @@ class SkillsRegistry(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     version: int = 1
-    skills: list[ExternalSkill] = Field(default_factory=list)
+    skills: list[ExternalSkill] = Field(default_factory=list[ExternalSkill])
+
+
+class SkillLockEntry(BaseModel):
+    """Validate one skill installer lock entry."""
+
+    model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
+
+    skill_path: str = Field(alias="skillPath")
+
+
+class SkillsLock(BaseModel):
+    """Validate the temporary lock file emitted by the skill installer."""
+
+    model_config = ConfigDict(extra="allow", strict=True)
+
+    skills: dict[str, SkillLockEntry]
 
 
 class VendorResult(BaseModel):
