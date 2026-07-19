@@ -26,4 +26,5 @@ jobs:
           fetch-depth: 0
       - uses: ./
         with:
+          github-token: ${{ secrets.AGENT_SYNC_TOKEN }}
           refresh-external-skills: ${{ github.event_name == 'schedule' }}
