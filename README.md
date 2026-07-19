@@ -101,6 +101,18 @@ Only the directories and files your repository uses are required.
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `dry-run` | `false` | Report differences without writing or committing. |
 
+## Workflow Authentication
+
+When Agent Sync may update a branch with an open pull request, use a GitHub App
+installation token or personal access token so the resulting checks run without
+manual approval:
+
+```yaml
+- uses: julien777z/agent-sync-action@v0
+  with:
+    github-token: ${{ secrets.AGENT_SYNC_TOKEN }}
+```
+
 ## External skills
 
 Register external skills in `.agents/skills.json`:
