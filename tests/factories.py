@@ -103,6 +103,7 @@ def materialize_rule(
         exclude_defaults=True,
         exclude_none=True,
     )
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
 

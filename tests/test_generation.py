@@ -300,6 +300,7 @@ class TestMirrorIntegration:
             workspace.agents_dir / "rules/python.md",
             RuleFrontMatterFactory.build(name="removed"),
         )
+
         skill_front_matter = SkillFrontMatterFactory.build(name="review")
         materialize_skill(
             workspace.agents_dir / "skills/review/SKILL.md",

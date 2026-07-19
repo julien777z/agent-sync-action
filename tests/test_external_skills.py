@@ -442,6 +442,7 @@ class TestInstallerState:
         lock = SkillsLockFactory.build(
             skills={"upstream": SkillLockEntryFactory.build(skill_path="skills/sample/SKILL.md")}
         )
+
         materialize_skills_lock(tmp_path / "skills-lock.json", lock)
 
         assert installer.read_skill_path(tmp_path) == "skills/sample/SKILL.md"
