@@ -35,6 +35,7 @@ The canonical project rules live in `.agents/rules/`.
 - Include little to no implementation or internal technical detail; describe public capabilities and outcomes instead.
 - Follow Features with an Example or Examples section.
 - Introduce each example with a one- or two-line description of its purpose, followed by a small code example.
+- In cron-based examples, add an inline comment translating each cron expression into its plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
 
 <!-- Source: .agents/rules/poetry.md -->
