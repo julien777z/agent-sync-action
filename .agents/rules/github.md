@@ -28,6 +28,7 @@ alwaysApply: true
 
 ### Consumer Actions Or Libraries
 
+- Lead with the consumer-facing purpose; do not state that an action or library is reusable when that is already evident from the project.
 - Place a concise, list-based Features section immediately after the introduction.
 - Include little to no implementation or internal technical detail; describe public capabilities and outcomes instead.
 - Follow Features with an Example or Examples section.

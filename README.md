@@ -1,7 +1,7 @@
 # Agent Sync Action
 
-A reusable GitHub Action for managing Claude, Cursor, and Codex configuration
-from one canonical `.agents/` directory.
+Manage Claude, Cursor, and Codex configuration from one canonical `.agents/`
+directory.
 
 ## Features
 
