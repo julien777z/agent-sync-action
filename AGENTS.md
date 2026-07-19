@@ -53,8 +53,8 @@ The canonical project rules live in `.agents/rules/`.
 ## Project Configuration
 
 - Target Python 3.12 and use Poetry 2.x with PEP 621 `[project]` metadata; do not use legacy `[tool.poetry]` metadata or dependency tables.
-- Declare runtime dependencies in `[project.dependencies]`, development dependencies in Poetry `[dependency-groups].dev`, and console entry points in `[project.scripts]`.
-- Configure strict Pyright, pytest, and Black with a 100-character line length and Python 3.12 target inferred from `[project.requires-python]`.
+- Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
+- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python 3.12 target inferred from `[project.requires-python]`.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
 ```toml
@@ -77,7 +77,7 @@ build-backend = "poetry.core.masonry.api"
 
 ## Testing
 
-- Use pytest with small, readable tests.
+- Use pytest and pytest-asyncio with small, readable tests, and mark async tests with `@pytest.mark.asyncio`.
 - Prefer dependency injection or fakes over deep patching.
 
 ## Guardrails
@@ -694,7 +694,8 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 ## Logging
 
 - Use the `logging` module instead of `print()` for debugging, status, progress, or diagnostics in any code, including scripts and CLI tools.
-- In a module that emits diagnostics, configure a module-level logger with `logger = logging.getLogger(__name__)` and use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
+- Configure a logger at the top of each module: `logger = logging.getLogger(__name__)`.
+- Use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
 
 ## Guardrails
 
