@@ -77,22 +77,25 @@ class TestReconciliation:
         assert os.readlink(directory_target) == "../../.agents/rules"
         assert source.read_text() == "source\n"
 
-    def test_stale_managed_paths_are_removed_but_unmanaged_codex_rules_remain(
+    def test_stale_provider_paths_are_removed(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that stale detection respects the managed ownership boundary."""
+        """Test that stale detection makes provider directories match the manifest."""
 
         claude_rules = workspace.root / ".claude/rules"
         claude_rules.mkdir(parents=True)
         stale_rule = claude_rules / "orphan.md"
         stale_rule.write_text("stale\n")
+        stale_directory = claude_rules / "custom"
+        stale_directory.mkdir()
+        (stale_directory / "rule.md").write_text("stale\n")
         duplicate_rule = claude_rules / "orphan 2.md"
         duplicate_rule.write_text("duplicate\n")
         codex_rules = workspace.root / ".codex/rules"
         codex_rules.mkdir(parents=True)
-        unmanaged = codex_rules / "custom.rules"
-        unmanaged.write_text("allow_rule()\n")
+        stale_codex_rule = codex_rules / "custom.rules"
+        stale_codex_rule.write_text("allow_rule()\n")
 
         plan = build_plan(
             workspace,
@@ -100,8 +103,27 @@ class TestReconciliation:
         )
 
         assert stale_rule in plan.stale_paths
+        assert stale_directory in plan.stale_paths
         assert duplicate_rule in plan.stale_paths
-        assert unmanaged not in plan.stale_paths
+        assert stale_codex_rule in plan.stale_paths
+
+    def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
+        """Test that provider settings cannot outlive their source configuration."""
+
+        stale_settings = [
+            workspace.root / ".claude/settings.json",
+            workspace.root / ".codex/config.toml",
+        ]
+        for path in stale_settings:
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("stale\n")
+
+        plan = build_plan(
+            workspace,
+            generate_manifest(workspace, load_configuration(workspace)),
+        )
+
+        assert set(stale_settings) <= set(plan.stale_paths)
 
     def test_removed_sources_prune_dangling_provider_links(
         self,

@@ -1,11 +1,9 @@
 import difflib
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Final
 
-from agent_sync.generation.rule import CODEX_RULE_MARKER
 from agent_sync.models.output import (
     Change,
     GeneratedFile,
@@ -21,7 +19,6 @@ from agent_sync.workspace import Workspace
 logger = logging.getLogger(__name__)
 
 MAX_DIFF_LINES: Final[int] = 20
-NUMBERED_COPY_PATTERN: Final[re.Pattern[str]] = re.compile(r" \d+$")
 
 
 def build_plan(workspace: Workspace, manifest: Manifest) -> ReconciliationPlan:
@@ -80,6 +77,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
         (Provider.CURSOR, "agents"),
         (Provider.CLAUDE, "hooks"),
         (Provider.CURSOR, "hooks"),
+        (Provider.CODEX, "rules"),
     )
     for provider, dirname in managed_directories:
         directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / dirname
@@ -87,9 +85,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
             continue
 
         for path in directory.iterdir():
-            if (path.is_file() or path.is_symlink()) and path not in expected:
-                stale.add(path)
-            if dirname == "rules" and NUMBERED_COPY_PATTERN.search(path.stem):
+            if path not in expected:
                 stale.add(path)
 
     for provider in Provider:
@@ -101,20 +97,15 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
             if (path.is_dir() or path.is_symlink()) and path not in expected:
                 stale.add(path)
 
-    codex_rules_dir = PROVIDER_LAYOUTS[Provider.CODEX].root(workspace.root) / "rules"
-    if codex_rules_dir.exists():
-        for path in codex_rules_dir.glob("*.rules"):
-            content = workspace.read_text(path)
-            if (
-                path not in expected
-                and content is not None
-                and content.startswith(CODEX_RULE_MARKER)
-            ):
-                stale.add(path)
-
-    claude_settings = PROVIDER_LAYOUTS[Provider.CLAUDE].root(workspace.root) / "settings.json"
-    if claude_settings.exists() and claude_settings not in expected:
-        stale.add(claude_settings)
+    managed_settings = (
+        PROVIDER_LAYOUTS[Provider.CLAUDE].root(workspace.root) / "settings.json",
+        PROVIDER_LAYOUTS[Provider.CODEX].root(workspace.root) / "config.toml",
+    )
+    stale.update(
+        path
+        for path in managed_settings
+        if (path.exists() or path.is_symlink()) and path not in expected
+    )
 
     return sorted(stale, key=str)
 

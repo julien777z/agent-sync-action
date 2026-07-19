@@ -11,7 +11,7 @@ from one canonical `.agents/` directory.
 - Vendors registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
-- Preserves unmanaged Codex configuration.
+- Overwrites generated provider files so they always match `.agents/`.
 - Supports direct commits, pull requests, and read-only dry runs.
 
 ## Examples
@@ -125,7 +125,7 @@ Register external skills in `.agents/skills.json`:
 - `skill`: upstream slug when it differs from `name`.
 - `managed`: set to `false` to disable automatic updates; defaults to `true`.
 
-## Local CLI
+## Local Development
 
 ```bash
 poetry install

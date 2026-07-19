@@ -20,4 +20,4 @@ alwaysApply: true
 ## Coverage And Scenarios
 
 - Parametrize same-shape scenarios and give parameters readable IDs.
-- Verify dry runs, failure exit codes, stale cleanup, unmanaged-state preservation, and idempotence.
+- Verify dry runs, failure exit codes, stale cleanup, complete provider-state convergence, and idempotence.

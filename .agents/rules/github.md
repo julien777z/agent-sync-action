@@ -34,3 +34,4 @@ alwaysApply: true
 - Introduce each example with a one- or two-line description of its purpose, followed by a small code example.
 - In cron-based examples, add an inline comment translating each cron expression into its plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
+- Include a Local Development section with the commands needed to install, run, and validate the project locally.

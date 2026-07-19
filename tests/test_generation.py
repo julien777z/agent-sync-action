@@ -9,7 +9,6 @@ import pytest
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.agent import generate_agent_outputs
 from agent_sync.generation.command import generate_command_outputs
-from agent_sync.generation.generation import generate_manifest
 from agent_sync.generation.hook import generate_hook_outputs
 from agent_sync.generation.rule import generate_rule_outputs
 from agent_sync.generation.skill import generate_skill_outputs
@@ -176,9 +175,9 @@ class TestDocumentGeneration:
 
 
 class TestSettingsGeneration:
-    """Verify synchronized settings preserve provider-owned configuration."""
+    """Verify synchronized settings fully own generated provider files."""
 
-    def test_codex_capacity_and_unmanaged_toml_are_preserved(
+    def test_codex_capacity_overwrites_existing_toml(
         self,
         workspace: Workspace,
         rule_file_factory: Callable[..., Path],
@@ -202,20 +201,20 @@ class TestSettingsGeneration:
 
         assert canonical["project_doc_max_bytes"] == capacity
         assert native["project_doc_max_bytes"] == capacity
-        assert native["model_reasoning_effort"] == "high"
+        assert "model_reasoning_effort" not in native
         assert mirror_providers(workspace, dry_run=True) == 0
 
-    def test_malformed_managed_markers_fail_before_writes(self, workspace: Workspace) -> None:
-        """Test that malformed Codex ownership markers abort the whole manifest."""
+    def test_invalid_existing_toml_is_overwritten(self, workspace: Workspace) -> None:
+        """Test that existing Codex content never affects generated settings."""
 
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "codex.json").write_text('{"project_doc_max_bytes":1}')
         config_path = workspace.root / ".codex/config.toml"
         config_path.parent.mkdir()
-        config_path.write_text("# >>> agent-sync managed Codex settings >>>\n")
+        config_path.write_text("invalid = [\n")
 
-        with pytest.raises(AgentSyncError, match="malformed"):
-            generate_manifest(workspace, load_configuration(workspace))
+        assert mirror_providers(workspace, dry_run=False) == 0
+        assert tomllib.loads(config_path.read_text())["project_doc_max_bytes"] > 0
 
 
 class TestMirrorIntegration:

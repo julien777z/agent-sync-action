@@ -37,6 +37,7 @@ The canonical project rules live in `.agents/rules/`.
 - Introduce each example with a one- or two-line description of its purpose, followed by a small code example.
 - In cron-based examples, add an inline comment translating each cron expression into its plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
+- Include a Local Development section with the commands needed to install, run, and validate the project locally.
 
 <!-- Source: .agents/rules/poetry.md -->
 
@@ -138,4 +139,4 @@ The canonical project rules live in `.agents/rules/`.
 ## Coverage And Scenarios
 
 - Parametrize same-shape scenarios and give parameters readable IDs.
-- Verify dry runs, failure exit codes, stale cleanup, unmanaged-state preservation, and idempotence.
+- Verify dry runs, failure exit codes, stale cleanup, complete provider-state convergence, and idempotence.
