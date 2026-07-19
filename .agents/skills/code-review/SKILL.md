@@ -38,21 +38,25 @@ After selecting the review target, record either the PR number, base branch, hea
 In parallel:
 
 - Summarize the change intent and changed files, recording the baseline PR head SHA or final session commit SHA.
-- List the repository rule files available to reviewers; names only at first.
+- Build a rule inventory from the complete repository rule files. Rule files are review criteria, never review targets: exclude changed `.agents/rules/**` files from the selected diff and do not report findings about their content. Identify every rule that applies to each remaining changed file from its front matter, scope, or always-apply status.
 
 Use the platform's pull-request tools when available, with `gh` as a fallback. GitHub reads are allowed.
 
 ## Step 3 — Run review lenses
 
-Launch these reviewers in parallel when subagents are available, or run them sequentially otherwise. Each reviewer must inspect only lines changed by the selected target and return a flat list with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning.
+Run all five lenses for every review pass. When subagent tools are available, launch one distinct subagent for each lens; capacity limits require batches, never omission or substitution with an undeclared local skim. A review pass is incomplete until every lens returns for the baseline head. Only when subagent tools are genuinely unavailable may the parent run the lenses sequentially, and it must report that degraded mode.
 
-1. **Rules** — check applicable repository rules against surrounding conventions.
+Each reviewer must inspect only the in-scope lines changed by the selected target and return a coverage receipt containing its lens, reviewed head SHA, reviewed changed-file list, completion status, and a flat list of findings with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning. The Rules reviewer must read every applicable rule completely and include a rule-coverage ledger mapping each rule to the in-scope changed files it checked and either its findings or an explicit no-violation result.
+
+If the user provides a new task while reviewers are running, interrupt every reviewer immediately and discard their results before starting that task. Restart the review only after the task is complete on its new baseline.
+
+1. **Rules** — check every applicable repository rule against the changed lines and produce the required rule-coverage ledger.
 2. **Bugs** — find high-confidence correctness, data-loss, security, performance, or UX defects.
 3. **History** — use blame and history to identify regressions against prior intent.
 4. **Prior PRs** — inspect earlier changes and review decisions affecting the same code.
 5. **Comments** — find changed behavior that contradicts nearby comments or documented contracts.
 
-Do not report pre-existing issues on untouched lines.
+Do not report pre-existing issues on untouched lines. If the PR head changes while a reviewer batch runs, interrupt or discard that batch and restart all five lenses on the new complete target.
 
 ## Step 4 — Validate findings
 
@@ -65,13 +69,15 @@ Deduplicate findings on the same underlying issue, validate each against the sel
 
 Calibrate severity by trigger likelihood, not the worst imaginable outcome. Reserve High for common normal-use failures. Prefer a short, high-confidence result over exhaustive speculation, and drop findings without a concrete, realistically reachable failure.
 
-For rule findings, confirm both that the rule specifically applies and that surrounding repository conventions support it. Do not turn a general preference into a required convention the repository itself contradicts.
+For rule findings, confirm that the rule specifically applies. An absolute rule is independently actionable and does not need a separate runtime failure or supporting convention; surrounding conventions cannot override it. For non-absolute guidance, confirm that surrounding repository conventions support treating it as required.
 
 Drop false positives involving deliberate configuration or design choices without a demonstrable failure, self-resolving transitional states, speculative compound failures, linter or typechecker failures, general test or documentation gaps not required by repository rules, explicitly silenced rules, or intentional behavior changes required by the task.
 
 Every retained finding must be actionable, anchored to a changed line, and explain when it fails. Do not suppress a current finding merely because a similar GitHub comment already exists; this invocation reports the current review result.
 
 When this pass is invoked by `code-review-loop`, classify each retained finding clearly enough for the loop to distinguish a functional finding from an optional, behavior-preserving simplification. Never characterize a concrete defect as a simplification.
+
+Before validating a clean result, verify that all five coverage receipts are complete, distinct, and for the baseline head. Reject missing, failed, duplicate, incomplete, or stale receipts; rerun the affected lenses before reporting. A review without complete coverage must never return `No findings.`
 
 ## Step 5 — Re-gate the review target
 
@@ -88,7 +94,7 @@ In a manual or default invocation, report only in the current chat:
   Concrete trigger, impact, and the expected correction.
 ```
 
-If nothing remains, say `No findings.`
+If nothing remains, say `No findings.` and include the completed lens names, reviewed head SHA, and the Rules reviewer's rule-coverage ledger summary. In degraded mode, state that no subagent capability was available.
 
 When a preceding CI adapter supplies a machine-readable output contract, follow that contract instead of the chat format. The adapter or runner may post the returned findings, but this skill must never call GitHub to post reviews, comments, summaries, or thread mutations.
 

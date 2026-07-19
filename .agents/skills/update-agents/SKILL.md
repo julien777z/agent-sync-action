@@ -31,6 +31,7 @@ Upsert `.agents` source-of-truth files for agents, skills, or rules based on use
    - Avoid duplicate guidance/content when updating.
    - When adding a **new** restriction or rule, keep the wording **concise**—one clear statement or bullet per idea; do not pad with redundant sentences or multiple bullets that restate the same requirement.
    - **Stable guidance:** Do not embed concrete repository file paths or copy code examples from the current codebase into `.agents` files; those go stale when files move or refactors land. Prefer generic placeholders (for example `services/<name>/...`), short pattern descriptions, or minimal invented examples that are not tied to live paths or current line-level code.
+   - Keep a Guardrails section at the bottom of a skill or rule when one is present.
 
 5. Multi-target behavior.
    - Apply multi-target updates for `agents`, `skills`, and `rules`.
