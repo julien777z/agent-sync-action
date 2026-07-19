@@ -61,13 +61,16 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
 def build_plan(workspace: Workspace, manifest: Manifest) -> ReconciliationPlan:
     """Compare a generated manifest with managed workspace state."""
 
-    changes = [
-        change
-        for output in manifest.outputs
-        if (change := compare_output(workspace, output)) is not None
-    ]
-
     stale_paths = find_stale_paths(workspace, manifest)
+    changes: list[Change] = []
+
+    for output in manifest.outputs:
+        change = compare_output(workspace, output)
+
+        if change is not None:
+            changes.append(change)
+        elif any(stale_path in output.target_path.parents for stale_path in stale_paths):
+            changes.append(Change(output=output, existing=None))
 
     return ReconciliationPlan(changes=changes, stale_paths=stale_paths)
 

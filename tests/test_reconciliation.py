@@ -223,6 +223,24 @@ class TestReconciliation:
         assert (provider_root / "rules/sample.md").is_symlink()
         assert sentinel.read_text() == "preserve\n"
 
+    def test_parent_blocker_recreates_an_otherwise_matching_link(
+        self,
+        workspace: Workspace,
+        rule_file_factory: RuleFileFactory,
+    ) -> None:
+        """Test that deleting a blocked provider root still recreates its links."""
+
+        rule_file_factory("sample")
+        external = workspace.root / "external"
+        external_rules = external / "rules"
+        external_rules.mkdir(parents=True)
+        (external_rules / "sample.md").symlink_to("../../.agents/rules/sample.md")
+        provider_root = workspace.root / ".claude"
+        provider_root.symlink_to(external, target_is_directory=True)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert (provider_root / "rules/sample.md").is_symlink()
+
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that provider settings cannot outlive their source configuration."""
 
