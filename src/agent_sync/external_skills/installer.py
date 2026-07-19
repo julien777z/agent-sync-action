@@ -1,3 +1,4 @@
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -7,6 +8,8 @@ from pydantic import ValidationError
 
 from agent_sync.config import ACTION_CONFIG
 from agent_sync.models.registry import ExternalSkill, SkillsLock
+
+logger = logging.getLogger(__name__)
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(

@@ -1,9 +1,12 @@
+import logging
 from pathlib import Path
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
 from agent_sync.models.output import Provider
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderLayout(BaseModel):

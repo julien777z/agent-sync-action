@@ -1,6 +1,10 @@
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agent_sync.utils import SAFE_SLUG_PATTERN
+
+logger = logging.getLogger(__name__)
 
 
 class ExternalSkill(BaseModel):

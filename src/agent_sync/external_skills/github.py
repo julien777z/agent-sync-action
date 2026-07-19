@@ -1,9 +1,12 @@
 import io
+import logging
 import re
 import subprocess
 import tarfile
 import urllib.request
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_revision(repository: str) -> str:

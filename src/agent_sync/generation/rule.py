@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Final
 
@@ -6,6 +7,8 @@ from pydantic import BaseModel
 from agent_sync.document import FrontMatterValues, render_front_matter
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.document import RuleFrontMatter
+
+logger = logging.getLogger(__name__)
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,

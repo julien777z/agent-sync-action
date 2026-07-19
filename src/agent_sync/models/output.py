@@ -1,9 +1,12 @@
 from collections import Counter
 from enum import StrEnum
+import logging
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Provider(StrEnum):

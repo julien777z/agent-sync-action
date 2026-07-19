@@ -128,7 +128,7 @@ Register external skills in `.agents/skills.json`:
 ## Local Development
 
 ```bash
-poetry install
+poetry install --extras dev
 poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync mirror-providers --root .
 ```

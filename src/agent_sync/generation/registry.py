@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import logging
 from typing import Final, TypedDict
 
 from agent_sync.config import SourceConfig
@@ -10,6 +11,8 @@ from agent_sync.generation.rule import (
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import generate_claude_settings, generate_codex_settings
+
+logger = logging.getLogger(__name__)
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,

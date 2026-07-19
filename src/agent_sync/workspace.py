@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -6,6 +7,8 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field
 
 from agent_sync.config import ACTION_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class Workspace(BaseModel):

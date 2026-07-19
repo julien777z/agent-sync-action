@@ -1,3 +1,5 @@
+import logging
+
 from agent_sync.document import render_front_matter
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
@@ -5,6 +7,8 @@ from agent_sync.models.output import Provider
 from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.source import resolve_agent_model
 from agent_sync.utils import ensure_trailing_newline
+
+logger = logging.getLogger(__name__)
 
 
 def generate_agents(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:

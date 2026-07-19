@@ -1,9 +1,12 @@
+import logging
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent_sync.models.output import Provider
+
+logger = logging.getLogger(__name__)
 
 
 class ActionConfig(BaseSettings):

@@ -1,3 +1,5 @@
+import logging
+
 from agent_sync.config import (
     AgentModelOverride,
     CodexSettings,
@@ -8,6 +10,8 @@ from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
 from agent_sync.utils import load_json_model, validate_slug
 from agent_sync.workspace import Workspace
+
+logger = logging.getLogger(__name__)
 
 
 def load_source_config(workspace: Workspace) -> SourceConfig:

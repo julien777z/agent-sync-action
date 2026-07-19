@@ -1,4 +1,8 @@
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class SkillFrontMatter(BaseModel):
