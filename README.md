@@ -51,7 +51,7 @@ name: Sync External Skills
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # every Monday at 06:00 UTC
+    - cron: "0 6 * * 1" # every Monday
 
 permissions:
   contents: write

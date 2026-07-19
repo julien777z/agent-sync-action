@@ -23,22 +23,22 @@ alwaysApply: true
 - Use conventional commit messages when applicable and keep commits atomic and focused.
 - Do not commit generated files unless the repository explicitly requires them.
 
-## Guardrails
-
-- Never commit or push agent-authored changes directly to the default branch. If the checkout is on the default branch or detached, create a descriptive non-default branch; otherwise retain the current branch and deliver through its pull request.
-
 ## README
 
 - Describe available capabilities without assuming how consumers will use the project or framing guidance as prohibitions such as "never do X."
 - Remove repeated explanations and prefer short sections, bullets, tables, and focused examples over long prose.
 
-### Consumer Actions Or Libraries
+### GitHub Actions And Libraries
 
 - Lead with the consumer-facing purpose; do not state that an action or library is reusable when that is already evident from the project.
 - Place a concise, list-based Features section immediately after the introduction.
 - Include little to no implementation or internal technical detail; describe public capabilities and outcomes instead.
 - Follow Features with an Example or Examples section.
 - Introduce each example with a one- or two-line description of its purpose, followed by a small code example.
-- In cron-based examples, add an inline comment translating each cron expression into its plain-language schedule.
+- In cron-based examples, use a conventional schedule such as every Monday and add an inline comment translating the cron expression into that plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
 - Include a Local Development section with the commands needed to install, run, and validate the project locally.
+
+## Guardrails
+
+- Never commit or push agent-authored changes directly to the default branch. If the checkout is on the default branch or detached, create a descriptive non-default branch; otherwise retain the current branch and deliver through its pull request.
