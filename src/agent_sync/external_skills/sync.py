@@ -69,11 +69,12 @@ def update_external_skill(
 
         installer.install_skill(skill, working_directory, source_root)
         installed = installer.locate_installed_skill(working_directory, source_root, skill.name)
-        normalize_skill_metadata(installed, skill)
         skill_path = installer.read_skill_path(working_directory)
 
         if skill_path is not None and "/" not in skill_path:
             installer.supplement_root_assets(installed, source_root)
+
+        normalize_skill_metadata(installed, skill)
 
         destination = skills_dir / skill.name
         changed = trees_differ(installed, destination)

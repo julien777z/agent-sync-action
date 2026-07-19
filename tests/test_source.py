@@ -7,7 +7,7 @@ from agent_sync.workspace import Workspace
 
 
 class TestCanonicalSources:
-    """Verify canonical configuration is strict and typed."""
+    """Test that canonical configuration is strict and typed."""
 
     def test_missing_optional_directories_produce_empty_configuration(
         self,
@@ -69,7 +69,7 @@ class TestCanonicalSources:
 
 
 class TestWorkspace:
-    """Verify workspace access observes the filesystem directly."""
+    """Test that workspace access observes the filesystem directly."""
 
     def test_reads_current_disk_state(self, workspace: Workspace) -> None:
         """Test that workspace reads never return stale cached content."""

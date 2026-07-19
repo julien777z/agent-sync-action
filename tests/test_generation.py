@@ -29,7 +29,7 @@ def load_context(workspace: Workspace) -> GenerationContext:
 
 
 class TestArtifactRegistry:
-    """Verify the provider support matrix is explicit."""
+    """Test that the provider support matrix is explicit."""
 
     def test_declares_supported_provider_artifacts(self) -> None:
         """Test that the registry contains the stable provider support matrix."""
@@ -47,7 +47,7 @@ class TestArtifactRegistry:
 
 
 class TestSkillGeneration:
-    """Verify canonical skills become provider directory links."""
+    """Test that canonical skills become provider directory links."""
 
     def test_links_every_provider_to_the_canonical_directory(
         self,
@@ -111,7 +111,7 @@ class TestSkillGeneration:
 
 
 class TestDocumentGeneration:
-    """Verify agents, rules, and hooks use their artifact formats."""
+    """Test that agents, rules, and hooks use their artifact formats."""
 
     def test_agent_model_override_precedes_provider_default(
         self,
@@ -217,7 +217,7 @@ class TestDocumentGeneration:
 
 
 class TestSettingsGeneration:
-    """Verify synchronized settings fully own generated provider files."""
+    """Test that synchronized settings fully own generated provider files."""
 
     def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
         """Test that Claude settings preserve validated provider keys."""
@@ -280,7 +280,7 @@ class TestSettingsGeneration:
 
 
 class TestMirrorIntegration:
-    """Verify complete mirroring converges on committed relative links."""
+    """Test that complete mirroring converges on committed relative links."""
 
     def test_fresh_mirror_is_idempotent(
         self,

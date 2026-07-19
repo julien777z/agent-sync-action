@@ -20,7 +20,7 @@ from agent_sync.workspace import Workspace
 
 
 class TestManifest:
-    """Verify generated output ownership is unambiguous."""
+    """Test that generated output ownership is unambiguous."""
 
     def test_duplicate_targets_are_rejected(self, workspace: Workspace) -> None:
         """Test that two outputs cannot own the same target path."""
@@ -37,7 +37,7 @@ class TestManifest:
 
 
 class TestReconciliation:
-    """Verify managed output comparison and mutation behavior."""
+    """Test that managed output comparison and mutation behavior."""
 
     def test_replaces_files_and_directories_with_relative_links(
         self,

@@ -5,7 +5,7 @@ from agent_sync.utils import trees_differ
 
 
 class TestTreesDiffer:
-    """Verify directory tree comparisons."""
+    """Test that directory tree comparisons work."""
 
     def test_detects_changes(
         self,

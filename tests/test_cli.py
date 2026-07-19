@@ -16,7 +16,7 @@ def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 class TestCli:
-    """Verify the unified CLI exposes both explicit pipeline operations."""
+    """Test that the unified CLI exposes both explicit pipeline operations."""
 
     def test_mirror_command_returns_clean_after_generation(self, workspace: Workspace) -> None:
         """Test that the mirror command runs and reaches an idempotent workspace."""

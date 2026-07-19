@@ -4,7 +4,7 @@ import yaml
 
 
 class TestAction:
-    """Verify the reusable action contract and repository workflow."""
+    """Test that the reusable action and repository workflow keep their contract."""
 
     def test_keeps_the_public_input_contract(self) -> None:
         """Test that action inputs and defaults remain stable through the refactor."""

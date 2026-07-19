@@ -13,7 +13,7 @@ from agent_sync.workspace import Workspace
 
 
 class TestExternalSkillModel:
-    """Verify external-skill registry validation and defaults."""
+    """Test that external-skill registry validation and defaults work."""
 
     def test_upstream_slug_defaults_to_local_name(self) -> None:
         """Test that an omitted upstream slug uses the local skill name."""
@@ -72,7 +72,7 @@ class TestExternalSkillModel:
 
 
 class TestExternalSkillBoundaries:
-    """Verify immutable GitHub snapshots and installer behavior."""
+    """Test that immutable GitHub snapshots and installer behavior work."""
 
     def test_runtime_config_accepts_namespaced_overrides(
         self,
@@ -284,9 +284,75 @@ class TestExternalSkillBoundaries:
             "---\nname: react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
         )
 
+    def test_root_assets_do_not_restore_upstream_metadata(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that root asset copying cannot undo the local metadata rewrite."""
+
+        skill = ExternalSkill(
+            name="local-skill",
+            repo="example/repository",
+            skill="upstream-skill",
+            automatic_updates=True,
+        )
+
+        def fake_resolve(repository: str) -> str:
+            """Return a stable synthetic revision."""
+
+            return "a" * 40
+
+        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+
+        def fake_download(repository: str, revision: str, destination: Path) -> Path:
+            """Create a root-level upstream skill document."""
+
+            source_root = destination / "repository"
+            source_root.mkdir(parents=True)
+            (source_root / "SKILL.md").write_text(
+                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+            )
+
+            return source_root
+
+        monkeypatch.setattr(github, "download_snapshot", fake_download)
+
+        def fake_install(
+            installed_skill: ExternalSkill,
+            working_directory: Path,
+            source_root: Path,
+        ) -> None:
+            """Create the installed skill before root assets are copied."""
+
+            installed = working_directory / ".staging/skills" / installed_skill.name
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text(
+                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+            )
+
+        monkeypatch.setattr(installer, "install_skill", fake_install)
+
+        def fake_read_skill_path(directory: Path) -> str:
+            """Return a root-level lock path."""
+
+            return "SKILL.md"
+
+        monkeypatch.setattr(installer, "read_skill_path", fake_read_skill_path)
+
+        assert external_skills.update_external_skill(
+            workspace,
+            skill,
+            workspace.agents_dir / "skills",
+            dry_run=False,
+        )
+        assert (workspace.agents_dir / "skills/local-skill/SKILL.md").read_text() == (
+            "---\nname: local-skill\ndescription: A skill.\n---\n\nContent.\n"
+        )
+
 
 class TestExternalSkillService:
-    """Verify registry orchestration and dry-run change reporting."""
+    """Test that registry orchestration and dry-run change reporting work."""
 
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
@@ -372,7 +438,7 @@ class TestExternalSkillService:
 
 
 class TestInstallerState:
-    """Verify installer lock reading."""
+    """Test that installer lock reading works."""
 
     def test_reads_the_only_lock_entry(
         self,
