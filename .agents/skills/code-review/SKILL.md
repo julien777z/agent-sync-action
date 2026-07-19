@@ -38,7 +38,7 @@ After selecting the review target, record either the PR number, base branch, hea
 In parallel:
 
 - Summarize the change intent and changed files, recording the baseline PR head SHA or final session commit SHA.
-- Build a rule inventory from the complete repository rule files. Identify every rule that applies to a changed file from its front matter, scope, or always-apply status.
+- Build a rule inventory from the complete repository rule files. Rule files are review criteria, never review targets: exclude changed `.agents/rules/**` files from the selected diff and do not report findings about their content. Identify every rule that applies to each remaining changed file from its front matter, scope, or always-apply status.
 
 Use the platform's pull-request tools when available, with `gh` as a fallback. GitHub reads are allowed.
 
@@ -46,7 +46,7 @@ Use the platform's pull-request tools when available, with `gh` as a fallback. G
 
 Run all five lenses for every review pass. When subagent tools are available, launch one distinct subagent for each lens; capacity limits require batches, never omission or substitution with an undeclared local skim. A review pass is incomplete until every lens returns for the baseline head. Only when subagent tools are genuinely unavailable may the parent run the lenses sequentially, and it must report that degraded mode.
 
-Each reviewer must inspect only lines changed by the selected target and return a coverage receipt containing its lens, reviewed head SHA, reviewed changed-file list, completion status, and a flat list of findings with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning. The Rules reviewer must read every applicable rule completely and include a rule-coverage ledger mapping each rule to the changed files it checked and either its findings or an explicit no-violation result.
+Each reviewer must inspect only the in-scope lines changed by the selected target and return a coverage receipt containing its lens, reviewed head SHA, reviewed changed-file list, completion status, and a flat list of findings with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning. The Rules reviewer must read every applicable rule completely and include a rule-coverage ledger mapping each rule to the in-scope changed files it checked and either its findings or an explicit no-violation result.
 
 If the user provides a new task while reviewers are running, interrupt every reviewer immediately and discard their results before starting that task. Restart the review only after the task is complete on its new baseline.
 
