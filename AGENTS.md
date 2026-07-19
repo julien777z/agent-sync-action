@@ -26,10 +26,15 @@ The canonical project rules live in `.agents/rules/`.
 
 ## README
 
-- Place a concise, list-based Features section immediately after the introduction.
-- Describe user-facing capabilities and outcomes instead of implementation details.
-- Keep setup, configuration, and examples only when they help users adopt the action.
+- Describe available capabilities without assuming how consumers will use the project or framing guidance as prohibitions such as "never do X."
 - Remove repeated explanations and prefer short sections, bullets, tables, and focused examples over long prose.
+
+### Consumer Actions Or Libraries
+
+- Place a concise, list-based Features section immediately after the introduction.
+- Include little to no implementation or internal technical detail; describe public capabilities and outcomes instead.
+- Follow Features with an Example or Examples section.
+- Introduce each example with a one- or two-line description of its purpose, followed by a small code example.
 
 <!-- Source: .agents/rules/poetry.md -->
 
