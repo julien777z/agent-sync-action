@@ -11,7 +11,7 @@ from agent_sync.models.document import (
     RuleFrontMatter,
     SkillFrontMatter,
 )
-from agent_sync.slug import validate_slug
+from agent_sync.utils import validate_slug
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agent_sync.slug import SAFE_SLUG_PATTERN
+from agent_sync.utils import SAFE_SLUG_PATTERN
 
 
 class ExternalSkill(BaseModel):

@@ -11,7 +11,7 @@ from agent_sync.configuration import (
 )
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
-from agent_sync.slug import validate_slug
+from agent_sync.utils import validate_slug
 from agent_sync.workspace import Workspace
 
 
