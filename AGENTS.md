@@ -694,8 +694,7 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 ## Logging
 
 - Use the `logging` module instead of `print()` for debugging, status, progress, or diagnostics in any code, including scripts and CLI tools.
-- Configure a logger at the top of each module: `logger = logging.getLogger(__name__)`.
-- Use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
+- In a module that emits diagnostics, configure a module-level logger with `logger = logging.getLogger(__name__)` and use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
 
 ## Guardrails
 
