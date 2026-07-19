@@ -105,22 +105,3 @@ def supplement_root_assets(destination: Path, source_root: Path) -> None:
             shutil.copytree(entry, target, dirs_exist_ok=True)
         else:
             shutil.copy2(entry, target)
-
-
-def snapshot_tree(directory: Path) -> dict[str, bytes]:
-    """Read every file in a directory tree into a comparable snapshot."""
-
-    if not directory.is_dir():
-        return {}
-
-    return {
-        str(path.relative_to(directory)): path.read_bytes()
-        for path in sorted(directory.rglob("*"))
-        if path.is_file()
-    }
-
-
-def trees_differ(source: Path, destination: Path) -> bool:
-    """Report whether two skill directory trees differ."""
-
-    return snapshot_tree(source) != snapshot_tree(destination)

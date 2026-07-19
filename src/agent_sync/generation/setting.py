@@ -2,11 +2,11 @@ import json
 import tomllib
 
 from agent_sync.configuration import CodexSettings, PlatformSettings
-from agent_sync.document import ensure_trailing_newline
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.utils import ensure_trailing_newline
 
 
 def generate_claude_settings(

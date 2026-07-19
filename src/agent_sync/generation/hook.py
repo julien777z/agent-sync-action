@@ -1,7 +1,7 @@
-from agent_sync.document import ensure_trailing_newline
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.utils import ensure_trailing_newline
 
 
 def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:

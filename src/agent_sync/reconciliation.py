@@ -1,6 +1,5 @@
 import difflib
 import logging
-import os
 from pathlib import Path
 from typing import Final
 
@@ -14,6 +13,7 @@ from agent_sync.models.output import (
     ReconciliationPlan,
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.utils import relative_link_target
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def compare_output(
 def expected_link(output: GeneratedLink) -> str:
     """Return the relative target text for a generated symlink."""
 
-    return os.path.relpath(output.link_target, output.target_path.parent)
+    return relative_link_target(output.target_path, output.link_target)
 
 
 def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:

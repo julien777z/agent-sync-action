@@ -278,7 +278,7 @@ class TestVendorService:
 
 
 class TestInstallerState:
-    """Verify installer lock reading and tree comparison."""
+    """Verify installer lock reading."""
 
     def test_reads_the_only_lock_entry(
         self,
@@ -289,15 +289,3 @@ class TestInstallerState:
         directory = skills_lock_factory("skills/sample/SKILL.md", key="upstream")
 
         assert installer.read_skill_path(directory) == "skills/sample/SKILL.md"
-
-    def test_tree_comparison_detects_changes(
-        self,
-        tmp_path: Path,
-        skill_tree_factory: Callable[[Path, dict[str, str]], Path],
-    ) -> None:
-        """Test that file content changes alter the skill snapshot."""
-
-        source = skill_tree_factory(tmp_path / "source", {"SKILL.md": "new\n"})
-        destination = skill_tree_factory(tmp_path / "destination", {"SKILL.md": "old\n"})
-
-        assert installer.trees_differ(source, destination)

@@ -2,6 +2,7 @@ import yaml
 from pydantic import BaseModel, JsonValue, RootModel, ValidationError
 
 from agent_sync.errors import AgentSyncError
+from agent_sync.utils import ensure_trailing_newline
 
 
 class FrontMatterDumper(yaml.SafeDumper):
@@ -32,12 +33,6 @@ class FrontMatterValues(RootModel[dict[str, JsonValue]]):
 
 
 type YamlMapping = dict[str, JsonValue]
-
-
-def ensure_trailing_newline(text: str) -> str:
-    """Return text with a trailing newline."""
-
-    return text if text.endswith("\n") else text + "\n"
 
 
 def parse_markdown[T: BaseModel](content: str, model: type[T], source: str) -> tuple[T, str]:

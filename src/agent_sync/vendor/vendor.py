@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Final
 
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry, VendorResult
-from agent_sync.utils import load_json_model
+from agent_sync.utils import load_json_model, trees_differ
 from agent_sync.vendor import github, installer
 from agent_sync.workspace import Workspace
 
@@ -18,7 +18,7 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> int:
     """Vendor external skills that have automatic updates enabled."""
 
     registry_path = workspace.agents_dir / REGISTRY_FILENAME
-    registry = load_json_model(workspace, registry_path, SkillsRegistry)
+    registry = load_json_model(registry_path, SkillsRegistry)
     if registry is None:
         logger.info("No external-skill registry at %s; nothing to vendor.", registry_path)
 
@@ -67,7 +67,7 @@ def vendor_skill(
             installer.supplement_root_assets(installed, source_root)
 
         destination = skills_dir / skill.name
-        changed = installer.trees_differ(installed, destination)
+        changed = trees_differ(installed, destination)
         if changed and not dry_run:
             workspace.delete(destination)
             destination.parent.mkdir(parents=True, exist_ok=True)

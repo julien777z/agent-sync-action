@@ -22,7 +22,7 @@ def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
                 raise AgentSyncError(f"Unsupported provider settings file: {path}") from exc
 
             model = CodexSettings if provider is Provider.CODEX else PlatformSettings
-            loaded = load_json_model(workspace, path, model)
+            loaded = load_json_model(path, model)
             if loaded is not None:
                 settings[provider] = loaded
 
@@ -30,7 +30,7 @@ def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
     if workspace.models_dir.exists():
         for path in sorted(workspace.models_dir.glob("*.json")):
             slug = validate_slug(path.stem, path)
-            loaded = load_json_model(workspace, path, AgentModelOverride)
+            loaded = load_json_model(path, AgentModelOverride)
             if loaded is not None:
                 overrides[slug] = loaded
 

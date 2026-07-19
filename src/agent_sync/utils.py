@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 from typing import Final
@@ -6,21 +7,26 @@ from typing import Final
 from pydantic import BaseModel, ValidationError
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.workspace import Workspace
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
+def ensure_trailing_newline(text: str) -> str:
+    """Return text with a trailing newline."""
+
+    return text if text.endswith("\n") else text + "\n"
+
+
 def load_json_model[T: BaseModel](
-    workspace: Workspace,
     path: Path,
     model: type[T],
 ) -> T | None:
     """Load and validate a typed JSON file when it exists."""
 
-    raw = workspace.read_text(path)
-    if raw is None:
+    if not path.exists():
         return None
+
+    raw = path.read_text(encoding="utf-8")
 
     try:
         value = json.loads(raw)
@@ -40,3 +46,28 @@ def validate_slug(slug: str, source_path: Path) -> str:
         raise AgentSyncError(f"Invalid slug '{slug}' from {source_path}")
 
     return slug
+
+
+def relative_link_target(target_path: Path, link_target: Path) -> str:
+    """Return a link target relative to the link's parent directory."""
+
+    return os.path.relpath(link_target, target_path.parent)
+
+
+def trees_differ(source: Path, destination: Path) -> bool:
+    """Report whether two directory trees contain different files."""
+
+    return _snapshot_tree(source) != _snapshot_tree(destination)
+
+
+def _snapshot_tree(directory: Path) -> dict[str, bytes]:
+    """Read every file in a directory tree into a comparable snapshot."""
+
+    if not directory.is_dir():
+        return {}
+
+    return {
+        str(path.relative_to(directory)): path.read_bytes()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    }
