@@ -26,7 +26,7 @@ class TestExternalSkillModel:
 
         assert skill.upstream_skill == "sample-skill"
 
-    @pytest.mark.parametrize("name", ["Bad Name", "UPPER", "-leading"])
+    @pytest.mark.parametrize("name", ["Bad Name", "UPPER", "-leading", "sample\n"])
     def test_invalid_skill_names_fail(self, name: str) -> None:
         """Test that unsafe external skill names are rejected."""
 

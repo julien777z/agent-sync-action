@@ -18,7 +18,7 @@ class ExternalSkill(BaseModel):
     def validate_name(cls, value: str) -> str:
         """Reject names that would not be a safe skill directory slug."""
 
-        if not SAFE_SLUG_PATTERN.match(value):
+        if not SAFE_SLUG_PATTERN.fullmatch(value):
             raise ValueError(
                 f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})"
             )
