@@ -167,6 +167,28 @@ class TestReconciliation:
         assert not directory.is_symlink()
         assert (directory / "sample.md").is_symlink()
 
+    def test_provider_root_symlinks_are_replaced_without_touching_their_target(
+        self,
+        workspace: Workspace,
+        rule_file_factory: Callable[..., Path],
+    ) -> None:
+        """Test that provider-root symlinks cannot redirect generated output externally."""
+
+        rule_file_factory("sample")
+        external = workspace.root / "external"
+        external.mkdir()
+        sentinel = external / "sentinel"
+        sentinel.write_text("preserve\n")
+
+        provider_root = workspace.root / ".claude"
+        provider_root.symlink_to(external, target_is_directory=True)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert provider_root.is_dir()
+        assert not provider_root.is_symlink()
+        assert (provider_root / "rules/sample.md").is_symlink()
+        assert sentinel.read_text() == "preserve\n"
+
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that provider settings cannot outlive their source configuration."""
 

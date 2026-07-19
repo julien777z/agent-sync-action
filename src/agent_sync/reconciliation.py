@@ -102,6 +102,12 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     expected = {output.target_path for output in manifest.outputs}
     stale: set[Path] = set()
 
+    stale.update(
+        blocker
+        for output in manifest.outputs
+        for blocker in workspace.find_parent_blockers(output.target_path)
+    )
+
     for provider, directory_name in owned_provider_directories():
         directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
 

@@ -64,21 +64,48 @@ class Workspace(BaseModel):
     def replace_text(self, path: Path, content: str, executable: bool) -> None:
         """Replace a path with a generated UTF-8 file."""
 
+        self.prepare_parent(path)
+
         if path.is_symlink() or path.is_dir():
             self.delete(path)
 
-        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         path.chmod(0o755 if executable else 0o644)
 
     def replace_link(self, path: Path, target: Path) -> None:
         """Replace a path with a relative symlink."""
 
+        self.prepare_parent(path)
+
         if path.is_symlink() or path.exists():
             self.delete(path)
 
-        path.parent.mkdir(parents=True, exist_ok=True)
         path.symlink_to(os.path.relpath(target, path.parent))
+
+    def find_parent_blockers(self, path: Path) -> list[Path]:
+        """Return non-directory ancestors that would make an output unsafe to write."""
+
+        relative_parent = path.parent.relative_to(self.root)
+        current = self.root
+        blockers: list[Path] = []
+
+        for part in relative_parent.parts:
+            current /= part
+
+            if current.is_symlink() or (current.exists() and not current.is_dir()):
+                blockers.append(current)
+
+                break
+
+        return blockers
+
+    def prepare_parent(self, path: Path) -> None:
+        """Replace unsafe output ancestors, then create the output parent directory."""
+
+        for blocker in self.find_parent_blockers(path):
+            self.delete(blocker)
+
+        path.parent.mkdir(parents=True, exist_ok=True)
 
     def delete(self, path: Path) -> None:
         """Delete a file, directory, or symlink without following links."""
