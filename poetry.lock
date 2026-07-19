@@ -100,7 +100,7 @@ description = "Faker is a Python package that generates fake data for you."
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version < \"4.0\" and extra == \"dev\""
+markers = "extra == \"dev\""
 files = [
     {file = "faker-40.31.0-py3-none-any.whl", hash = "sha256:bedc97c292a48a6a1bbe471a9076d7395a196421ede1cedde99d5719f6b91027"},
     {file = "faker-40.31.0.tar.gz", hash = "sha256:af163a937aec99dca5abaeb94dd5008c51c26c6e9af1a26c8db4b3c4e7ca4403"},
@@ -219,7 +219,7 @@ description = "Mock data generation factories"
 optional = true
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
-markers = "python_version < \"4.0\" and extra == \"dev\""
+markers = "extra == \"dev\""
 files = [
     {file = "polyfactory-3.3.0-py3-none-any.whl", hash = "sha256:686abcaa761930d3df87b91e95b26b8d8cb9fdbbbe0b03d5f918acff5c72606e"},
     {file = "polyfactory-3.3.0.tar.gz", hash = "sha256:237258b6ff43edf362ffd1f68086bb796466f786adfa002b0ac256dbf2246e9a"},
@@ -687,7 +687,7 @@ description = "Provider of IANA time zone data"
 optional = true
 python-versions = ">=2"
 groups = ["main"]
-markers = "python_version < \"4.0\" and extra == \"dev\" and platform_system == \"Windows\""
+markers = "extra == \"dev\" and platform_system == \"Windows\""
 files = [
     {file = "tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931"},
     {file = "tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415"},
@@ -698,5 +698,5 @@ dev = ["black", "polyfactory", "pyright", "pytest", "pytest-asyncio"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12"
-content-hash = "02f4e9dd319a0e02181b919c3a57814689ec3d5cd109054f0d92aeb99882f992"
+python-versions = ">=3.12,<4.0"
+content-hash = "430d4869c1a9b3de8f2393dc214a57ef134f6255de29167c250e4b2c9340cb4a"
