@@ -82,6 +82,41 @@ class TestReconciliation:
         assert os.readlink(directory_target) == "../../.agents/rules"
         assert source.read_text() == "source\n"
 
+    @pytest.mark.parametrize("target_kind", ["directory", "symlink"])
+    def test_file_outputs_replace_non_file_targets(
+        self,
+        workspace: Workspace,
+        target_kind: str,
+    ) -> None:
+        """Test that generated files replace directories and external symlinks."""
+
+        target = workspace.root / ".claude/settings.json"
+        target.parent.mkdir()
+
+        if target_kind == "directory":
+            target.mkdir()
+        else:
+            external = workspace.root / "external-settings.json"
+            external.write_text("generated\n")
+            target.symlink_to(external)
+
+        output = GeneratedFile(
+            target_path=target,
+            content="generated\n",
+            artifact=ArtifactKind.SETTING,
+            source_path=workspace.agents_dir / "settings/claude.json",
+            provider=Provider.CLAUDE,
+        )
+        plan = build_plan(workspace, Manifest(outputs=[output]))
+
+        assert plan.changes
+
+        apply_plan(workspace, plan)
+
+        assert target.is_file()
+        assert not target.is_symlink()
+        assert target.read_text() == "generated\n"
+
     def test_stale_provider_paths_are_removed(
         self,
         workspace: Workspace,

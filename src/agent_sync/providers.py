@@ -1,13 +1,15 @@
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
+
+from pydantic import BaseModel, ConfigDict
 
 from agent_sync.models.output import Provider
 
 
-@dataclass(frozen=True)
-class ProviderLayout:
+class ProviderLayout(BaseModel):
     """Describe stable paths and extensions for one provider."""
+
+    model_config = ConfigDict(frozen=True)
 
     directory: str
     rule_extension: str

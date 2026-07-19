@@ -51,7 +51,7 @@ runs:
         echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
 
     - name: Read Node version
-      if: ${{ steps.refresh.outputs.enabled == 'true' }}
+      if: ${{ steps.refresh.outputs.enabled == 'true' || inputs.mode == 'commit' }}
       id: node
       shell: bash
       run: |
@@ -64,7 +64,7 @@ runs:
         python-version-file: ${{ github.action_path }}/.python-version
 
     - name: Set up Node
-      if: ${{ steps.refresh.outputs.enabled == 'true' }}
+      if: ${{ steps.refresh.outputs.enabled == 'true' || inputs.mode == 'commit' }}
       uses: actions/setup-node@v4
       with:
         node-version: ${{ steps.node.outputs.version }}

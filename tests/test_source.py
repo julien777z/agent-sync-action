@@ -68,14 +68,17 @@ class TestCanonicalSources:
             load_source_config(workspace)
 
 
-def test_workspace_reads_current_disk_state(workspace: Workspace) -> None:
-    """Test that workspace reads never return stale cached content."""
+class TestWorkspace:
+    """Verify workspace access observes the filesystem directly."""
 
-    path = workspace.root / "state.txt"
-    path.write_text("first")
+    def test_reads_current_disk_state(self, workspace: Workspace) -> None:
+        """Test that workspace reads never return stale cached content."""
 
-    assert workspace.read_text(path) == "first"
+        path = workspace.root / "state.txt"
+        path.write_text("first")
 
-    path.write_text("second")
+        assert workspace.read_text(path) == "first"
 
-    assert workspace.read_text(path) == "second"
+        path.write_text("second")
+
+        assert workspace.read_text(path) == "second"

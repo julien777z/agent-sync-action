@@ -50,10 +50,10 @@ def validate_slug(slug: str, source_path: Path) -> str:
 def trees_differ(source: Path, destination: Path) -> bool:
     """Report whether two directory trees contain different files."""
 
-    return _snapshot_tree(source) != _snapshot_tree(destination)
+    return snapshot_tree(source) != snapshot_tree(destination)
 
 
-def _snapshot_tree(directory: Path) -> dict[str, bytes]:
+def snapshot_tree(directory: Path) -> dict[str, bytes]:
     """Read every file in a directory tree into a comparable snapshot."""
 
     if not directory.is_dir():

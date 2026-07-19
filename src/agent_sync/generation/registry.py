@@ -31,51 +31,51 @@ class ArtifactRegistration(TypedDict):
 
 
 ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
-    ArtifactKind.SKILL: {
-        "owned_directory": "skills",
-        "owned_files": {},
-        "handlers": {
+    ArtifactKind.SKILL: ArtifactRegistration(
+        owned_directory="skills",
+        owned_files={},
+        handlers={
             Provider.CLAUDE: generate_skills,
             Provider.CURSOR: generate_skills,
             Provider.CODEX: generate_skills,
         },
-    },
-    ArtifactKind.AGENT: {
-        "owned_directory": "agents",
-        "owned_files": {},
-        "handlers": {
+    ),
+    ArtifactKind.AGENT: ArtifactRegistration(
+        owned_directory="agents",
+        owned_files={},
+        handlers={
             Provider.CLAUDE: generate_agents,
             Provider.CURSOR: generate_agents,
         },
-    },
-    ArtifactKind.RULE: {
-        "owned_directory": "rules",
-        "owned_files": {},
-        "handlers": {
+    ),
+    ArtifactKind.RULE: ArtifactRegistration(
+        owned_directory="rules",
+        owned_files={},
+        handlers={
             Provider.CLAUDE: generate_rule_links,
             Provider.CURSOR: generate_rule_links,
             Provider.CODEX: generate_codex_rules,
         },
-    },
-    ArtifactKind.HOOK: {
-        "owned_directory": "hooks",
-        "owned_files": {},
-        "handlers": {
+    ),
+    ArtifactKind.HOOK: ArtifactRegistration(
+        owned_directory="hooks",
+        owned_files={},
+        handlers={
             Provider.CLAUDE: generate_hooks,
             Provider.CURSOR: generate_hooks,
         },
-    },
-    ArtifactKind.SETTING: {
-        "owned_directory": None,
-        "owned_files": {
+    ),
+    ArtifactKind.SETTING: ArtifactRegistration(
+        owned_directory=None,
+        owned_files={
             Provider.CLAUDE: ("settings.json",),
             Provider.CODEX: ("config.toml",),
         },
-        "handlers": {
+        handlers={
             Provider.CLAUDE: generate_claude_settings,
             Provider.CODEX: generate_codex_settings,
         },
-    },
+    ),
 }
 
 

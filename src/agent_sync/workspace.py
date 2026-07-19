@@ -1,6 +1,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,7 +35,7 @@ class Workspace(BaseModel):
         return self.agents_dir / "models"
 
     @classmethod
-    def resolve(cls, root: str | None, agents_dirname: str | None) -> "Workspace":
+    def resolve(cls, root: str | None, agents_dirname: str | None) -> Self:
         """Resolve CLI options, environment values, and defaults into a workspace."""
 
         resolved_root = root or ACTION_CONFIG.root or Path.cwd()

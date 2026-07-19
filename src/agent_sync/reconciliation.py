@@ -84,6 +84,9 @@ def compare_output(
 
         return None if existing == expected else Change(output=output, existing=existing)
 
+    if output.target_path.is_symlink() or output.target_path.is_dir():
+        return Change(output=output, existing=None)
+
     existing = workspace.read_text(output.target_path)
     executable_matches = (
         not output.target_path.exists()
