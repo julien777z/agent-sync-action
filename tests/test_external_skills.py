@@ -6,9 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from agent_sync.config import CONFIG, Config
+from agent_sync.external_skills import github, installer
+from agent_sync.external_skills import sync as external_skills
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
-from agent_sync.vendor import github, installer
-from agent_sync.vendor import vendor as vendor_service
 from agent_sync.workspace import Workspace
 
 
@@ -40,7 +40,7 @@ class TestExternalSkillModel:
             ExternalSkill.model_validate({"name": "sample", "repo": "example/sample"})
 
 
-class TestVendorBoundaries:
+class TestExternalSkillBoundaries:
     """Verify immutable GitHub snapshots and installer behavior."""
 
     def test_runtime_config_accepts_namespaced_overrides(
@@ -129,7 +129,7 @@ class TestVendorBoundaries:
 
         assert str(source_root) in captured
         assert f"skills@{CONFIG.skills_cli_version}" in captured
-        assert captured[captured.index("-a") + 1] == CONFIG.skills_cli_agent
+        assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
 
     def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
         """Test that staging discovery does not depend on one provider directory."""
@@ -210,7 +210,7 @@ class TestVendorBoundaries:
             fake_supplement,
         )
 
-        vendor_service.vendor_skill(
+        external_skills.update_external_skill(
             workspace,
             skill,
             workspace.agents_dir / "skills",
@@ -222,13 +222,13 @@ class TestVendorBoundaries:
         assert observed[2] == ("assets", observed[1][1])
 
 
-class TestVendorService:
+class TestExternalSkillService:
     """Verify registry orchestration and dry-run change reporting."""
 
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
 
-        assert vendor_service.vendor_skills(workspace, dry_run=True) is False
+        assert external_skills.sync_external_skills(workspace, dry_run=True) is False
 
     def test_dry_run_reports_changes(
         self,
@@ -250,7 +250,7 @@ class TestVendorService:
             )
         )
 
-        def fake_vendor_skill(
+        def fake_update_external_skill(
             resolved_workspace: Workspace,
             skill: ExternalSkill,
             skills_dir: Path,
@@ -260,9 +260,13 @@ class TestVendorService:
 
             return True
 
-        monkeypatch.setattr(vendor_service, "vendor_skill", fake_vendor_skill)
+        monkeypatch.setattr(
+            external_skills,
+            "update_external_skill",
+            fake_update_external_skill,
+        )
 
-        assert vendor_service.vendor_skills(workspace, dry_run=True) is True
+        assert external_skills.sync_external_skills(workspace, dry_run=True) is True
 
     def test_disabled_automatic_updates_skip_vendoring(
         self,
@@ -288,7 +292,7 @@ class TestVendorService:
         local_skill.parent.mkdir(parents=True)
         local_skill.write_text("local\n")
 
-        def fail_vendor(
+        def fail_update(
             resolved_workspace: Workspace,
             skill: ExternalSkill,
             skills_dir: Path,
@@ -298,9 +302,9 @@ class TestVendorService:
 
             raise AssertionError("disabled skill must not be vendored")
 
-        monkeypatch.setattr(vendor_service, "vendor_skill", fail_vendor)
+        monkeypatch.setattr(external_skills, "update_external_skill", fail_update)
 
-        assert vendor_service.vendor_skills(workspace, dry_run=False) is False
+        assert external_skills.sync_external_skills(workspace, dry_run=False) is False
         assert local_skill.read_text() == "local\n"
 
 

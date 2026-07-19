@@ -13,6 +13,9 @@ inputs:
   refresh-external-skills:
     description: Force vendoring external skills from the registry before mirroring.
     default: "false"
+  skills-cli-version:
+    description: Version of the skills CLI used to update external skills.
+    default: "1.5.13"
   mode:
     description: How to persist changes — commit (push to the branch) or pull-request.
     default: commit
@@ -73,6 +76,8 @@ runs:
     - name: Vendor external skills
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
+      env:
+        AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
       run: python -m agent_sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
@@ -83,6 +88,7 @@ runs:
       if: ${{ inputs.dry-run != 'true' }}
       shell: bash
       env:
+        AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
         GH_TOKEN: ${{ inputs.github-token }}
         MODE: ${{ inputs.mode }}
       run: |

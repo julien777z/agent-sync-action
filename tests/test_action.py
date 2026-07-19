@@ -17,6 +17,10 @@ def test_action_keeps_the_public_input_contract() -> None:
             "description": "Force vendoring external skills from the registry before mirroring.",
             "default": "false",
         },
+        "skills-cli-version": {
+            "description": "Version of the skills CLI used to update external skills.",
+            "default": "1.5.13",
+        },
         "mode": {
             "description": "How to persist changes — commit (push to the branch) or pull-request.",
             "default": "commit",
@@ -44,6 +48,7 @@ def test_action_uses_the_installed_unified_cli() -> None:
 
     assert "python -m agent_sync mirror-providers" in action_text
     assert "python -m agent_sync vendor-skills" in action_text
+    assert "AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}" in action_text
     assert "PYTHONPATH=" not in action_text
     assert "requirements.txt" not in action_text
 

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from agent_sync.config import CONFIG
 from agent_sync.models.registry import ExternalSkill, SkillsLock
 
+SKILLS_CLI_AGENT: Final[str] = "universal"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "node_modules",
@@ -36,7 +37,7 @@ def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Pa
         "--skill",
         skill.upstream_skill,
         "-a",
-        CONFIG.skills_cli_agent,
+        SKILLS_CLI_AGENT,
         "-y",
         "--copy",
     ]

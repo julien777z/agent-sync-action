@@ -4,9 +4,9 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry, VendorResult
+from agent_sync.external_skills import github, installer
+from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
 from agent_sync.utils import load_json_model, trees_differ
-from agent_sync.vendor import github, installer
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -14,29 +14,29 @@ logger = logging.getLogger(__name__)
 REGISTRY_FILENAME: Final[str] = "skills.json"
 
 
-def vendor_skills(workspace: Workspace, dry_run: bool) -> bool:
-    """Vendor external skills and report whether a dry run found changes."""
+def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
+    """Update external skills and report whether a dry run found changes."""
 
     registry_path = workspace.agents_dir / REGISTRY_FILENAME
     registry = load_json_model(registry_path, SkillsRegistry)
 
     if registry is None:
-        logger.info("No external-skill registry at %s; nothing to vendor.", registry_path)
+        logger.info("No external-skill registry at %s; nothing to update.", registry_path)
 
         return False
 
     updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
 
     if not updatable_skills:
-        logger.info("No external skills have automatic updates enabled; nothing to vendor.")
+        logger.info("No external skills have automatic updates enabled; nothing to update.")
 
         return False
 
     skills_dir = workspace.agents_dir / "skills"
     results = [
-        VendorResult(
+        ExternalSkillResult(
             skill=skill,
-            changed=vendor_skill(workspace, skill, skills_dir, dry_run),
+            changed=update_external_skill(workspace, skill, skills_dir, dry_run),
         )
         for skill in updatable_skills
     ]
@@ -46,15 +46,15 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> bool:
     return dry_run and any(result.changed for result in results)
 
 
-def vendor_skill(
+def update_external_skill(
     workspace: Workspace,
     skill: ExternalSkill,
     skills_dir: Path,
     dry_run: bool,
 ) -> bool:
-    """Vendor one external skill from a single immutable source snapshot."""
+    """Update one external skill from a single immutable source snapshot."""
 
-    logger.info("Vendoring %s from %s", skill.name, skill.repo)
+    logger.info("Updating %s from %s", skill.name, skill.repo)
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as temporary_directory:
         working_directory = Path(temporary_directory)
@@ -83,8 +83,8 @@ def vendor_skill(
     return changed
 
 
-def report_results(results: list[VendorResult], dry_run: bool) -> None:
-    """Log the result of each external skill vendoring operation."""
+def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
+    """Log the result of each external skill update."""
 
     for result in results:
         if result.changed:

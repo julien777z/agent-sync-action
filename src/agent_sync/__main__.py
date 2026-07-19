@@ -5,8 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from agent_sync.errors import AgentSyncError
+from agent_sync.external_skills.sync import sync_external_skills
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.vendor.vendor import vendor_skills
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
             case "vendor-skills":
-                differences_found = vendor_skills(workspace, parsed.dry_run)
+                differences_found = sync_external_skills(workspace, parsed.dry_run)
 
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError) as exc:

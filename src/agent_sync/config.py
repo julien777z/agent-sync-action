@@ -14,7 +14,6 @@ class Config(BaseSettings):
     )
 
     skills_cli_version: str = "1.5.13"
-    skills_cli_agent: str = "universal"
 
 
 CONFIG = Config()

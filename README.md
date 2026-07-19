@@ -97,6 +97,7 @@ Only the directories and files your repository uses are required.
 |---|---|---|
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
 | `refresh-external-skills` | `false` | Vendor registered external skills before mirroring. |
+| `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `dry-run` | `false` | Report differences without writing or committing. |

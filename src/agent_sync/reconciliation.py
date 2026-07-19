@@ -18,7 +18,7 @@ from agent_sync.models.output import (
     Manifest,
     ReconciliationPlan,
 )
-from agent_sync.models.provider import PROVIDER_LAYOUTS
+from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 

@@ -57,8 +57,8 @@ class SkillsLock(BaseModel):
     skills: dict[str, SkillLockEntry]
 
 
-class VendorResult(BaseModel):
-    """The outcome of vendoring one external skill into .agents/skills/."""
+class ExternalSkillResult(BaseModel):
+    """The outcome of updating one external skill in .agents/skills/."""
 
     model_config = ConfigDict(frozen=True)
 
