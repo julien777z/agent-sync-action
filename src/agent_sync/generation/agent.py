@@ -10,10 +10,12 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
 
     outputs: list[GeneratedOutput] = []
     root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
     for source in context.agents:
         front_matter = source.front_matter.model_copy(
             update={"model": resolve_agent_model(source.slug, provider, context.configuration)}
         )
+
         outputs.append(
             GeneratedFile(
                 target_path=root / "agents" / f"{source.slug}.md",

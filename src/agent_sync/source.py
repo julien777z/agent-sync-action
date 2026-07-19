@@ -14,6 +14,7 @@ def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
     """Load all provider settings and agent model overrides."""
 
     settings: dict[Provider, PlatformSettings | CodexSettings] = {}
+
     if workspace.settings_dir.exists():
         for path in sorted(workspace.settings_dir.glob("*.json")):
             try:
@@ -23,14 +24,17 @@ def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
 
             model = CodexSettings if provider is Provider.CODEX else PlatformSettings
             loaded = load_json_model(path, model)
+
             if loaded is not None:
                 settings[provider] = loaded
 
     overrides: dict[str, AgentModelOverride] = {}
+
     if workspace.models_dir.exists():
         for path in sorted(workspace.models_dir.glob("*.json")):
             slug = validate_slug(path.stem, path)
             loaded = load_json_model(path, AgentModelOverride)
+
             if loaded is not None:
                 overrides[slug] = loaded
 

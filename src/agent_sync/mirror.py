@@ -18,6 +18,7 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
     configuration = load_configuration(workspace)
     manifest = generate_manifest(workspace, configuration)
     plan = build_plan(workspace, manifest)
+
     if plan.is_clean:
         logger.info("No differences found.")
 
@@ -29,6 +30,7 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
         return True
 
     apply_plan(workspace, plan)
+
     logger.info(
         "Mirroring complete. %d output(s) written, %d stale path(s) deleted.",
         len(plan.changes),

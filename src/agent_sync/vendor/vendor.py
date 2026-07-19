@@ -19,12 +19,14 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> bool:
 
     registry_path = workspace.agents_dir / REGISTRY_FILENAME
     registry = load_json_model(registry_path, SkillsRegistry)
+
     if registry is None:
         logger.info("No external-skill registry at %s; nothing to vendor.", registry_path)
 
         return False
 
     updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
+
     if not updatable_skills:
         logger.info("No external skills have automatic updates enabled; nothing to vendor.")
 
@@ -38,6 +40,7 @@ def vendor_skills(workspace: Workspace, dry_run: bool) -> bool:
         )
         for skill in updatable_skills
     ]
+
     report_results(results, dry_run)
 
     return dry_run and any(result.changed for result in results)
@@ -52,6 +55,7 @@ def vendor_skill(
     """Vendor one external skill from a single immutable source snapshot."""
 
     logger.info("Vendoring %s from %s", skill.name, skill.repo)
+
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as temporary_directory:
         working_directory = Path(temporary_directory)
         revision = github.resolve_revision(skill.repo)
@@ -60,14 +64,17 @@ def vendor_skill(
             revision,
             working_directory / "source",
         )
+
         installer.install_skill(skill, working_directory, source_root)
         installed = installer.locate_installed_skill(working_directory, skill.name)
         skill_path = installer.read_skill_path(working_directory)
+
         if skill_path is not None and "/" not in skill_path:
             installer.supplement_root_assets(installed, source_root)
 
         destination = skills_dir / skill.name
         changed = trees_differ(installed, destination)
+
         if changed and not dry_run:
             workspace.delete(destination)
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -84,6 +91,7 @@ def report_results(results: list[VendorResult], dry_run: bool) -> None:
             status = "would update" if dry_run else "updated"
         else:
             status = "unchanged"
+
         logger.info("  %s (%s): %s", result.skill.name, result.skill.repo, status)
 
     changed_count = sum(result.changed for result in results)

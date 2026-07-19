@@ -41,6 +41,7 @@ def parse_markdown[T: BaseModel](content: str, model: type[T], source: str) -> t
     raw_front_matter: YamlMapping = {}
     body = content
     lines = content.splitlines()
+
     if lines and lines[0] == "---":
         try:
             end_index = lines[1:].index("---") + 1
@@ -49,6 +50,7 @@ def parse_markdown[T: BaseModel](content: str, model: type[T], source: str) -> t
 
         front_matter_content = "\n".join(lines[1:end_index]).strip()
         body = "\n".join(lines[end_index + 1 :])
+
         if front_matter_content:
             try:
                 raw_front_matter = FrontMatterValues.model_validate(
@@ -90,7 +92,9 @@ def render_front_matter(front_matter: BaseModel | YamlMapping, body: str) -> str
         if values
         else ""
     )
+
     output = f"---\n{rendered}\n---\n"
+
     if body:
         output += f"\n{body}"
 
@@ -103,10 +107,12 @@ def normalize_rule(front_matter: BaseModel, body: str) -> str:
     values = FrontMatterValues.model_validate(
         front_matter.model_dump(by_alias=True, exclude_none=True)
     ).root
+
     known_keys = ("description", "globs", "alwaysApply", "starlark")
     normalized = {
         key: values[key] for key in known_keys if key in values and values[key] not in (None, "")
     }
+
     for key in sorted(set(values) - set(known_keys) - {"name"}):
         normalized[key] = values[key]
 

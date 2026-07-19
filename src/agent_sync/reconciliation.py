@@ -29,6 +29,7 @@ def build_plan(workspace: Workspace, manifest: Manifest) -> ReconciliationPlan:
         for output in manifest.outputs
         if (change := compare_output(workspace, output)) is not None
     ]
+
     stale_paths = find_stale_paths(workspace, manifest)
 
     return ReconciliationPlan(changes=changes, stale_paths=stale_paths)
@@ -51,6 +52,7 @@ def compare_output(
         not output.target_path.exists()
         or bool(output.target_path.stat().st_mode & 0o111) == output.executable
     )
+
     if existing == output.content and executable_matches:
         return None
 
@@ -68,14 +70,17 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     expected = {output.target_path for output in manifest.outputs}
     stale: set[Path] = set()
+
     for provider, directory_name in owned_provider_directories():
         directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+
         if directory.exists():
             stale.update(path for path in directory.iterdir() if path not in expected)
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
             root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+
             stale.update(
                 path
                 for filename in filenames
@@ -91,16 +96,20 @@ def apply_plan(workspace: Workspace, plan: ReconciliationPlan) -> None:
 
     for stale_path in plan.stale_paths:
         workspace.delete(stale_path)
+
         logger.info("deleted: %s", stale_path)
 
     for change in plan.changes:
         output = change.output
+
         if isinstance(output, GeneratedFile):
             workspace.replace_text(output.target_path, output.content, output.executable)
+
             status = "created" if change.existing is None else "updated"
             logger.info("%s: %s", status, output.target_path)
         else:
             workspace.replace_link(output.target_path, output.link_target)
+
             logger.info("linked: %s -> %s", output.target_path, expected_link(output))
 
 
@@ -108,6 +117,7 @@ def report_plan(plan: ReconciliationPlan) -> None:
     """Log every generated difference and stale managed path."""
 
     logger.info("Differences detected:")
+
     for change in plan.changes:
         status = "missing" if change.existing is None else "changed"
         logger.info(
@@ -144,6 +154,7 @@ def summarize_change(change: Change) -> str:
             lineterm="",
         )
     )
+
     if not lines:
         return "(trailing newline or executable-mode difference)"
 

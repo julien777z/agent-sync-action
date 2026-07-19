@@ -19,7 +19,9 @@ def generate_manifest(
         for output in shared_outputs
         if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
     )
+
     context = context.model_copy(update={"instructions": instructions.content})
+
     provider_outputs = [
         output
         for registration in ARTIFACT_REGISTRY.values()

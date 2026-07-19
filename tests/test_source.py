@@ -73,6 +73,7 @@ def test_workspace_reads_current_disk_state(workspace: Workspace) -> None:
 
     path = workspace.root / "state.txt"
     path.write_text("first")
+
     assert workspace.read_text(path) == "first"
 
     path.write_text("second")

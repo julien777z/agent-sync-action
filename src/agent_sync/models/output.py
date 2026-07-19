@@ -70,6 +70,7 @@ class Manifest(BaseModel):
         duplicates = sorted(
             (target for target, count in target_counts.items() if count > 1), key=str
         )
+
         if duplicates:
             raise ValueError(f"Duplicate generated targets: {duplicates}")
 

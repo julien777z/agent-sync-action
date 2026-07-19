@@ -48,12 +48,15 @@ class TestReconciliation:
         source = workspace.agents_dir / "rules/sample.md"
         source.parent.mkdir()
         source.write_text("source\n")
+
         file_target = workspace.root / ".claude/rules/sample.md"
         file_target.parent.mkdir(parents=True)
         file_target.write_text("copy\n")
+
         directory_target = workspace.root / ".cursor/skills/sample"
         directory_target.mkdir(parents=True)
         (directory_target / "SKILL.md").write_text("copy\n")
+
         manifest = Manifest(
             outputs=[
                 GeneratedLink(
@@ -89,11 +92,14 @@ class TestReconciliation:
         claude_rules.mkdir(parents=True)
         stale_rule = claude_rules / "orphan.md"
         stale_rule.write_text("stale\n")
+
         stale_directory = claude_rules / "custom"
         stale_directory.mkdir()
         (stale_directory / "rule.md").write_text("stale\n")
+
         duplicate_rule = claude_rules / "orphan 2.md"
         duplicate_rule.write_text("duplicate\n")
+
         codex_rules = workspace.root / ".codex/rules"
         codex_rules.mkdir(parents=True)
         stale_codex_rule = codex_rules / "custom.rules"
@@ -161,6 +167,7 @@ class TestReconciliation:
         rules_dir.mkdir()
         source = rules_dir / "sample.md"
         source.write_text("# Sample\n")
+
         assert mirror_providers(workspace, dry_run=False) is False
 
         source.unlink()
@@ -175,6 +182,7 @@ class TestReconciliation:
         target = workspace.root / "script"
         target.write_text("#!/bin/sh\n")
         target.chmod(0o644)
+
         output = GeneratedFile(
             target_path=target,
             content="#!/bin/sh\n",
@@ -182,8 +190,11 @@ class TestReconciliation:
             artifact=ArtifactKind.HOOK,
             source_path=workspace.agents_dir / "hooks/script",
         )
+
         plan = build_plan(workspace, Manifest(outputs=[output]))
 
         assert plan.changes
+
         apply_plan(workspace, plan)
+
         assert target.stat().st_mode & 0o111

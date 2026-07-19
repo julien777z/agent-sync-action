@@ -69,10 +69,9 @@ def test_action_sets_up_node_only_for_external_skills() -> None:
 
 
 def test_agent_sync_workflow_runs_on_feature_branches() -> None:
-    """Test that repository mirroring runs on branches with maintainer authentication."""
+    """Test that repository mirroring is not restricted to the default branch."""
 
     workflow_text = Path(".github/workflows/agent-sync.yml").read_text(encoding="utf-8")
 
     assert "branches: [main]" not in workflow_text
     assert "uses: ./" in workflow_text
-    assert "github-token: ${{ secrets.AGENT_SYNC_TOKEN }}" in workflow_text

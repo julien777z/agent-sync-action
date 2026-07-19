@@ -257,6 +257,7 @@ class TestVendorService:
                 ]
             )
         )
+
         local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
         local_skill.parent.mkdir(parents=True)
         local_skill.write_text("local\n")

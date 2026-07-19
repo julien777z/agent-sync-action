@@ -31,11 +31,13 @@ def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Repository root (default: $AGENT_SYNC_ROOT or cwd).",
     )
+
     parser.add_argument(
         "--agents-dir",
         default=None,
         help="Canonical source directory (default: $AGENT_SYNC_AGENTS_DIR or .agents).",
     )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -50,6 +52,7 @@ def create_parser() -> argparse.ArgumentParser:
         prog="agent-sync",
         description="Mirror canonical agent sources and vendor registered skills.",
     )
+
     commands = parser.add_subparsers(dest="command", required=True)
 
     mirror_parser = commands.add_parser(
@@ -79,6 +82,7 @@ if __name__ == "__main__":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
             case "vendor-skills":
                 differences_found = vendor_skills(workspace, parsed.dry_run)
+
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError) as exc:
         logger.error("%s", exc)

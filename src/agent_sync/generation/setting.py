@@ -16,6 +16,7 @@ def generate_claude_settings(
     """Generate complete Claude settings when configured."""
 
     settings = context.configuration.settings.get(provider)
+
     if not isinstance(settings, PlatformSettings):
         return []
 
@@ -39,12 +40,14 @@ def generate_codex_settings(
     """Generate synchronized Codex settings and source capacity."""
 
     settings = context.configuration.settings.get(provider)
+
     if not isinstance(settings, CodexSettings):
         return []
 
     synchronized = settings.model_copy(
         update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
     )
+
     source_path = context.workspace.settings_dir / "codex.json"
 
     return [
@@ -71,10 +74,13 @@ def render_codex_settings(settings: CodexSettings) -> str:
     """Render the complete generated Codex TOML file."""
 
     lines: list[str] = []
+
     if settings.model:
         lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
+
     lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
     rendered = ensure_trailing_newline("\n".join(lines))
+
     try:
         tomllib.loads(rendered)
     except tomllib.TOMLDecodeError as exc:

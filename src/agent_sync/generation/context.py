@@ -93,24 +93,29 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
     """Load validated skill directories."""
 
     skills_dir = workspace.agents_dir / "skills"
+
     if not skills_dir.exists():
         return []
 
     sources: list[SkillSource] = []
+
     for directory in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
         slug = validate_slug(directory.name, directory)
         path = directory / "SKILL.md"
         content = workspace.read_text(path)
+
         if content is None:
             logger.warning("Missing SKILL.md in %s.", directory)
             continue
 
         front_matter, _ = parse_markdown(content, SkillFrontMatter, str(path))
+
         if front_matter.name != slug:
             raise AgentSyncError(
                 f"Skill {path} must use directory name {slug!r} "
                 f"as its front matter name, not {front_matter.name!r}"
             )
+
         sources.append(SkillSource(slug=slug, path=path, directory=directory))
 
     return sources
@@ -147,12 +152,15 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
     """Load hook files and executable intent."""
 
     hooks_dir = workspace.agents_dir / "hooks"
+
     if not hooks_dir.exists():
         return []
 
     sources: list[HookSource] = []
+
     for path in sorted(path for path in hooks_dir.iterdir() if path.is_file()):
         content = workspace.read_text(path)
+
         if content is not None:
             sources.append(
                 HookSource(
@@ -173,13 +181,16 @@ def load_markdown_sources[T: BaseModel](
     """Load typed Markdown documents from one source directory."""
 
     directory = workspace.agents_dir / directory_name
+
     if not directory.exists():
         return []
 
     sources: list[tuple[Path, str, T, str]] = []
+
     for path in sorted(directory.glob("*.md")):
         slug = validate_slug(path.stem, path)
         content = workspace.read_text(path)
+
         if content is not None:
             front_matter, body = parse_markdown(content, model, str(path))
             sources.append((path, slug, front_matter, body))

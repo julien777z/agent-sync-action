@@ -153,6 +153,7 @@ class TestDocumentGeneration:
             for output in outputs
             if isinstance(output, GeneratedFile) and output.target_path == source
         )
+
         links = [output for output in outputs if isinstance(output, GeneratedLink)]
 
         assert source_output.content.startswith(
@@ -223,9 +224,11 @@ class TestSettingsGeneration:
         """Test that generated instructions determine Codex document capacity."""
 
         rule_file_factory("project", body="# Project Rules\n\nKeep changes focused.")
+
         workspace.settings_dir.mkdir(parents=True)
         settings_path = workspace.settings_dir / "codex.json"
         settings_path.write_text('{"model":"gpt-5","project_doc_max_bytes":1}')
+
         config_path = workspace.root / ".codex/config.toml"
         config_path.parent.mkdir()
         config_path.write_text('model_reasoning_effort = "high"\n')
@@ -247,6 +250,7 @@ class TestSettingsGeneration:
 
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "codex.json").write_text('{"project_doc_max_bytes":1}')
+
         config_path = workspace.root / ".codex/config.toml"
         config_path.parent.mkdir()
         config_path.write_text("invalid = [\n")
@@ -270,6 +274,7 @@ class TestMirrorIntegration:
         skill_file_factory("review")
 
         assert mirror_providers(workspace, dry_run=False) is False
+
         assert os.readlink(workspace.root / ".claude/rules/python.md") == (
             "../../.agents/rules/python.md"
         )

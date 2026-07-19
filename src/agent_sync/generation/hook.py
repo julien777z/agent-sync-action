@@ -8,6 +8,7 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
     """Generate one provider's hook files."""
 
     root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
     return [
         GeneratedFile(
             target_path=root / "hooks" / source.path.name,

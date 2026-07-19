@@ -8,6 +8,7 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
     """Generate one provider's skill links."""
 
     root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
     return [
         GeneratedLink(
             target_path=root / "skills" / source.slug,
