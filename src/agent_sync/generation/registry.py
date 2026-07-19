@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Final, TypedDict
 
-from agent_sync.configuration import CanonicalConfiguration
+from agent_sync.config import SourceConfig
 from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.rule import (
@@ -81,11 +81,11 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
 
 def generate_manifest(
     workspace: Workspace,
-    configuration: CanonicalConfiguration,
+    source_config: SourceConfig,
 ) -> Manifest:
     """Generate the complete desired provider-output manifest."""
 
-    context = load_generation_context(workspace, configuration)
+    context = load_generation_context(workspace, source_config)
     shared_outputs = generate_shared_rule_outputs(context)
     instructions = next(
         output

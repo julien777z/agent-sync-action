@@ -19,7 +19,7 @@ from agent_sync.models.output import (
     ReconciliationPlan,
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
-from agent_sync.source import load_configuration
+from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,8 @@ def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
     if not workspace.agents_dir.exists():
         raise AgentSyncError(f"Missing agents directory: {workspace.agents_dir}")
 
-    configuration = load_configuration(workspace)
-    manifest = generate_manifest(workspace, configuration)
+    source_config = load_source_config(workspace)
+    manifest = generate_manifest(workspace, source_config)
     plan = build_plan(workspace, manifest)
 
     if plan.is_clean:

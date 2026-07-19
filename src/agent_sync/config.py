@@ -1,6 +1,23 @@
 from pydantic import BaseModel, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent_sync.models.output import Provider
+
+
+class Config(BaseSettings):
+    """Load runtime settings from typed defaults or environment overrides."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="AGENT_SYNC_",
+        extra="ignore",
+        frozen=True,
+    )
+
+    skills_cli_version: str = "1.5.13"
+    skills_cli_agent: str = "universal"
+
+
+CONFIG = Config()
 
 
 class PlatformSettings(BaseModel):
@@ -12,7 +29,7 @@ class PlatformSettings(BaseModel):
 
 
 class CodexSettings(BaseModel):
-    """Validate canonical settings for generated Codex project configuration."""
+    """Validate source settings for generated Codex project configuration."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -40,8 +57,8 @@ class AgentModelOverride(BaseModel):
                 return None
 
 
-class CanonicalConfiguration(BaseModel):
-    """Hold all validated canonical settings and model overrides."""
+class SourceConfig(BaseModel):
+    """Hold all validated source settings and model overrides."""
 
     model_config = ConfigDict(frozen=True)
 

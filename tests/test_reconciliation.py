@@ -13,7 +13,7 @@ from agent_sync.models.output import (
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
-from agent_sync.source import load_configuration
+from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
 
@@ -105,7 +105,7 @@ class TestReconciliation:
 
         plan = build_plan(
             workspace,
-            generate_manifest(workspace, load_configuration(workspace)),
+            generate_manifest(workspace, load_source_config(workspace)),
         )
 
         assert stale_rule in plan.stale_paths
@@ -132,7 +132,7 @@ class TestReconciliation:
 
         plan = build_plan(
             workspace,
-            generate_manifest(workspace, load_configuration(workspace)),
+            generate_manifest(workspace, load_source_config(workspace)),
         )
 
         assert stale_path in plan.stale_paths
@@ -150,7 +150,7 @@ class TestReconciliation:
 
         plan = build_plan(
             workspace,
-            generate_manifest(workspace, load_configuration(workspace)),
+            generate_manifest(workspace, load_source_config(workspace)),
         )
 
         assert set(stale_settings) <= set(plan.stale_paths)

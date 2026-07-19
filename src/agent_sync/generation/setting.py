@@ -1,7 +1,7 @@
 import json
 import tomllib
 
-from agent_sync.configuration import CodexSettings, PlatformSettings
+from agent_sync.config import CodexSettings, PlatformSettings
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
@@ -15,7 +15,7 @@ def generate_claude_settings(
 ) -> list[GeneratedOutput]:
     """Generate complete Claude settings when configured."""
 
-    settings = context.configuration.settings.get(provider)
+    settings = context.source_config.settings.get(provider)
 
     if not isinstance(settings, PlatformSettings):
         return []
@@ -39,7 +39,7 @@ def generate_codex_settings(
 ) -> list[GeneratedOutput]:
     """Generate synchronized Codex settings and source capacity."""
 
-    settings = context.configuration.settings.get(provider)
+    settings = context.source_config.settings.get(provider)
 
     if not isinstance(settings, CodexSettings):
         return []

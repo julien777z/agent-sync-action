@@ -1,8 +1,8 @@
-from agent_sync.configuration import (
+from agent_sync.config import (
     AgentModelOverride,
-    CanonicalConfiguration,
     CodexSettings,
     PlatformSettings,
+    SourceConfig,
 )
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
@@ -10,7 +10,7 @@ from agent_sync.utils import load_json_model, validate_slug
 from agent_sync.workspace import Workspace
 
 
-def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
+def load_source_config(workspace: Workspace) -> SourceConfig:
     """Load all provider settings and agent model overrides."""
 
     settings: dict[Provider, PlatformSettings | CodexSettings] = {}
@@ -38,19 +38,19 @@ def load_configuration(workspace: Workspace) -> CanonicalConfiguration:
             if loaded is not None:
                 overrides[slug] = loaded
 
-    return CanonicalConfiguration(settings=settings, model_overrides=overrides)
+    return SourceConfig(settings=settings, model_overrides=overrides)
 
 
 def resolve_agent_model(
     agent_slug: str,
     provider: Provider,
-    configuration: CanonicalConfiguration,
+    source_config: SourceConfig,
 ) -> str | None:
     """Resolve a per-agent override before the provider default model."""
 
-    override = configuration.model_overrides.get(agent_slug)
+    override = source_config.model_overrides.get(agent_slug)
     resolved_override = override.for_provider(provider) if override is not None else None
-    provider_settings = configuration.settings.get(provider)
+    provider_settings = source_config.settings.get(provider)
     default = provider_settings.model if provider_settings is not None else None
 
     return resolved_override or default

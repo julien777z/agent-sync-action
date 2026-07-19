@@ -15,7 +15,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
 
     for source in context.agents:
         front_matter = source.front_matter.model_copy(
-            update={"model": resolve_agent_model(source.slug, provider, context.configuration)}
+            update={"model": resolve_agent_model(source.slug, provider, context.source_config)}
         )
 
         outputs.append(

@@ -20,14 +20,14 @@ from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.document import RuleFrontMatter
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.source import load_configuration
+from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
 
 def load_context(workspace: Workspace) -> GenerationContext:
     """Load generation inputs from one test workspace."""
 
-    return load_generation_context(workspace, load_configuration(workspace))
+    return load_generation_context(workspace, load_source_config(workspace))
 
 
 class TestArtifactRegistry:

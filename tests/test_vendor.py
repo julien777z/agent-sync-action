@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from agent_sync.config import CONFIG, Config
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.vendor import github, installer
 from agent_sync.vendor import vendor as vendor_service
@@ -41,6 +42,16 @@ class TestExternalSkillModel:
 
 class TestVendorBoundaries:
     """Verify immutable GitHub snapshots and installer behavior."""
+
+    def test_runtime_config_accepts_namespaced_overrides(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that future CLI versions can be selected without code changes."""
+
+        monkeypatch.setenv("AGENT_SYNC_SKILLS_CLI_VERSION", "9.9.9")
+
+        assert Config().skills_cli_version == "9.9.9"
 
     def test_revision_resolution_returns_exact_head(
         self,
@@ -117,6 +128,21 @@ class TestVendorBoundaries:
         installer.install_skill(skill, tmp_path, source_root)
 
         assert str(source_root) in captured
+        assert f"skills@{CONFIG.skills_cli_version}" in captured
+        assert captured[captured.index("-a") + 1] == CONFIG.skills_cli_agent
+
+    def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
+        """Test that staging discovery does not depend on one provider directory."""
+
+        source_root = tmp_path / "source/repository"
+        source_root.mkdir(parents=True)
+        (source_root / "SKILL.md").write_text("source\n")
+
+        installed = tmp_path / ".staging/skills/sample"
+        installed.mkdir(parents=True)
+        (installed / "SKILL.md").write_text("installed\n")
+
+        assert installer.locate_installed_skill(tmp_path, source_root, "sample") == installed
 
     def test_one_snapshot_drives_installation_and_assets(
         self,
@@ -160,7 +186,7 @@ class TestVendorBoundaries:
             """Create one synthetic installed skill."""
 
             observed.append(("install", str(source_root)))
-            installed = working_directory / ".claude/skills" / installed_skill.name
+            installed = working_directory / ".staging/skills" / installed_skill.name
             installed.mkdir(parents=True)
             (installed / "SKILL.md").write_text("content\n")
 

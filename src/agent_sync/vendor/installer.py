@@ -5,9 +5,9 @@ from typing import Final
 
 from pydantic import ValidationError
 
+from agent_sync.config import CONFIG
 from agent_sync.models.registry import ExternalSkill, SkillsLock
 
-SKILLS_CLI_VERSION: Final[str] = "1.5.13"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "node_modules",
@@ -30,13 +30,13 @@ def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Pa
     command = [
         "npx",
         "--yes",
-        f"skills@{SKILLS_CLI_VERSION}",
+        f"skills@{CONFIG.skills_cli_version}",
         "add",
         str(source_root),
         "--skill",
         skill.upstream_skill,
         "-a",
-        "claude-code",
+        CONFIG.skills_cli_agent,
         "-y",
         "--copy",
     ]
@@ -56,27 +56,28 @@ def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Pa
         )
 
 
-def locate_installed_skill(working_directory: Path, name: str) -> Path:
+def locate_installed_skill(working_directory: Path, source_root: Path, name: str) -> Path:
     """Locate the single skill directory produced by the installer."""
 
-    expected = working_directory / ".claude" / "skills" / name
-
-    if expected.is_dir():
-        return expected
-
-    installed_root = working_directory / ".claude" / "skills"
-    candidates = (
-        [path for path in installed_root.iterdir() if path.is_dir()]
-        if installed_root.exists()
-        else []
+    candidates = sorted(
+        {
+            path.parent
+            for path in working_directory.rglob("SKILL.md")
+            if source_root not in path.parents
+        },
+        key=str,
     )
+    matching = [candidate for candidate in candidates if candidate.name == name]
 
-    if len(candidates) == 1:
+    if len(matching) == 1:
+        return matching[0]
+
+    if not matching and len(candidates) == 1:
         return candidates[0]
 
     raise RuntimeError(
-        f"Could not locate installed skill '{name}' under {installed_root} "
-        f"(found: {[path.name for path in candidates]})"
+        f"Could not locate one installed skill '{name}' under {working_directory} "
+        f"(found: {[str(path.relative_to(working_directory)) for path in candidates]})"
     )
 
 

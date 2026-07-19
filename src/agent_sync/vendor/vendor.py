@@ -66,7 +66,7 @@ def vendor_skill(
         )
 
         installer.install_skill(skill, working_directory, source_root)
-        installed = installer.locate_installed_skill(working_directory, skill.name)
+        installed = installer.locate_installed_skill(working_directory, source_root, skill.name)
         skill_path = installer.read_skill_path(working_directory)
 
         if skill_path is not None and "/" not in skill_path:

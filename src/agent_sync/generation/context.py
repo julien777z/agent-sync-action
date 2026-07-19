@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from agent_sync.configuration import CanonicalConfiguration
+from agent_sync.config import SourceConfig
 from agent_sync.document import parse_markdown
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.document import (
@@ -65,7 +65,7 @@ class GenerationContext(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     workspace: Workspace
-    configuration: CanonicalConfiguration
+    source_config: SourceConfig
     skills: tuple[SkillSource, ...]
     agents: tuple[AgentSource, ...]
     rules: tuple[RuleSource, ...]
@@ -75,13 +75,13 @@ class GenerationContext(BaseModel):
 
 def load_generation_context(
     workspace: Workspace,
-    configuration: CanonicalConfiguration,
+    source_config: SourceConfig,
 ) -> GenerationContext:
     """Read and validate every generation source once."""
 
     return GenerationContext(
         workspace=workspace,
-        configuration=configuration,
+        source_config=source_config,
         skills=tuple(load_skills(workspace)),
         agents=tuple(load_agents(workspace)),
         rules=tuple(load_rules(workspace)),
