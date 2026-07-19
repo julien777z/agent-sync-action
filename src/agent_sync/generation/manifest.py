@@ -1,7 +1,7 @@
+from agent_sync.configuration import CanonicalConfiguration
 from agent_sync.generation.context import load_generation_context
 from agent_sync.generation.registry import ARTIFACT_REGISTRY
 from agent_sync.generation.rule import generate_shared_rule_outputs
-from agent_sync.models.configuration import CanonicalConfiguration
 from agent_sync.models.output import ArtifactKind, GeneratedFile, Manifest
 from agent_sync.workspace import Workspace
 

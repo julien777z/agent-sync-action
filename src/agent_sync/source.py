@@ -3,13 +3,13 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from agent_sync.errors import AgentSyncError
-from agent_sync.models.configuration import (
+from agent_sync.configuration import (
     AgentModelOverride,
     CanonicalConfiguration,
     CodexSettings,
     PlatformSettings,
 )
+from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
 from agent_sync.slug import validate_slug
 from agent_sync.workspace import Workspace

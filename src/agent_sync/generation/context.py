@@ -3,9 +3,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from agent_sync.configuration import CanonicalConfiguration
 from agent_sync.document import parse_markdown
 from agent_sync.errors import AgentSyncError
-from agent_sync.models.configuration import CanonicalConfiguration
 from agent_sync.models.document import (
     AgentFrontMatter,
     RuleFrontMatter,
