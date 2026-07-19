@@ -129,7 +129,9 @@ For example, this installs the
 - `name`: local directory under `.agents/skills/`.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
-- `automatic_updates`: required; controls whether automatic updates install this skill.
+- `automatic_updates`: required; installs this skill when external skills refresh — when
+  `refresh-external-skills` is `true`, on your scheduled workflow, or after a push that
+  changes `.agents/skills.json`.
 
 ## Local Development
 
