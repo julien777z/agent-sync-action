@@ -134,7 +134,7 @@ def load_agents(workspace: Workspace) -> list[AgentSource]:
 
 
 def load_rules(workspace: Workspace) -> list[RuleSource]:
-    """Load parsed non-empty rule documents."""
+    """Load parsed rule documents."""
 
     return [
         RuleSource(slug=slug, path=path, front_matter=front_matter, body=body)
@@ -143,7 +143,6 @@ def load_rules(workspace: Workspace) -> list[RuleSource]:
             "rules",
             RuleFrontMatter,
         )
-        if body
     ]
 
 

@@ -48,6 +48,7 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
             source_path=source.path,
         )
         for source in context.rules
+        if source.body
     ]
 
     outputs.append(
@@ -61,6 +62,7 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
                         source.body,
                     )
                     for source in context.rules
+                    if source.body
                 ]
             ),
             artifact=ArtifactKind.INSTRUCTIONS,
@@ -90,6 +92,7 @@ def generate_rule_links(
             provider=provider,
         )
         for source in context.rules
+        if source.body
     ]
 
 

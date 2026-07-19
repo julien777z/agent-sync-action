@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.document import parse_markdown
 from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.registry import ARTIFACT_REGISTRY
@@ -17,7 +16,6 @@ from agent_sync.generation.rule import (
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import generate_claude_settings
-from agent_sync.models.document import RuleFrontMatter
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.source import load_source_config
@@ -174,31 +172,32 @@ class TestDocumentGeneration:
         assert {link.link_target for link in links} == {source}
         assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
 
-    def test_codex_rules_render_starlark(self, workspace: Workspace) -> None:
-        """Test that Codex rule output contains only configured Starlark."""
+    def test_codex_rules_render_starlark_without_markdown_body(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a Starlark-only rule still generates its Codex output."""
 
         rules_dir = workspace.agents_dir / "rules"
         rules_dir.mkdir()
         source = rules_dir / "git.md"
         source.write_text(
-            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n\n# Git\n"
+            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n"
         )
 
         context = load_context(workspace)
         outputs = generate_codex_rules(context, Provider.CODEX)
-        normalized = next(
-            output
-            for output in generate_shared_rule_outputs(context)
-            if isinstance(output, GeneratedFile) and output.target_path == source
-        )
-        front_matter, _ = parse_markdown(normalized.content, RuleFrontMatter, str(source))
 
         assert len(outputs) == 1
         assert isinstance(outputs[0], GeneratedFile)
         assert outputs[0].target_path == workspace.root / ".codex/rules/git.rules"
         assert 'allow_rule(prefix_rule = ["git", "status"])' in outputs[0].content
-        assert front_matter.starlark is not None
-        assert front_matter.starlark.strip() == 'allow_rule(prefix_rule = ["git", "status"])'
+        shared_outputs = generate_shared_rule_outputs(context)
+
+        assert len(shared_outputs) == 1
+        assert shared_outputs[0].artifact is ArtifactKind.INSTRUCTIONS
+        assert not generate_rule_links(context, Provider.CLAUDE)
+        assert not generate_rule_links(context, Provider.CURSOR)
 
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""
