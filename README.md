@@ -16,10 +16,10 @@ from one canonical `.agents/` directory.
 
 ## Examples
 
-### Mirror Canonical Configuration
+### Mirror Agent Configuration
 
-Use this workflow to mirror `.agents/` whenever its canonical configuration
-changes on `main`.
+Use this workflow to mirror `.agents/` whenever its configuration changes on
+`main`.
 
 ```yaml
 name: Agent Sync
@@ -88,7 +88,7 @@ jobs:
 | `models/` | Per-agent provider model overrides. |
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
-| `skills/` | Canonical skill directories linked into provider layouts. |
+| `skills/` | Skill directories linked into provider layouts. |
 | `skills.json` | Registry of external skills available for automatic updates. |
 
 Only the directories and files your repository uses are required.
@@ -100,7 +100,7 @@ Only the directories and files your repository uses are required.
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
 | `refresh-external-skills` | `false` | Vendor registered external skills before mirroring. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
-| `agents-dir` | `.agents` | Canonical source directory. |
+| `agents-dir` | `.agents` | Agent configuration source directory. |
 | `dry-run` | `false` | Report differences without writing or committing. |
 
 ## External skills
