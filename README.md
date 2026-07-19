@@ -8,7 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to each supported provider.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
-- Vendors registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
+- Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
 - Overwrites generated provider files so they always match `.agents/`.
@@ -43,7 +43,7 @@ jobs:
 
 ### Sync External Skills
 
-Use this scheduled workflow to vendor the latest registered external skills and
+Use this scheduled workflow to install the latest registered external skills and
 mirror any resulting changes.
 
 ```yaml
@@ -96,7 +96,7 @@ Only the directories and files your repository uses are required.
 | Input | Default | Purpose |
 |---|---|---|
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
-| `refresh-external-skills` | `false` | Vendor registered external skills before mirroring. |
+| `refresh-external-skills` | `false` | Install registered external skills before mirroring. |
 | `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
@@ -125,7 +125,7 @@ Register external skills in `.agents/skills.json`:
 - `name`: local directory under `.agents/skills/`.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
-- `automatic_updates`: required; controls whether vendoring updates this skill.
+- `automatic_updates`: required; controls whether automatic updates install this skill.
 
 ## Local Development
 
