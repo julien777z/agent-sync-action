@@ -307,21 +307,12 @@ config = third_party_package.Config(
 )
 ```
 
-## Configuration and Constants
-
-- Define constants at the top of the file, after imports.
-- Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
-- Use `Final[T]` type annotation from `typing` for constants.
-- When a mutable object is annotated with `Final`, complete any setup-time mutation in the same expression as initialization instead of binding it first and mutating it on the next line.
-- Use UPPER_SNAKE_CASE naming convention for constants.
-- Only extract literals to constants when they are reused, configurable, or carry domain meaning; keep trivial single-use literals inline (for example, delimiters like `"-"` or `"."`).
-- Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
-- Prefer enums for error identifiers/messages instead of a constant per error string.
+## Configuration
 
 - Define the repository's settings in one `Config` class derived from `pydantic_settings.BaseSettings`, instantiate one module-level `CONFIG = Config()`, and import that validated object wherever settings are needed.
 - Put environment-backed, deployment-tunable, or intentionally overridable values in `Config`. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
 - Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
-- Use `TypedDict` only for static structured data that is not configuration. Reserve standalone `Final` constants for genuinely fixed values such as compiled regexes, invariant paths, or sentinels.
+- Use `TypedDict` only for static structured data that is not configuration.
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -337,7 +328,6 @@ class Config(BaseSettings):
 CONFIG = Config()
 ```
 
-- Fixed third-party endpoint URLs and values fully derived from existing config (for example a from-address derived from `CONFIG.DOMAIN`) are **module-level `Final` constants** in the module that uses them, not config fields.
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
 - Avoid large piles of module-level constants. If a value is genuinely operator-tunable, add it to the project's central config model or settings layer.
 - Do not add useless config values like `DEFAULT_ENVIRONMENT`.
@@ -345,6 +335,17 @@ CONFIG = Config()
 - Do not read environment variables directly with `os.getenv`, `os.environ`, or `os.environ.get` in application/service/library code.
 - Always read environment-backed values from the typed config object so defaults, validation, and normalization live in one place.
 - Exception: one-off scripts may read from `os` when introducing a `CONFIG` model would be unnecessary overhead.
+
+## Constants
+
+- Define constants at the top of the file, after imports.
+- Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
+- Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
+- Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in `Config` even when they have a default.
+- When a mutable object is annotated with `Final`, complete any setup-time mutation in the same expression as initialization instead of binding it first and mutating it on the next line.
+- Only extract literals when they are reused or carry domain meaning; keep trivial single-use literals inline (for example, delimiters like `"-"` or `"."`).
+- Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
+- Prefer enums for error identifiers/messages instead of a constant per error string.
 
 - **Never commit development or test secret values into application or library code** — not even to compare against them. Embedding a known dev key (or its hash) so the code can reject it just moves the secret *into* the codebase, which is the opposite of the goal. Real secrets live in the secrets manager; test secrets live in test configuration (`pyproject.toml` env), never in `.py` source.
 - **Do not branch on the environment in application code to relax or vary security posture** (`if ENVIRONMENT == "development": allow the weaker cipher / skip the check`). Which crypto backend, keys, and credentials are used is a deployment concern: production sets the real backend and secrets, tests set test values via test config. Application code states the single required contract (for example "encryption is AWS/KMS") and lets it hold everywhere.
@@ -377,6 +378,9 @@ def get_auth_secret(config: Settings | None = None) -> str:
 ```
 
 ## Architecture and Boundaries
+
+- Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
+- Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared `CONFIG` object.
 
 - Application code (a function, method, property, class, constant, or field) with **zero non-test consumers** is dead code and must be deleted, along with the tests that only exist to exercise it.
 - **Tests do not justify keeping otherwise-unused application code.** A test that asserts a symbol no other application code reads is testing a fabricated contract; delete the symbol and that test together rather than preserving the symbol "because it's covered".
