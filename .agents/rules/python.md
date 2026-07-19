@@ -209,18 +209,6 @@ register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=TaskHandlerKey.P
 register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=handler.__name__)
 ```
 
-- Keep `__main__.py` and script entrypoints thin.
-- Entrypoints should only bootstrap and call a `main()` function from a dedicated runtime/service module.
-- Place orchestration loops, transaction flow, and business logic in regular modules, not in the entrypoint file.
-
-```python
-# __main__.py
-from .runtime import main
-
-if __name__ == "__main__":
-    main()
-```
-
 - Avoid monolithic service modules that mix orchestration, third-party API calls, policy decisions, and data mappers.
 - Split large services into focused modules, for example:
   - orchestration module (route-facing flow)

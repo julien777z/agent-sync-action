@@ -1,40 +1,21 @@
 from agent_sync.document import ensure_trailing_newline
+from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.provider import PROVIDER_LAYOUTS
-from agent_sync.workspace import Workspace
-
-HOOK_PROVIDERS = (Provider.CLAUDE, Provider.CURSOR)
 
 
-def generate_hook_outputs(workspace: Workspace) -> list[GeneratedOutput]:
-    """Generate provider hook files from canonical scripts."""
+def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Generate one provider's hook files."""
 
-    outputs: list[GeneratedOutput] = []
-    hooks_dir = workspace.agents_dir / "hooks"
-    if not hooks_dir.exists():
-        return outputs
-
-    for path in sorted(hooks_dir.iterdir()):
-        if not path.is_file():
-            continue
-
-        content = workspace.read_text(path)
-        if content is None:
-            continue
-
-        executable = path.suffix == ".sh" or content.startswith("#!")
-        for provider in HOOK_PROVIDERS:
-            outputs.append(
-                GeneratedFile(
-                    target_path=(
-                        PROVIDER_LAYOUTS[provider].root(workspace.root) / "hooks" / path.name
-                    ),
-                    content=ensure_trailing_newline(content),
-                    artifact=ArtifactKind.HOOK,
-                    source_path=path,
-                    provider=provider,
-                    executable=executable,
-                )
-            )
-
-    return outputs
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    return [
+        GeneratedFile(
+            target_path=root / "hooks" / source.path.name,
+            content=ensure_trailing_newline(source.content),
+            artifact=ArtifactKind.HOOK,
+            source_path=source.path,
+            provider=provider,
+            executable=source.executable,
+        )
+        for source in context.hooks
+    ]

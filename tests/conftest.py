@@ -23,6 +23,8 @@ def skill_file_factory(workspace: Workspace) -> Callable[..., Path]:
     """Create canonical skill documents in the synthetic workspace."""
 
     def _build(slug: str, body: str = "Body text.") -> Path:
+        """Build one skill document."""
+
         skill_dir = workspace.agents_dir / "skills" / slug
         skill_dir.mkdir(parents=True)
         source = skill_dir / "SKILL.md"
@@ -45,6 +47,8 @@ def rule_file_factory(workspace: Workspace) -> Callable[..., Path]:
         body: str = "# Rule\n\nAlways be ruling.",
         front_matter: str | None = "name: removed\ndescription: A rule.",
     ) -> Path:
+        """Build one rule document."""
+
         rules_dir = workspace.agents_dir / "rules"
         rules_dir.mkdir(parents=True, exist_ok=True)
         source = rules_dir / f"{slug}.md"
@@ -61,6 +65,8 @@ def registry_file_factory(workspace: Workspace) -> Callable[[SkillsRegistry], Pa
     """Write a typed external-skill registry into canonical sources."""
 
     def _build(registry: SkillsRegistry) -> Path:
+        """Build one external-skill registry."""
+
         path = workspace.agents_dir / "skills.json"
         path.write_text(registry.model_dump_json(), encoding="utf-8")
 
@@ -74,6 +80,8 @@ def skills_lock_factory(tmp_path: Path) -> Callable[..., Path]:
     """Write one installer lock entry into a temporary working directory."""
 
     def _build(skill_path: str, key: str = "skill") -> Path:
+        """Build one installer lock file."""
+
         (tmp_path / "skills-lock.json").write_text(
             json.dumps({"skills": {key: {"skillPath": skill_path}}}),
             encoding="utf-8",
@@ -89,6 +97,8 @@ def skill_tree_factory() -> Callable[[Path, dict[str, str]], Path]:
     """Create a comparable skill directory tree."""
 
     def _build(base: Path, files: dict[str, str]) -> Path:
+        """Build one skill directory tree."""
+
         for relative, content in files.items():
             target = base / relative
             target.parent.mkdir(parents=True, exist_ok=True)

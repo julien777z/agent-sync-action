@@ -5,9 +5,10 @@ alwaysApply: true
 
 # Project Rules
 
-## Generated Output
+## Generated Outputs
 
-- Never commit auto-generated output; let CI generate it before invoking the action from the current checkout.
+- Agents never stage generated provider output.
+- Only the repository Agent Sync workflow may generate and commit provider output while validating the checked-out action.
 
 ## PR Monitoring And Background Timers
 

@@ -1,7 +1,7 @@
 import logging
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.generation.generation import generate_manifest
+from agent_sync.generation.manifest import generate_manifest
 from agent_sync.reconciliation import apply_plan, build_plan, report_plan
 from agent_sync.source import load_configuration
 from agent_sync.workspace import Workspace

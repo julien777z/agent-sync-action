@@ -35,3 +35,4 @@ jobs:
         uses: ./
         with:
           dry-run: "true"
+          refresh-external-skills: "true"

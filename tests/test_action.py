@@ -55,3 +55,23 @@ def test_repository_validates_the_current_checkout_action() -> None:
 
     assert "poetry run python -m agent_sync mirror-providers --root ." in workflow_text
     assert "uses: ./" in workflow_text
+    assert 'refresh-external-skills: "true"' in workflow_text
+
+
+def test_action_sets_up_node_only_for_external_skills() -> None:
+    """Test that Node setup uses the action-owned version only for vendoring."""
+
+    action_text = Path("action.yml").read_text(encoding="utf-8")
+
+    assert "node_version=\"$(tr -d '[:space:]'" in action_text
+    assert "node-version: ${{ steps.node.outputs.version }}" in action_text
+    assert "node-version-file: ${{ github.action_path }}/.nvmrc" not in action_text
+
+
+def test_agent_sync_workflow_runs_on_feature_branches() -> None:
+    """Test that repository mirroring is not restricted to the default branch."""
+
+    workflow_text = Path(".github/workflows/agent-sync.yml").read_text(encoding="utf-8")
+
+    assert "branches: [main]" not in workflow_text
+    assert "uses: ./" in workflow_text

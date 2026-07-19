@@ -3,68 +3,68 @@ import tomllib
 
 from agent_sync.document import ensure_trailing_newline
 from agent_sync.errors import AgentSyncError
-from agent_sync.models.configuration import CanonicalConfiguration, CodexSettings, PlatformSettings
+from agent_sync.generation.context import GenerationContext
+from agent_sync.models.configuration import CodexSettings, PlatformSettings
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.provider import PROVIDER_LAYOUTS
-from agent_sync.workspace import Workspace
 
 
-def generate_setting_outputs(
-    workspace: Workspace,
-    configuration: CanonicalConfiguration,
-    instructions: GeneratedFile,
+def generate_claude_settings(
+    context: GenerationContext,
+    provider: Provider,
 ) -> list[GeneratedOutput]:
-    """Generate provider settings and synchronized canonical Codex capacity."""
+    """Generate complete Claude settings when configured."""
 
-    outputs: list[GeneratedOutput] = []
-    claude_settings = configuration.settings.get(Provider.CLAUDE)
-    if isinstance(claude_settings, PlatformSettings):
-        outputs.append(
-            GeneratedFile(
-                target_path=(
-                    PROVIDER_LAYOUTS[Provider.CLAUDE].root(workspace.root) / "settings.json"
-                ),
-                content=ensure_trailing_newline(
-                    json.dumps(claude_settings.model_dump(exclude_none=True), indent=2)
-                ),
-                artifact=ArtifactKind.SETTING,
-                source_path=workspace.settings_dir / "claude.json",
-                provider=Provider.CLAUDE,
-            )
-        )
+    settings = context.configuration.settings.get(provider)
+    if not isinstance(settings, PlatformSettings):
+        return []
 
-    codex_settings = configuration.settings.get(Provider.CODEX)
-    if not isinstance(codex_settings, CodexSettings):
-        return outputs
-
-    synchronized = codex_settings.model_copy(
-        update={"project_doc_max_bytes": len(instructions.content.encode("utf-8"))}
-    )
-    canonical_path = workspace.settings_dir / "codex.json"
-    outputs.append(
+    return [
         GeneratedFile(
-            target_path=canonical_path,
+            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.root) / "settings.json",
+            content=ensure_trailing_newline(
+                json.dumps(settings.model_dump(exclude_none=True), indent=2)
+            ),
+            artifact=ArtifactKind.SETTING,
+            source_path=context.workspace.settings_dir / f"{provider.value}.json",
+            provider=provider,
+        )
+    ]
+
+
+def generate_codex_settings(
+    context: GenerationContext,
+    provider: Provider,
+) -> list[GeneratedOutput]:
+    """Generate synchronized Codex settings and source capacity."""
+
+    settings = context.configuration.settings.get(provider)
+    if not isinstance(settings, CodexSettings):
+        return []
+
+    synchronized = settings.model_copy(
+        update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
+    )
+    source_path = context.workspace.settings_dir / "codex.json"
+
+    return [
+        GeneratedFile(
+            target_path=source_path,
             content=ensure_trailing_newline(
                 synchronized.model_dump_json(indent=2, exclude_none=True)
             ),
             artifact=ArtifactKind.SETTING,
-            source_path=canonical_path,
-            provider=Provider.CODEX,
-        )
-    )
-
-    config_path = PROVIDER_LAYOUTS[Provider.CODEX].root(workspace.root) / "config.toml"
-    outputs.append(
+            source_path=source_path,
+            provider=provider,
+        ),
         GeneratedFile(
-            target_path=config_path,
+            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.root) / "config.toml",
             content=render_codex_settings(synchronized),
             artifact=ArtifactKind.SETTING,
-            source_path=canonical_path,
-            provider=Provider.CODEX,
-        )
-    )
-
-    return outputs
+            source_path=source_path,
+            provider=provider,
+        ),
+    ]
 
 
 def render_codex_settings(settings: CodexSettings) -> str:

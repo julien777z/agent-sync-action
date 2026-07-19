@@ -4,13 +4,13 @@ import os
 from pathlib import Path
 from typing import Final
 
+from agent_sync.generation.registry import ARTIFACT_REGISTRY, owned_provider_directories
 from agent_sync.models.output import (
     Change,
     GeneratedFile,
     GeneratedLink,
     GeneratedOutput,
     Manifest,
-    Provider,
     ReconciliationPlan,
 )
 from agent_sync.models.provider import PROVIDER_LAYOUTS
@@ -68,44 +68,20 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     expected = {output.target_path for output in manifest.outputs}
     stale: set[Path] = set()
-    managed_directories = (
-        (Provider.CLAUDE, "rules"),
-        (Provider.CURSOR, "rules"),
-        (Provider.CLAUDE, "commands"),
-        (Provider.CURSOR, "commands"),
-        (Provider.CLAUDE, "agents"),
-        (Provider.CURSOR, "agents"),
-        (Provider.CLAUDE, "hooks"),
-        (Provider.CURSOR, "hooks"),
-        (Provider.CODEX, "rules"),
-    )
-    for provider, dirname in managed_directories:
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / dirname
-        if not directory.exists():
-            continue
+    for provider, directory_name in owned_provider_directories():
+        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+        if directory.exists():
+            stale.update(path for path in directory.iterdir() if path not in expected)
 
-        for path in directory.iterdir():
-            if path not in expected:
-                stale.add(path)
-
-    for provider in Provider:
-        skills_dir = PROVIDER_LAYOUTS[provider].root(workspace.root) / "skills"
-        if not skills_dir.exists():
-            continue
-
-        for path in skills_dir.iterdir():
-            if (path.is_dir() or path.is_symlink()) and path not in expected:
-                stale.add(path)
-
-    managed_settings = (
-        PROVIDER_LAYOUTS[Provider.CLAUDE].root(workspace.root) / "settings.json",
-        PROVIDER_LAYOUTS[Provider.CODEX].root(workspace.root) / "config.toml",
-    )
-    stale.update(
-        path
-        for path in managed_settings
-        if (path.exists() or path.is_symlink()) and path not in expected
-    )
+    for registration in ARTIFACT_REGISTRY.values():
+        for provider, filenames in registration["owned_files"].items():
+            root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+            stale.update(
+                path
+                for filename in filenames
+                if ((path := root / filename).exists() or path.is_symlink())
+                and path not in expected
+            )
 
     return sorted(stale, key=str)
 

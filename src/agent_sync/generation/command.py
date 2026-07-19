@@ -1,56 +1,74 @@
 from agent_sync.document import (
     ensure_trailing_newline,
-    normalize_text,
-    parse_markdown,
     render_front_matter,
 )
-from agent_sync.models.document import CommandFrontMatter
+from agent_sync.generation.context import CommandSource, GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.provider import PROVIDER_LAYOUTS
-from agent_sync.slug import validate_slug
-from agent_sync.workspace import Workspace
-
-COMMAND_PROVIDERS = (Provider.CLAUDE, Provider.CURSOR)
 
 
-def generate_command_outputs(workspace: Workspace) -> list[GeneratedOutput]:
-    """Generate provider command files from canonical command documents."""
+def generate_claude_commands(
+    context: GenerationContext,
+    provider: Provider,
+) -> list[GeneratedOutput]:
+    """Generate Claude commands with supported front matter."""
 
-    outputs: list[GeneratedOutput] = []
-    commands_dir = workspace.agents_dir / "commands"
-    if not commands_dir.exists():
-        return outputs
+    return [generate_claude_command(context, provider, source) for source in context.commands]
 
-    for path in sorted(commands_dir.glob("*.md")):
-        slug = validate_slug(path.stem, path)
-        content = workspace.read_text(path)
-        if content is None:
-            continue
 
-        front_matter, body = parse_markdown(content, CommandFrontMatter, str(path))
-        variants = front_matter.variants or {}
-        claude_front_matter = front_matter.model_dump(
-            by_alias=True,
-            exclude_none=True,
-            exclude={"variants"},
+def generate_claude_command(
+    context: GenerationContext,
+    provider: Provider,
+    source: CommandSource,
+) -> GeneratedFile:
+    """Generate one Claude command."""
+
+    front_matter = source.front_matter.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude={"variants"},
+    )
+    body = command_body(source, provider)
+
+    return GeneratedFile(
+        target_path=(
+            PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+            / "commands"
+            / f"{source.slug}.md"
+        ),
+        content=(
+            render_front_matter(front_matter, body)
+            if front_matter
+            else ensure_trailing_newline(body)
+        ),
+        artifact=ArtifactKind.COMMAND,
+        source_path=source.path,
+        provider=provider,
+    )
+
+
+def generate_cursor_commands(
+    context: GenerationContext,
+    provider: Provider,
+) -> list[GeneratedOutput]:
+    """Generate plain Cursor command files."""
+
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    return [
+        GeneratedFile(
+            target_path=root / "commands" / f"{source.slug}.md",
+            content=ensure_trailing_newline(command_body(source, provider)),
+            artifact=ArtifactKind.COMMAND,
+            source_path=source.path,
+            provider=provider,
         )
-        for provider in COMMAND_PROVIDERS:
-            provider_body = normalize_text(variants.get(provider.value, body) or body)
-            rendered = (
-                render_front_matter(claude_front_matter, provider_body)
-                if provider is Provider.CLAUDE and claude_front_matter
-                else ensure_trailing_newline(provider_body)
-            )
-            outputs.append(
-                GeneratedFile(
-                    target_path=(
-                        PROVIDER_LAYOUTS[provider].root(workspace.root) / "commands" / f"{slug}.md"
-                    ),
-                    content=rendered,
-                    artifact=ArtifactKind.COMMAND,
-                    source_path=path,
-                    provider=provider,
-                )
-            )
+        for source in context.commands
+    ]
 
-    return outputs
+
+def command_body(source: CommandSource, provider: Provider) -> str:
+    """Resolve one provider's command body."""
+
+    variants = source.front_matter.variants or {}
+
+    return (variants.get(provider.value) or source.body).strip()

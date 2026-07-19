@@ -3,7 +3,8 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.generation.generation import generate_manifest
+from agent_sync.generation.manifest import generate_manifest
+from agent_sync.generation.registry import owned_provider_directories
 from agent_sync.mirror import mirror_providers
 from agent_sync.models.output import (
     ArtifactKind,
@@ -12,6 +13,7 @@ from agent_sync.models.output import (
     Manifest,
     Provider,
 )
+from agent_sync.models.provider import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan
 from agent_sync.source import load_configuration
 from agent_sync.workspace import Workspace
@@ -106,6 +108,30 @@ class TestReconciliation:
         assert stale_directory in plan.stale_paths
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
+
+    @pytest.mark.parametrize(
+        ("provider", "directory_name"),
+        owned_provider_directories(),
+    )
+    def test_registry_directories_are_fully_owned(
+        self,
+        workspace: Workspace,
+        provider: Provider,
+        directory_name: str,
+    ) -> None:
+        """Test that every registry-owned directory removes unknown entries."""
+
+        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+        directory.mkdir(parents=True)
+        stale_path = directory / "unregistered"
+        stale_path.write_text("stale\n")
+
+        plan = build_plan(
+            workspace,
+            generate_manifest(workspace, load_configuration(workspace)),
+        )
+
+        assert stale_path in plan.stale_paths
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that provider settings cannot outlive their source configuration."""

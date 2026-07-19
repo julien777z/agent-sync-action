@@ -52,8 +52,13 @@ class TestVendorBoundaries:
 
         def fake_run(
             command: list[str],
-            **kwargs: object,
+            *,
+            capture_output: bool,
+            text: bool,
+            check: bool,
         ) -> subprocess.CompletedProcess[str]:
+            """Return a successful immutable revision lookup."""
+
             return subprocess.CompletedProcess(command, 0, f"{revision}\tHEAD\n", "")
 
         monkeypatch.setattr(github.subprocess, "run", fake_run)
@@ -65,8 +70,13 @@ class TestVendorBoundaries:
 
         def fake_run(
             command: list[str],
-            **kwargs: object,
+            *,
+            capture_output: bool,
+            text: bool,
+            check: bool,
         ) -> subprocess.CompletedProcess[str]:
+            """Return an invalid revision lookup result."""
+
             return subprocess.CompletedProcess(command, 0, "not-a-sha\tHEAD\n", "")
 
         monkeypatch.setattr(github.subprocess, "run", fake_run)
@@ -86,8 +96,14 @@ class TestVendorBoundaries:
 
         def fake_run(
             command: list[str],
-            **kwargs: object,
+            *,
+            cwd: Path,
+            capture_output: bool,
+            text: bool,
+            check: bool,
         ) -> subprocess.CompletedProcess[str]:
+            """Capture one installer invocation."""
+
             captured.extend(command)
             return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -118,11 +134,15 @@ class TestVendorBoundaries:
         )
 
         def fake_resolve(repository: str) -> str:
+            """Resolve a stable synthetic revision."""
+
             return revision
 
         monkeypatch.setattr(github, "resolve_revision", fake_resolve)
 
         def fake_download(repository: str, downloaded_revision: str, destination: Path) -> Path:
+            """Create one synthetic downloaded snapshot."""
+
             observed.append(("snapshot", downloaded_revision))
             source_root = destination / "repository"
             source_root.mkdir(parents=True)
@@ -137,6 +157,8 @@ class TestVendorBoundaries:
             working_directory: Path,
             source_root: Path,
         ) -> None:
+            """Create one synthetic installed skill."""
+
             observed.append(("install", str(source_root)))
             installed = working_directory / ".claude/skills" / installed_skill.name
             installed.mkdir(parents=True)
@@ -145,11 +167,15 @@ class TestVendorBoundaries:
         monkeypatch.setattr(installer, "install_skill", fake_install)
 
         def fake_read_skill_path(working_directory: Path) -> str:
+            """Return the synthetic installed skill path."""
+
             return "SKILL.md"
 
         monkeypatch.setattr(installer, "read_skill_path", fake_read_skill_path)
 
         def fake_supplement(destination: Path, source_root: Path) -> None:
+            """Record the snapshot used for supplemental assets."""
+
             observed.append(("assets", str(source_root)))
 
         monkeypatch.setattr(
@@ -204,6 +230,8 @@ class TestVendorService:
             skills_dir: Path,
             dry_run: bool,
         ) -> bool:
+            """Report one synthetic vendoring change."""
+
             return True
 
         monkeypatch.setattr(vendor_service, "vendor_skill", fake_vendor_skill)
@@ -233,7 +261,14 @@ class TestVendorService:
         local_skill.parent.mkdir(parents=True)
         local_skill.write_text("local\n")
 
-        def fail_vendor(*args: object, **kwargs: object) -> bool:
+        def fail_vendor(
+            resolved_workspace: Workspace,
+            skill: ExternalSkill,
+            skills_dir: Path,
+            dry_run: bool,
+        ) -> bool:
+            """Fail if a disabled skill reaches vendoring."""
+
             raise AssertionError("disabled skill must not be vendored")
 
         monkeypatch.setattr(vendor_service, "vendor_skill", fail_vendor)

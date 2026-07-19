@@ -7,15 +7,47 @@ from pathlib import Path
 import pytest
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.generation.agent import generate_agent_outputs
-from agent_sync.generation.command import generate_command_outputs
-from agent_sync.generation.hook import generate_hook_outputs
-from agent_sync.generation.rule import generate_rule_outputs
-from agent_sync.generation.skill import generate_skill_outputs
+from agent_sync.generation.agent import generate_agents
+from agent_sync.generation.command import generate_claude_commands, generate_cursor_commands
+from agent_sync.generation.context import GenerationContext, load_generation_context
+from agent_sync.generation.hook import generate_hooks
+from agent_sync.generation.registry import ARTIFACT_REGISTRY
+from agent_sync.generation.rule import (
+    generate_codex_rules,
+    generate_rule_links,
+    generate_shared_rule_outputs,
+)
+from agent_sync.generation.setting import generate_claude_settings
+from agent_sync.generation.skill import generate_skills
 from agent_sync.mirror import mirror_providers
-from agent_sync.models.output import GeneratedFile, GeneratedLink, Provider
+from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
 from agent_sync.source import load_configuration
 from agent_sync.workspace import Workspace
+
+
+def load_context(workspace: Workspace) -> GenerationContext:
+    """Load generation inputs from one test workspace."""
+
+    return load_generation_context(workspace, load_configuration(workspace))
+
+
+class TestArtifactRegistry:
+    """Verify the provider support matrix is explicit."""
+
+    def test_declares_supported_provider_artifacts(self) -> None:
+        """Test that the registry contains the stable provider support matrix."""
+
+        assert {
+            artifact: set(registration["handlers"])
+            for artifact, registration in ARTIFACT_REGISTRY.items()
+        } == {
+            ArtifactKind.SKILL: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
+            ArtifactKind.COMMAND: {Provider.CLAUDE, Provider.CURSOR},
+            ArtifactKind.AGENT: {Provider.CLAUDE, Provider.CURSOR},
+            ArtifactKind.RULE: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
+            ArtifactKind.HOOK: {Provider.CLAUDE, Provider.CURSOR},
+            ArtifactKind.SETTING: {Provider.CLAUDE, Provider.CODEX},
+        }
 
 
 class TestSkillGeneration:
@@ -29,7 +61,8 @@ class TestSkillGeneration:
         """Test that all provider skill paths link to one canonical directory."""
 
         source = skill_file_factory("sample-skill")
-        outputs = generate_skill_outputs(workspace)
+        context = load_context(workspace)
+        outputs = [output for provider in Provider for output in generate_skills(context, provider)]
         links = {
             output.target_path: output.link_target
             for output in outputs
@@ -67,7 +100,7 @@ class TestSkillGeneration:
         )
 
         with pytest.raises(AgentSyncError):
-            generate_skill_outputs(workspace)
+            load_context(workspace)
 
 
 class TestDocumentGeneration:
@@ -86,7 +119,11 @@ class TestDocumentGeneration:
             encoding="utf-8",
         )
 
-        outputs = generate_command_outputs(workspace)
+        context = load_context(workspace)
+        outputs = [
+            *generate_claude_commands(context, Provider.CLAUDE),
+            *generate_cursor_commands(context, Provider.CURSOR),
+        ]
         files = {
             output.provider: output.content
             for output in outputs
@@ -104,7 +141,11 @@ class TestDocumentGeneration:
         commands_dir.mkdir()
         (commands_dir / "start.md").write_text("Start services.\n")
 
-        outputs = generate_command_outputs(workspace)
+        context = load_context(workspace)
+        outputs = [
+            *generate_claude_commands(context, Provider.CLAUDE),
+            *generate_cursor_commands(context, Provider.CURSOR),
+        ]
 
         assert all(
             isinstance(output, GeneratedFile) and output.content == "Start services.\n"
@@ -127,8 +168,11 @@ class TestDocumentGeneration:
             '{"claude":"override","cursor":"cursor-model"}'
         )
 
-        configuration = load_configuration(workspace)
-        outputs = generate_agent_outputs(workspace, configuration)
+        context = load_context(workspace)
+        outputs = [
+            *generate_agents(context, Provider.CLAUDE),
+            *generate_agents(context, Provider.CURSOR),
+        ]
         files = {
             output.provider: output.content
             for output in outputs
@@ -146,7 +190,12 @@ class TestDocumentGeneration:
         """Test that one normalized rule owns both provider links."""
 
         source = rule_file_factory("python")
-        outputs = generate_rule_outputs(workspace)
+        context = load_context(workspace)
+        outputs = [
+            *generate_shared_rule_outputs(context),
+            *generate_rule_links(context, Provider.CLAUDE),
+            *generate_rule_links(context, Provider.CURSOR),
+        ]
         source_output = next(
             output
             for output in outputs
@@ -161,6 +210,23 @@ class TestDocumentGeneration:
         assert {link.link_target for link in links} == {source}
         assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
 
+    def test_codex_rules_render_starlark(self, workspace: Workspace) -> None:
+        """Test that Codex rule output contains only configured Starlark."""
+
+        rules_dir = workspace.agents_dir / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "commands.md").write_text(
+            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n'
+            "---\n\n# Commands\n"
+        )
+
+        outputs = generate_codex_rules(load_context(workspace), Provider.CODEX)
+
+        assert len(outputs) == 1
+        assert isinstance(outputs[0], GeneratedFile)
+        assert outputs[0].target_path == workspace.root / ".codex/rules/commands.rules"
+        assert 'allow_rule(prefix_rule = ["git", "status"])' in outputs[0].content
+
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""
 
@@ -168,7 +234,11 @@ class TestDocumentGeneration:
         hooks_dir.mkdir()
         (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
 
-        outputs = generate_hook_outputs(workspace)
+        context = load_context(workspace)
+        outputs = [
+            *generate_hooks(context, Provider.CLAUDE),
+            *generate_hooks(context, Provider.CURSOR),
+        ]
 
         assert outputs
         assert all(isinstance(output, GeneratedFile) and output.executable for output in outputs)
@@ -176,6 +246,23 @@ class TestDocumentGeneration:
 
 class TestSettingsGeneration:
     """Verify synchronized settings fully own generated provider files."""
+
+    def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
+        """Test that Claude settings preserve validated provider keys."""
+
+        workspace.settings_dir.mkdir()
+        (workspace.settings_dir / "claude.json").write_text(
+            '{"model":"sonnet","permissions":{"allow":["Read"]}}'
+        )
+
+        outputs = generate_claude_settings(load_context(workspace), Provider.CLAUDE)
+
+        assert len(outputs) == 1
+        assert isinstance(outputs[0], GeneratedFile)
+        assert json.loads(outputs[0].content) == {
+            "model": "sonnet",
+            "permissions": {"allow": ["Read"]},
+        }
 
     def test_codex_capacity_overwrites_existing_toml(
         self,
