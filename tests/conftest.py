@@ -1,11 +1,44 @@
 import json
 from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 
 from agent_sync.models.registry import SkillsRegistry
 from agent_sync.workspace import Workspace
+
+
+class SkillFileFactory(Protocol):
+    """Describe a builder for canonical skill documents."""
+
+    def __call__(self, slug: str, body: str = "Body text.") -> Path:
+        """Build one canonical skill document."""
+
+        ...
+
+
+class RuleFileFactory(Protocol):
+    """Describe a builder for canonical rule documents."""
+
+    def __call__(
+        self,
+        slug: str,
+        body: str = "# Rule\n\nAlways be ruling.",
+        front_matter: str | None = "name: removed\ndescription: A rule.",
+    ) -> Path:
+        """Build one canonical rule document."""
+
+        ...
+
+
+class SkillsLockFactory(Protocol):
+    """Describe a builder for one installer lock file."""
+
+    def __call__(self, skill_path: str, key: str = "skill") -> Path:
+        """Build one installer lock file."""
+
+        ...
 
 
 @pytest.fixture
@@ -19,7 +52,7 @@ def workspace(tmp_path: Path) -> Workspace:
 
 
 @pytest.fixture
-def skill_file_factory(workspace: Workspace) -> Callable[..., Path]:
+def skill_file_factory(workspace: Workspace) -> SkillFileFactory:
     """Create canonical skill documents in the synthetic workspace."""
 
     def _build(slug: str, body: str = "Body text.") -> Path:
@@ -39,7 +72,7 @@ def skill_file_factory(workspace: Workspace) -> Callable[..., Path]:
 
 
 @pytest.fixture
-def rule_file_factory(workspace: Workspace) -> Callable[..., Path]:
+def rule_file_factory(workspace: Workspace) -> RuleFileFactory:
     """Create canonical rule documents in the synthetic workspace."""
 
     def _build(
@@ -76,7 +109,7 @@ def registry_file_factory(workspace: Workspace) -> Callable[[SkillsRegistry], Pa
 
 
 @pytest.fixture
-def skills_lock_factory(tmp_path: Path) -> Callable[..., Path]:
+def skills_lock_factory(tmp_path: Path) -> SkillsLockFactory:
     """Write one installer lock entry into a temporary working directory."""
 
     def _build(skill_path: str, key: str = "skill") -> Path:

@@ -1,10 +1,9 @@
 import json
 import os
 import tomllib
-from collections.abc import Callable
-from pathlib import Path
 
 import pytest
+from conftest import RuleFileFactory, SkillFileFactory
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
@@ -52,7 +51,7 @@ class TestSkillGeneration:
     def test_links_every_provider_to_the_canonical_directory(
         self,
         workspace: Workspace,
-        skill_file_factory: Callable[..., Path],
+        skill_file_factory: SkillFileFactory,
     ) -> None:
         """Test that all provider skill paths link to one canonical directory."""
 
@@ -146,7 +145,7 @@ class TestDocumentGeneration:
     def test_rules_normalize_sources_and_generate_links(
         self,
         workspace: Workspace,
-        rule_file_factory: Callable[..., Path],
+        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that one normalized rule owns both provider links."""
 
@@ -239,7 +238,7 @@ class TestSettingsGeneration:
     def test_codex_capacity_overwrites_existing_toml(
         self,
         workspace: Workspace,
-        rule_file_factory: Callable[..., Path],
+        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that generated instructions determine Codex document capacity."""
 
@@ -285,8 +284,8 @@ class TestMirrorIntegration:
     def test_fresh_mirror_is_idempotent(
         self,
         workspace: Workspace,
-        rule_file_factory: Callable[..., Path],
-        skill_file_factory: Callable[..., Path],
+        rule_file_factory: RuleFileFactory,
+        skill_file_factory: SkillFileFactory,
     ) -> None:
         """Test that mirroring writes relative links and reaches a clean dry run."""
 

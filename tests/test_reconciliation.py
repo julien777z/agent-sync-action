@@ -1,8 +1,7 @@
 import os
-from collections.abc import Callable
-from pathlib import Path
 
 import pytest
+from conftest import RuleFileFactory
 from pydantic import ValidationError
 
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
@@ -181,7 +180,7 @@ class TestReconciliation:
     def test_owned_directory_blockers_are_replaced(
         self,
         workspace: Workspace,
-        rule_file_factory: Callable[..., Path],
+        rule_file_factory: RuleFileFactory,
         target_kind: str,
     ) -> None:
         """Test that a non-directory owned path cannot block reconciliation."""
@@ -205,7 +204,7 @@ class TestReconciliation:
     def test_provider_root_symlinks_are_replaced_without_touching_their_target(
         self,
         workspace: Workspace,
-        rule_file_factory: Callable[..., Path],
+        rule_file_factory: RuleFileFactory,
     ) -> None:
         """Test that provider-root symlinks cannot redirect generated output externally."""
 

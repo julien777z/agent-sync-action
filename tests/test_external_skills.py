@@ -3,11 +3,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import SkillsLockFactory
 from pydantic import ValidationError
 
 from agent_sync.config import ACTION_CONFIG, ActionConfig
 from agent_sync.external_skills import github, installer
-from agent_sync.external_skills import sync as external_skills
+from agent_sync.external_skills import sync
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.workspace import Workspace
 
@@ -249,7 +250,7 @@ class TestExternalSkillBoundaries:
             fake_supplement,
         )
 
-        external_skills.update_external_skill(
+        sync.update_external_skill(
             workspace,
             skill,
             workspace.agents_dir / "skills",
@@ -278,7 +279,7 @@ class TestExternalSkillBoundaries:
             automatic_updates=True,
         )
 
-        external_skills.normalize_skill_metadata(installed, skill)
+        sync.normalize_skill_metadata(installed, skill)
 
         assert (installed / "SKILL.md").read_text() == (
             "---\nname: react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
@@ -340,7 +341,7 @@ class TestExternalSkillBoundaries:
 
         monkeypatch.setattr(installer, "read_skill_path", fake_read_skill_path)
 
-        assert external_skills.update_external_skill(
+        assert sync.update_external_skill(
             workspace,
             skill,
             workspace.agents_dir / "skills",
@@ -357,7 +358,7 @@ class TestExternalSkillService:
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
 
-        assert external_skills.sync_external_skills(workspace, dry_run=True) is False
+        assert sync.sync_external_skills(workspace, dry_run=True) is False
 
     def test_dry_run_reports_changes(
         self,
@@ -390,12 +391,12 @@ class TestExternalSkillService:
             return True
 
         monkeypatch.setattr(
-            external_skills,
+            sync,
             "update_external_skill",
             fake_update_external_skill,
         )
 
-        assert external_skills.sync_external_skills(workspace, dry_run=True) is True
+        assert sync.sync_external_skills(workspace, dry_run=True) is True
 
     def test_disabled_automatic_updates_skip_vendoring(
         self,
@@ -431,9 +432,9 @@ class TestExternalSkillService:
 
             raise AssertionError("disabled skill must not be vendored")
 
-        monkeypatch.setattr(external_skills, "update_external_skill", fail_update)
+        monkeypatch.setattr(sync, "update_external_skill", fail_update)
 
-        assert external_skills.sync_external_skills(workspace, dry_run=False) is False
+        assert sync.sync_external_skills(workspace, dry_run=False) is False
         assert local_skill.read_text() == "local\n"
 
 
@@ -442,7 +443,7 @@ class TestInstallerState:
 
     def test_reads_the_only_lock_entry(
         self,
-        skills_lock_factory: Callable[..., Path],
+        skills_lock_factory: SkillsLockFactory,
     ) -> None:
         """Test that one lock entry resolves regardless of its key."""
 

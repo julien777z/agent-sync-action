@@ -55,6 +55,7 @@ runs:
       id: node
       shell: bash
       run: |
+        # setup-node cannot read a composite action's version file directly.
         node_version="$(tr -d '[:space:]' < "$GITHUB_ACTION_PATH/.nvmrc")"
         echo "version=$node_version" >> "$GITHUB_OUTPUT"
 
