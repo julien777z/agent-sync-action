@@ -46,3 +46,12 @@ def test_action_uses_the_installed_unified_cli() -> None:
     assert "python -m agent_sync vendor-skills" in action_text
     assert "PYTHONPATH=" not in action_text
     assert "requirements.txt" not in action_text
+
+
+def test_repository_validates_the_current_checkout_action() -> None:
+    """Test that pull-request CI invokes the action from the current checkout."""
+
+    workflow_text = Path(".github/workflows/test.yml").read_text(encoding="utf-8")
+
+    assert "poetry run python -m agent_sync mirror-providers --root ." in workflow_text
+    assert "uses: ./" in workflow_text

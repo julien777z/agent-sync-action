@@ -1,5 +1,5 @@
 ---
-description: Follow focused GitHub Action, branch, commit, and pull-request conventions.
+description: Follow shared workflow, branch, pull-request, and commit conventions for GitHub repositories.
 alwaysApply: true
 ---
 
@@ -7,19 +7,25 @@ alwaysApply: true
 
 ## Workflows
 
-- Use version-tagged official actions and repository-owned runtime version files.
+- Do not hard-code runtime versions when a shared action, reusable workflow, or repository version file supplies them; omit `python-version` when shared Python automation provides it, and use `node-version-file: ".nvmrc"` for Node.js workflows.
+- Add an explanatory comment when an edge case requires an explicit version override.
+- Use version-tagged GitHub Actions such as `actions/checkout@v4` and `actions/setup-python@v5`, not full commit SHAs.
 
-## Branches And Pull Requests
+## Branches and Pull Requests
 
-- Keep pull requests focused with public, consumer-neutral titles and descriptions.
-- Reuse the current open branch and pull request for follow-up work unless the user requests another branch.
-- Never push agent-authored changes directly to the default branch.
-- Do not merge, tag, or publish without explicit user authorization.
+- Keep pull requests focused and give them descriptive titles and descriptions; request appropriate reviewers when the repository workflow requires them.
+- When additional work arrives on a non-default branch, retain that branch and add the work to its pull request even when the task could be reviewed independently.
+- Query the current branch's pull request before creating one. Reuse it while it is open, or create one from the current branch when none exists.
+- Create a separate branch only when the user asks or the current branch's pull request is already merged; start post-merge work from the default branch.
 
-## Commits And Generated Files
+## Commits
 
-- Use focused conventional commits when applicable.
-- Commit generated files only when this repository intentionally tracks provider mirrors.
+- Use conventional commit messages when applicable and keep commits atomic and focused.
+- Do not commit generated files unless the repository explicitly requires them.
+
+## Guardrails
+
+- Never commit or push agent-authored changes directly to the default branch. If the checkout is on the default branch or detached, create a descriptive non-default branch; otherwise retain the current branch and deliver through its pull request.
 
 ## README
 

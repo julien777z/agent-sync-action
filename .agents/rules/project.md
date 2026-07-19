@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Generated Output
 
-- Never commit auto-generated output; validate the action in synthetic consumer workspaces instead of running it against this repository.
+- Never commit auto-generated output; let CI generate it before invoking the action from the current checkout.
 
 ## PR Monitoring And Background Timers
 

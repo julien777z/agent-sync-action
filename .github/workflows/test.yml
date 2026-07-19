@@ -29,3 +29,9 @@ jobs:
         run: poetry run pytest
       - name: Compile Python
         run: poetry run python -m compileall -q src tests
+      - name: Prepare current-branch action validation
+        run: poetry run python -m agent_sync mirror-providers --root .
+      - name: Test current-branch action
+        uses: ./
+        with:
+          dry-run: "true"
