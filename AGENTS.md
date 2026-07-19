@@ -282,7 +282,7 @@ class Report(BaseModel):
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
-- Do not create a dedicated module for one generic stateless helper. Keep small cross-cutting helpers in the package's `utils.py`, and extract a focused module or package only when a cohesive domain or external boundary warrants it.
+- Put generic reusable functions in the package's `utils.py`, even when they currently have one caller; keep domain-specific behavior in its owning module, and extract a focused module or package only when a cohesive domain or external boundary warrants it.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
 ```python
