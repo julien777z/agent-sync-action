@@ -5,7 +5,7 @@ from typing import Final
 
 from pydantic import ValidationError
 
-from agent_sync.config import CONFIG
+from agent_sync.config import ACTION_CONFIG
 from agent_sync.models.registry import ExternalSkill, SkillsLock
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
@@ -31,7 +31,7 @@ def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Pa
     command = [
         "npx",
         "--yes",
-        f"skills@{CONFIG.skills_cli_version}",
+        f"skills@{ACTION_CONFIG.skills_cli_version}",
         "add",
         str(source_root),
         "--skill",

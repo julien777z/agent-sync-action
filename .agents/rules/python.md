@@ -106,8 +106,8 @@ config = third_party_package.Config(
 
 ## Configuration
 
-- Define the repository's settings in one `Config` class derived from `pydantic_settings.BaseSettings`, instantiate one module-level `CONFIG = Config()`, and import that validated object wherever settings are needed.
-- Put environment-backed, deployment-tunable, or intentionally overridable values in `Config`. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
+- Define the repository's settings in one descriptively named `BaseSettings` class such as `ActionConfig`, instantiate one module-level constant such as `ACTION_CONFIG = ActionConfig()`, and import that validated object wherever settings are needed.
+- Put environment-backed, deployment-tunable, or intentionally overridable values in that settings class. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
 - Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
 - Use `TypedDict` only for static structured data that is not configuration.
 
@@ -115,30 +115,30 @@ config = third_party_package.Config(
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Config(BaseSettings):
+class ActionConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APPLICATION_", frozen=True)
 
     tool_cli_version: str = "1.2.3"
     request_timeout_seconds: int = 30
 
 
-CONFIG = Config()
+ACTION_CONFIG = ActionConfig()
 ```
 
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
 - Avoid large piles of module-level constants. If a value is genuinely operator-tunable, add it to the project's central config model or settings layer.
 - Do not add useless config values like `DEFAULT_ENVIRONMENT`.
-- Do not add helper functions like `_get_environment` when the value already exists on `CONFIG`.
+- Do not add helper functions like `_get_environment` when the value already exists on the shared settings object.
 - Do not read environment variables directly with `os.getenv`, `os.environ`, or `os.environ.get` in application/service/library code.
-- Always read environment-backed values from the typed config object so defaults, validation, and normalization live in one place.
-- Exception: one-off scripts may read from `os` when introducing a `CONFIG` model would be unnecessary overhead.
+- Always read environment-backed values from the typed settings object so defaults, validation, and normalization live in one place.
+- Exception: one-off scripts may read from `os` when introducing a settings model would be unnecessary overhead.
 
 ## Constants
 
 - Define constants at the top of the file, after imports.
 - Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
-- Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in `Config` even when they have a default.
+- Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
 - When a mutable object is annotated with `Final`, complete any setup-time mutation in the same expression as initialization instead of binding it first and mutating it on the next line.
 - Only extract literals when they are reused or carry domain meaning; keep trivial single-use literals inline (for example, delimiters like `"-"` or `"."`).
 - Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
@@ -154,7 +154,7 @@ Avoid trivial wrapper functions that add no value. A function that just returns 
 
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
 - Do not rebind function arguments to a second local name when the value is unchanged (for example, `profile = obj`); name the parameter correctly at the signature instead.
-- Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `CONFIG` in every call); read from that source directly where the value is used.
+- Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `APPLICATION_CONFIG` in every call); read from that source directly where the value is used.
 
 - Prefer normal attribute assignment over `object.__setattr__(...)` when mutating Pydantic models in validators or helper methods.
 - Only use `object.__setattr__(...)` when normal assignment is genuinely unavailable (for example frozen models or descriptor bypass requirements), and keep that escape hatch explicit and justified.
@@ -162,7 +162,7 @@ Avoid trivial wrapper functions that add no value. A function that just returns 
 ```python
 # Bad: useless wrapper
 def resolve_config(config: Settings | None) -> Settings:
-    return config or CONFIG
+    return config or APPLICATION_CONFIG
 
 def get_auth_secret(config: Settings | None = None) -> str:
     resolved = resolve_config(config)  # Unnecessary indirection
@@ -170,20 +170,20 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 # Good: inline the fallback
 def get_auth_secret(config: Settings | None = None) -> str:
-    resolved = config or CONFIG
+    resolved = config or APPLICATION_CONFIG
     return resolved.SECRET
 ```
 
 ## Architecture and Boundaries
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
-- Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared `CONFIG` object.
+- Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
 
 - Application code (a function, method, property, class, constant, or field) with **zero non-test consumers** is dead code and must be deleted, along with the tests that only exist to exercise it.
 - **Tests do not justify keeping otherwise-unused application code.** A test that asserts a symbol no other application code reads is testing a fabricated contract; delete the symbol and that test together rather than preserving the symbol "because it's covered".
 - "Consumer" means live application/library code that reads the symbol — call sites, internal use by another live symbol, serialization, or a public package export in `__all__` that external packages import. Test modules are not consumers.
 - A symbol reached only indirectly through another symbol that is itself dead is also dead; remove the whole unused chain.
-- **Config fields that populate environment variables consumed by a third-party library are not dead code**, even when no application code reads the field directly. If a dependency we rely on reads an env var at runtime (for example a library whose `Settings` reads `ENCRYPTION_METHOD`/`ENCRYPTION_KEY`), the field must stay on `CONFIG` so the application sets that env var — the library is the consumer. Keep such fields and validate them where the environment requires it.
+- **Settings fields that populate environment variables consumed by a third-party library are not dead code**, even when no application code reads the field directly. If a dependency we rely on reads an env var at runtime (for example a library whose `Settings` reads `ENCRYPTION_METHOD`/`ENCRYPTION_KEY`), the field must stay on the shared settings object so the application sets that env var — the library is the consumer. Keep such fields and validate them where the environment requires it.
 
 - For values persisted in databases, queues, or cross-service contracts (for example handler names, event names, state keys), use explicit constants or enums.
 - Do not derive durable identifiers from implementation details like `function.__name__`.

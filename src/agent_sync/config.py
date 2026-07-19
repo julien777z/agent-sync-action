@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from agent_sync.models.output import Provider
 
 
-class Config(BaseSettings):
+class ActionConfig(BaseSettings):
     """Load runtime settings from typed defaults or environment overrides."""
 
     model_config = SettingsConfigDict(
@@ -16,7 +16,7 @@ class Config(BaseSettings):
     skills_cli_version: str = "1.5.13"
 
 
-CONFIG = Config()
+ACTION_CONFIG = ActionConfig()
 
 
 class PlatformSettings(BaseModel):

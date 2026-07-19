@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.config import CONFIG, Config
+from agent_sync.config import ACTION_CONFIG, ActionConfig
 from agent_sync.external_skills import github, installer
 from agent_sync.external_skills import sync as external_skills
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
@@ -51,7 +51,7 @@ class TestExternalSkillBoundaries:
 
         monkeypatch.setenv("AGENT_SYNC_SKILLS_CLI_VERSION", "9.9.9")
 
-        assert Config().skills_cli_version == "9.9.9"
+        assert ActionConfig().skills_cli_version == "9.9.9"
 
     def test_revision_resolution_returns_exact_head(
         self,
@@ -128,7 +128,7 @@ class TestExternalSkillBoundaries:
         installer.install_skill(skill, tmp_path, source_root)
 
         assert str(source_root) in captured
-        assert f"skills@{CONFIG.skills_cli_version}" in captured
+        assert f"skills@{ACTION_CONFIG.skills_cli_version}" in captured
         assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
 
     def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
