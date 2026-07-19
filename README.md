@@ -108,7 +108,8 @@ To add an external skill, find it on [skills.sh](https://www.skills.sh/), then a
 `.agents/skills.json`. Use its source repository and upstream slug, choose the local skill
 directory name you want, and set `automatic_updates` to keep it current.
 
-For example, this installs the React best-practices skill as
+For example, this installs the
+[React best-practices](https://www.skills.sh/vercel-labs/agent-skills/vercel-react-best-practices) skill as
 `.agents/skills/react-best-practices`:
 
 ```json
