@@ -78,7 +78,6 @@ def render_front_matter(front_matter: BaseModel | YamlMapping, body: str) -> str
             front_matter.model_dump(
                 by_alias=True,
                 exclude_none=True,
-                exclude={"variants"},
             )
         ).root
     else:

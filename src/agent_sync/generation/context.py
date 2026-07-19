@@ -8,7 +8,6 @@ from agent_sync.errors import AgentSyncError
 from agent_sync.models.configuration import CanonicalConfiguration
 from agent_sync.models.document import (
     AgentFrontMatter,
-    CommandFrontMatter,
     RuleFrontMatter,
     SkillFrontMatter,
 )
@@ -26,17 +25,6 @@ class SkillSource(BaseModel):
     slug: str
     path: Path
     directory: Path
-
-
-class CommandSource(BaseModel):
-    """Hold one parsed command source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    front_matter: CommandFrontMatter
-    body: str
 
 
 class AgentSource(BaseModel):
@@ -79,7 +67,6 @@ class GenerationContext(BaseModel):
     workspace: Workspace
     configuration: CanonicalConfiguration
     skills: tuple[SkillSource, ...]
-    commands: tuple[CommandSource, ...]
     agents: tuple[AgentSource, ...]
     rules: tuple[RuleSource, ...]
     hooks: tuple[HookSource, ...]
@@ -96,7 +83,6 @@ def load_generation_context(
         workspace=workspace,
         configuration=configuration,
         skills=tuple(load_skills(workspace)),
-        commands=tuple(load_commands(workspace)),
         agents=tuple(load_agents(workspace)),
         rules=tuple(load_rules(workspace)),
         hooks=tuple(load_hooks(workspace)),
@@ -128,19 +114,6 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
         sources.append(SkillSource(slug=slug, path=path, directory=directory))
 
     return sources
-
-
-def load_commands(workspace: Workspace) -> list[CommandSource]:
-    """Load parsed command documents."""
-
-    return [
-        CommandSource(slug=slug, path=path, front_matter=front_matter, body=body)
-        for path, slug, front_matter, body in load_markdown_sources(
-            workspace,
-            "commands",
-            CommandFrontMatter,
-        )
-    ]
 
 
 def load_agents(workspace: Workspace) -> list[AgentSource]:

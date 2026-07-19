@@ -20,15 +20,6 @@ class SkillFrontMatter(BaseModel):
         return value
 
 
-class CommandFrontMatter(BaseModel):
-    """Validate recognized canonical command metadata."""
-
-    model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
-
-    allowed_tools: str | None = Field(default=None, alias="allowed-tools")
-    variants: dict[str, str] | None = None
-
-
 class AgentFrontMatter(BaseModel):
     """Validate recognized canonical agent metadata."""
 

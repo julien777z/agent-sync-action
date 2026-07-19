@@ -8,7 +8,6 @@ import pytest
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.agent import generate_agents
-from agent_sync.generation.command import generate_claude_commands, generate_cursor_commands
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.hook import generate_hooks
 from agent_sync.generation.registry import ARTIFACT_REGISTRY
@@ -42,7 +41,6 @@ class TestArtifactRegistry:
             for artifact, registration in ARTIFACT_REGISTRY.items()
         } == {
             ArtifactKind.SKILL: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
-            ArtifactKind.COMMAND: {Provider.CLAUDE, Provider.CURSOR},
             ArtifactKind.AGENT: {Provider.CLAUDE, Provider.CURSOR},
             ArtifactKind.RULE: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
             ArtifactKind.HOOK: {Provider.CLAUDE, Provider.CURSOR},
@@ -104,53 +102,7 @@ class TestSkillGeneration:
 
 
 class TestDocumentGeneration:
-    """Verify commands, agents, rules, and hooks use their artifact formats."""
-
-    def test_command_variants_and_front_matter_are_provider_specific(
-        self,
-        workspace: Workspace,
-    ) -> None:
-        """Test that command variants render in their provider formats."""
-
-        commands_dir = workspace.agents_dir / "commands"
-        commands_dir.mkdir()
-        (commands_dir / "review.md").write_text(
-            "---\nallowed-tools: Read\nvariants:\n  cursor: Cursor body\n---\n\nShared body\n",
-            encoding="utf-8",
-        )
-
-        context = load_context(workspace)
-        outputs = [
-            *generate_claude_commands(context, Provider.CLAUDE),
-            *generate_cursor_commands(context, Provider.CURSOR),
-        ]
-        files = {
-            output.provider: output.content
-            for output in outputs
-            if isinstance(output, GeneratedFile)
-        }
-
-        assert "allowed-tools: Read" in files[Provider.CLAUDE]
-        assert files[Provider.CLAUDE].endswith("Shared body\n")
-        assert files[Provider.CURSOR] == "Cursor body\n"
-
-    def test_command_without_metadata_stays_plain(self, workspace: Workspace) -> None:
-        """Test that metadata-free commands do not gain empty front matter."""
-
-        commands_dir = workspace.agents_dir / "commands"
-        commands_dir.mkdir()
-        (commands_dir / "start.md").write_text("Start services.\n")
-
-        context = load_context(workspace)
-        outputs = [
-            *generate_claude_commands(context, Provider.CLAUDE),
-            *generate_cursor_commands(context, Provider.CURSOR),
-        ]
-
-        assert all(
-            isinstance(output, GeneratedFile) and output.content == "Start services.\n"
-            for output in outputs
-        )
+    """Verify agents, rules, and hooks use their artifact formats."""
 
     def test_agent_model_override_precedes_provider_default(
         self,
@@ -215,16 +167,15 @@ class TestDocumentGeneration:
 
         rules_dir = workspace.agents_dir / "rules"
         rules_dir.mkdir()
-        (rules_dir / "commands.md").write_text(
-            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n'
-            "---\n\n# Commands\n"
+        (rules_dir / "git.md").write_text(
+            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n\n# Git\n"
         )
 
         outputs = generate_codex_rules(load_context(workspace), Provider.CODEX)
 
         assert len(outputs) == 1
         assert isinstance(outputs[0], GeneratedFile)
-        assert outputs[0].target_path == workspace.root / ".codex/rules/commands.rules"
+        assert outputs[0].target_path == workspace.root / ".codex/rules/git.rules"
         assert 'allow_rule(prefix_rule = ["git", "status"])' in outputs[0].content
 
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:

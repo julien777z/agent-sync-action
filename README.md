@@ -5,7 +5,7 @@ directory.
 
 ## Features
 
-- Mirrors skills, rules, agents, commands, hooks, and settings to each supported provider.
+- Mirrors skills, rules, agents, hooks, and settings to each supported provider.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
 - Vendors registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
@@ -71,7 +71,6 @@ jobs:
 ```text
 .agents/
 ├── agents/
-├── commands/
 ├── hooks/
 ├── models/
 ├── rules/
@@ -83,7 +82,6 @@ jobs:
 | Path | Purpose |
 |---|---|
 | `agents/` | Agent definitions mirrored to supported providers. |
-| `commands/` | Reusable command definitions mirrored to supported providers. |
 | `hooks/` | Hook scripts mirrored with their executable state. |
 | `models/` | Per-agent provider model overrides. |
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |

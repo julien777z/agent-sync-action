@@ -18,7 +18,6 @@ class ArtifactKind(StrEnum):
     """Identify the canonical artifact represented by a generated output."""
 
     SKILL = "skill"
-    COMMAND = "command"
     AGENT = "agent"
     RULE = "rule"
     HOOK = "hook"

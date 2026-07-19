@@ -2,7 +2,6 @@ from collections.abc import Callable
 from typing import Final, TypedDict
 
 from agent_sync.generation.agent import generate_agents
-from agent_sync.generation.command import generate_claude_commands, generate_cursor_commands
 from agent_sync.generation.context import GenerationContext
 from agent_sync.generation.hook import generate_hooks
 from agent_sync.generation.rule import generate_codex_rules, generate_rule_links
@@ -29,14 +28,6 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
             Provider.CLAUDE: generate_skills,
             Provider.CURSOR: generate_skills,
             Provider.CODEX: generate_skills,
-        },
-    },
-    ArtifactKind.COMMAND: {
-        "owned_directory": "commands",
-        "owned_files": {},
-        "handlers": {
-            Provider.CLAUDE: generate_claude_commands,
-            Provider.CURSOR: generate_cursor_commands,
         },
     },
     ArtifactKind.AGENT: {
