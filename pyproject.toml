@@ -1,7 +1,7 @@
 [project]
 name = "agent-sync-action"
 version = "0.0.0"
-description = "Mirror canonical agent sources and vendor registered external skills."
+description = "Keep your AI coding assistants in sync from a single shared setup."
 authors = [{ name = "julien777z" }]
 license = "MIT"
 readme = "README.md"

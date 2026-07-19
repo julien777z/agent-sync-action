@@ -1,5 +1,5 @@
 name: Agent Sync Action
-description: Mirror canonical agent sources and vendor registered skills.
+description: Keep your AI coding assistants in sync from a single shared setup.
 author: julien777z
 
 branding:
