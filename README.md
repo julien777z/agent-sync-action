@@ -66,7 +66,7 @@ jobs:
           refresh-external-skills: true
 ```
 
-## Canonical layout
+## Layout
 
 ```text
 .agents/
@@ -79,6 +79,17 @@ jobs:
 ├── skills/
 └── skills.json
 ```
+
+| Path | Purpose |
+|---|---|
+| `agents/` | Agent definitions mirrored to supported providers. |
+| `commands/` | Reusable command definitions mirrored to supported providers. |
+| `hooks/` | Hook scripts mirrored with their executable state. |
+| `models/` | Per-agent provider model overrides. |
+| `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
+| `settings/` | Provider settings and default model configuration. |
+| `skills/` | Canonical skill directories linked into provider layouts. |
+| `skills.json` | Registry of external skills available for automatic updates. |
 
 Only the directories and files your repository uses are required.
 
@@ -100,8 +111,11 @@ Register external skills in `.agents/skills.json`:
 {
   "version": 1,
   "skills": [
-    { "name": "security-audit", "repo": "cloudflare/security-audit-skill" },
-    { "name": "react-guidelines", "repo": "example/agent-skills", "skill": "react" }
+    {
+      "name": "react-best-practices",
+      "repo": "vercel-labs/agent-skills",
+      "skill": "vercel-react-best-practices"
+    }
   ]
 }
 ```
