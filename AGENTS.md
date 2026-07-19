@@ -318,37 +318,25 @@ config = third_party_package.Config(
 - Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
 - Prefer enums for error identifiers/messages instead of a constant per error string.
 
-- A group of related **configuration values** (API hosts, endpoint paths, protocol versions, header tokens, feature markers, default model names, timeouts) is not a set of constants — collect it into a **single typed config map**, not one `Final` per value.
-- Model the map with a `TypedDict` and build it by **calling** the constructor with keyword arguments (`CONFIG: Final[ReviewConfig] = ReviewConfig(...)`), then read values by key (`CONFIG["routine_host"]`). Do not annotate a plain dict literal.
-- Reserve standalone `Final` constants for genuinely single, unrelated constants — a compiled regex, a file path, a sentinel — that do not belong to a config group.
-- This is about grouping; it does not override the **Configuration** section below. Environment-backed values, or values that belong in the repository's central settings layer, still go there — not in a module-level map.
+- Define the repository's settings in one `Config` class derived from `pydantic_settings.BaseSettings`, instantiate one module-level `CONFIG = Config()`, and import that validated object wherever settings are needed.
+- Put environment-backed, deployment-tunable, or intentionally overridable values in `Config`. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
+- Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
+- Use `TypedDict` only for static structured data that is not configuration. Reserve standalone `Final` constants for genuinely fixed values such as compiled regexes, invariant paths, or sentinels.
 
 ```python
-from typing import Final, TypedDict
-
-# Bad: one config group spread across many individual constants
-SERVICE_BASE_URL: Final[str] = "https://api.example.com/v1"
-API_VERSION: Final[str] = "2026-01-01"
-FEATURE_TOKEN: Final[str] = "example-feature"
-REQUEST_MARKER: Final[str] = "<!-- request-marker -->"
-
-# Good: one typed config map, built by calling the TypedDict constructor
-class ServiceConfig(TypedDict):
-    base_url: str
-    api_version: str
-    feature_token: str
-    request_marker: str
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-CONFIG: Final[ServiceConfig] = ServiceConfig(
-    base_url="https://api.example.com/v1",
-    api_version="2026-01-01",
-    feature_token="example-feature",
-    request_marker="<!-- request-marker -->",
-)
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="APPLICATION_", frozen=True)
+
+    tool_cli_version: str = "1.2.3"
+    request_timeout_seconds: int = 30
+
+
+CONFIG = Config()
 ```
 
-- Only **environment-backed or deployment-tunable** values (allowed environments, feature flags, limits, timeouts an operator may change) belong in the repository's typed configuration layer.
 - Fixed third-party endpoint URLs and values fully derived from existing config (for example a from-address derived from `CONFIG.DOMAIN`) are **module-level `Final` constants** in the module that uses them, not config fields.
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
 - Avoid large piles of module-level constants. If a value is genuinely operator-tunable, add it to the project's central config model or settings layer.
