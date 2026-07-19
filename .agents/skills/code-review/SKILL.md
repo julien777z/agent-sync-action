@@ -46,6 +46,8 @@ Use the platform's pull-request tools when available, with `gh` as a fallback. G
 
 Launch these reviewers in parallel when subagents are available, or run them sequentially otherwise. Each reviewer must inspect only lines changed by the selected target and return a flat list with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning.
 
+If the user provides a new task while reviewers are running, interrupt every reviewer immediately and discard their results before starting that task. Restart the review only after the task is complete on its new baseline.
+
 1. **Rules** — check applicable repository rules against surrounding conventions.
 2. **Bugs** — find high-confidence correctness, data-loss, security, performance, or UX defects.
 3. **History** — use blame and history to identify regressions against prior intent.
