@@ -104,7 +104,7 @@ Only the directories and files your repository uses are required.
 
 ## External skills
 
-External skills are downloaded from [github.com](https://github.com).
+External skills are installed from [skills.sh](https://www.skills.sh/).
 
 Register external skills in `.agents/skills.json`:
 
