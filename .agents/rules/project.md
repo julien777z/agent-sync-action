@@ -8,7 +8,7 @@ alwaysApply: true
 ## Generated Outputs
 
 - Agents never stage generated provider output.
-- Only the repository Agent Sync workflow may generate and commit provider output while validating the checked-out action.
+- Only the repository's Agent Sync workflow may generate and commit provider output.
 
 ## PR Monitoring And Background Timers
 
