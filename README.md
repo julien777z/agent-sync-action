@@ -14,7 +14,9 @@ from one canonical `.agents/` directory.
 - Preserves unmanaged Codex configuration.
 - Supports direct commits, pull requests, and read-only dry runs.
 
-## Example
+## Examples
+
+### Mirror Canonical Configuration
 
 Use this workflow to mirror `.agents/` whenever its canonical configuration
 changes on `main`.
@@ -37,6 +39,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julien777z/agent-sync-action@v0
+```
+
+### Sync External Skills
+
+Use this scheduled workflow to vendor the latest registered external skills and
+mirror any resulting changes.
+
+```yaml
+name: Sync External Skills
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julien777z/agent-sync-action@v0
+        with:
+          refresh-external-skills: true
 ```
 
 ## Canonical layout
