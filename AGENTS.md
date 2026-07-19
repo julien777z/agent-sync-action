@@ -8,24 +8,44 @@ The canonical project rules live in `.agents/rules/`.
 
 # GitHub Rules
 
+## Workflows
+
 - Use version-tagged official actions and repository-owned runtime version files.
+
+## Branches And Pull Requests
+
 - Keep pull requests focused with public, consumer-neutral titles and descriptions.
 - Reuse the current open branch and pull request for follow-up work unless the user requests another branch.
-- Use focused conventional commits when applicable.
 - Never push agent-authored changes directly to the default branch.
 - Do not merge, tag, or publish without explicit user authorization.
+
+## Commits And Generated Files
+
+- Use focused conventional commits when applicable.
 - Commit generated files only when this repository intentionally tracks provider mirrors.
+
+## README
+
+- Place a concise, list-based Features section immediately after the introduction.
+- Describe user-facing capabilities and outcomes instead of implementation details.
+- Keep setup, configuration, and examples only when they help users adopt the action.
+- Remove repeated explanations and prefer short sections, bullets, tables, and focused examples over long prose.
 
 <!-- Source: .agents/rules/poetry.md -->
 
 # Poetry Rules
 
+## Project Configuration
+
 - Target Python 3.12 and Poetry 2 with PEP 621 `[project]` metadata.
 - Declare runtime dependencies in `[project.dependencies]`, development tools in `[dependency-groups].dev`, and console commands in `[project.scripts]`.
 - Keep only package-discovery configuration under `[tool.poetry]`; do not duplicate metadata or dependency declarations there.
+- Keep the Poetry build system at the end of `pyproject.toml`.
+
+## Tooling And Validation
+
 - Configure Black with a 100-character line length, strict Pyright, and pytest.
 - Use `poetry install`, `poetry run black --check .`, `poetry run pyright`, and `poetry run pytest` for validation.
-- Keep the Poetry build system at the end of `pyproject.toml`.
 
 <!-- Source: .agents/rules/project.md -->
 
@@ -39,13 +59,18 @@ The canonical project rules live in `.agents/rules/`.
 
 # Pydantic Rules
 
+## Model Design
+
 - Use `BaseModel` for classes that hold application data; do not use dataclasses or named tuples.
-- Use `ConfigDict` for model configuration and strict validation at canonical input boundaries.
 - Use discriminated unions when variants have different required fields instead of optional fields that permit invalid combinations.
+- Do not override `BaseModel.__init__` or create models dynamically.
+
+## Validation And Serialization
+
+- Use `ConfigDict` for model configuration and strict validation at canonical input boundaries.
 - Use `model_dump()` and `model_dump_json()` for serialization.
 - Keep Python fields in `snake_case` and use aliases for external key names.
 - Use `Field` only for constraints, aliases, or discriminators—not descriptions.
-- Do not override `BaseModel.__init__` or create models dynamically.
 
 <!-- Source: .agents/rules/python.md -->
 
@@ -91,11 +116,19 @@ The canonical project rules live in `.agents/rules/`.
 
 # Testing Rules
 
+## Organization And Fixtures
+
 - Mirror source boundaries in the test layout and group related cases in descriptive test classes.
 - Give every test class and function a one-line docstring beginning with `Test that` for functions.
 - Put reusable workspace and artifact builders in the nearest `conftest.py` as typed factory fixtures.
 - Use synthetic consumer names and paths; public tests must not contain private repository artifacts or terminology.
+
+## Test Boundaries
+
 - Prefer real Pydantic models and filesystem state over `SimpleNamespace` or loosely shaped mocks.
 - Patch explicit external boundaries such as subprocess and network modules, not deep internal implementation details.
+
+## Coverage And Scenarios
+
 - Parametrize same-shape scenarios and give parameters readable IDs.
 - Verify dry runs, failure exit codes, stale cleanup, unmanaged-state preservation, and idempotence.

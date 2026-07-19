@@ -5,10 +5,25 @@ alwaysApply: true
 
 # GitHub Rules
 
+## Workflows
+
 - Use version-tagged official actions and repository-owned runtime version files.
+
+## Branches And Pull Requests
+
 - Keep pull requests focused with public, consumer-neutral titles and descriptions.
 - Reuse the current open branch and pull request for follow-up work unless the user requests another branch.
-- Use focused conventional commits when applicable.
 - Never push agent-authored changes directly to the default branch.
 - Do not merge, tag, or publish without explicit user authorization.
+
+## Commits And Generated Files
+
+- Use focused conventional commits when applicable.
 - Commit generated files only when this repository intentionally tracks provider mirrors.
+
+## README
+
+- Place a concise, list-based Features section immediately after the introduction.
+- Describe user-facing capabilities and outcomes instead of implementation details.
+- Keep setup, configuration, and examples only when they help users adopt the action.
+- Remove repeated explanations and prefer short sections, bullets, tables, and focused examples over long prose.
