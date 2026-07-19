@@ -23,7 +23,6 @@ build-backend = "poetry.core.masonry.api"
 
 - Prefer separate focused modules over monoliths, organizing code under `clients/`, `services/`, `models/`, and `core/` as applicable.
 - Prefer PEP 695 generic syntax when it improves a Python 3.12 interface.
-- Prefer Pydantic v2 models for validated or serialized objects; avoid dataclasses unless explicitly requested.
 - Give every function and class a one-line imperative docstring followed by a blank line.
 - Services may be plain functions. Pass clients, sessions, and configuration explicitly rather than storing module-level runtime globals.
 - Use `aiohttp` for HTTP I/O, inject a `ClientSession` configured with a sensible timeout, create long-lived sessions at application startup, enable `raise_for_status` when appropriate, and parse responses asynchronously with `json()` or `text()`.

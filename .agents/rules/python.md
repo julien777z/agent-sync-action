@@ -13,7 +13,7 @@ alwaysApply: true
 - Use `collections.abc` for abstract types: `Callable`, `Iterable`, etc.
 - Never use `Protocol` for model typing; use concrete model classes in type annotations.
 
-- Model structured payloads explicitly: use `TypedDict` for mapping-shaped data and `BaseModel` when validation or serialization is required, rather than arbitrary inline dictionaries or `dict[str, object]`.
+- Model structured payloads explicitly: use `TypedDict` for mapping-shaped data and Pydantic `BaseModel` for every data-holding class, rather than arbitrary inline dictionaries, `dict[str, object]`, `dataclass`, or `NamedTuple`.
 - Use exact types or precise unions for dynamic and nested shapes; never hide their contracts behind `Any` or placeholder `object` fields in application or test annotations.
 - Prefer real SDK and model types over `cast(...)`; reserve a narrowly scoped cast for information the type system genuinely cannot express.
 - Do not "fix" typing by expanding simple transformations into repetitive key-by-key copy blocks (for example, manually assigning each dict key only to satisfy pyright). Fix the source type hints (or add a precise cast/narrowing at the boundary) so the transformation can stay concise and readable.
