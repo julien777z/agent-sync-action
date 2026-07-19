@@ -18,7 +18,12 @@ from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink,
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
-from tests.factories import materialize_rule, materialize_skill
+from tests.factories import (
+    RuleFrontMatterFactory,
+    SkillFrontMatterFactory,
+    materialize_rule,
+    materialize_skill,
+)
 
 
 def load_context(workspace: Workspace) -> GenerationContext:
@@ -54,7 +59,9 @@ class TestSkillGeneration:
     ) -> None:
         """Test that all provider skill paths link to one canonical directory."""
 
-        source = materialize_skill(workspace, "sample-skill")
+        front_matter = SkillFrontMatterFactory.build()
+        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
         context = load_context(workspace)
         outputs = [output for provider in Provider for output in generate_skills(context, provider)]
         links = {
@@ -147,7 +154,8 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that one normalized rule owns both provider links."""
 
-        source = materialize_rule(workspace, "python")
+        source = workspace.agents_dir / "rules/python.md"
+        materialize_rule(source, RuleFrontMatterFactory.build(name="removed"))
         context = load_context(workspace)
         outputs = [
             *generate_shared_rule_outputs(context),
@@ -240,8 +248,8 @@ class TestSettingsGeneration:
         """Test that generated instructions determine Codex document capacity."""
 
         materialize_rule(
-            workspace,
-            "project",
+            workspace.agents_dir / "rules/project.md",
+            RuleFrontMatterFactory.build(name="removed"),
             body="# Project Rules\n\nKeep changes focused.",
         )
 
@@ -288,8 +296,15 @@ class TestMirrorIntegration:
     ) -> None:
         """Test that mirroring writes relative links and reaches a clean dry run."""
 
-        materialize_rule(workspace, "python")
-        materialize_skill(workspace, "review")
+        materialize_rule(
+            workspace.agents_dir / "rules/python.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
+        skill_front_matter = SkillFrontMatterFactory.build(name="review")
+        materialize_skill(
+            workspace.agents_dir / "skills/review/SKILL.md",
+            skill_front_matter,
+        )
 
         assert mirror_providers(workspace, dry_run=False) is False
 

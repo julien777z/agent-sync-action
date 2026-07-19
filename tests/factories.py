@@ -10,7 +10,6 @@ from agent_sync.models.registry import (
     SkillsLock,
     SkillsRegistry,
 )
-from agent_sync.workspace import Workspace
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
@@ -79,56 +78,45 @@ class SkillsLockFactory(ModelFactory[SkillsLock]):
 
 
 def materialize_skill(
-    workspace: Workspace,
-    slug: str,
+    path: Path,
+    front_matter: SkillFrontMatter,
     body: str = "Body text.",
-) -> Path:
+) -> None:
     """Write one generated canonical skill document."""
 
-    front_matter = SkillFrontMatterFactory.build(name=slug)
-    skill_dir = workspace.agents_dir / "skills" / slug
-    skill_dir.mkdir(parents=True)
-    source = skill_dir / "SKILL.md"
-    source.write_text(
-        render_front_matter(front_matter, f"# {slug}\n\n{body}"),
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        render_front_matter(front_matter, f"# {front_matter.name}\n\n{body}"),
         encoding="utf-8",
     )
 
-    return source
-
 
 def materialize_rule(
-    workspace: Workspace,
-    slug: str,
+    path: Path,
+    front_matter: RuleFrontMatter,
     body: str = "# Rule\n\nAlways be ruling.",
-) -> Path:
+) -> None:
     """Write one generated canonical rule document."""
 
-    front_matter = RuleFrontMatterFactory.build(name="removed")
     raw_front_matter = front_matter.model_dump(
         by_alias=True,
         exclude_defaults=True,
         exclude_none=True,
     )
-    rules_dir = workspace.agents_dir / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-    source = rules_dir / f"{slug}.md"
-    source.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
-
-    return source
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
 
 
-def materialize_registry(workspace: Workspace, registry: SkillsRegistry) -> None:
+def materialize_registry(path: Path, registry: SkillsRegistry) -> None:
     """Write one external-skill registry into canonical sources."""
 
-    path = workspace.agents_dir / "skills.json"
     path.write_text(registry.model_dump_json(), encoding="utf-8")
 
 
-def materialize_skills_lock(directory: Path, lock: SkillsLock) -> None:
+def materialize_skills_lock(path: Path, lock: SkillsLock) -> None:
     """Write one installer lock file."""
 
-    (directory / "skills-lock.json").write_text(
+    path.write_text(
         lock.model_dump_json(by_alias=True),
         encoding="utf-8",
     )

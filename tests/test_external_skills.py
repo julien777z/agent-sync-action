@@ -374,7 +374,7 @@ class TestExternalSkillService:
         """Test that changed external skills are reported by a dry run."""
 
         materialize_registry(
-            workspace,
+            workspace.agents_dir / "skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
         )
 
@@ -404,7 +404,7 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace,
+            workspace.agents_dir / "skills.json",
             SkillsRegistryFactory.build(
                 skills=[ExternalSkillFactory.build(automatic_updates=False)]
             ),
@@ -442,6 +442,6 @@ class TestInstallerState:
         lock = SkillsLockFactory.build(
             skills={"upstream": SkillLockEntryFactory.build(skill_path="skills/sample/SKILL.md")}
         )
-        materialize_skills_lock(tmp_path, lock)
+        materialize_skills_lock(tmp_path / "skills-lock.json", lock)
 
         assert installer.read_skill_path(tmp_path) == "skills/sample/SKILL.md"

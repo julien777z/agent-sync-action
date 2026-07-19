@@ -15,7 +15,7 @@ from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
-from tests.factories import materialize_rule
+from tests.factories import RuleFrontMatterFactory, materialize_rule
 
 
 class TestManifest:
@@ -184,7 +184,10 @@ class TestReconciliation:
     ) -> None:
         """Test that a non-directory owned path cannot block reconciliation."""
 
-        materialize_rule(workspace, "sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         directory = workspace.root / ".claude/rules"
         directory.parent.mkdir(parents=True)
 
@@ -206,7 +209,10 @@ class TestReconciliation:
     ) -> None:
         """Test that provider-root symlinks cannot redirect generated output externally."""
 
-        materialize_rule(workspace, "sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         external = workspace.root / "external"
         external.mkdir()
         sentinel = external / "sentinel"
@@ -227,7 +233,10 @@ class TestReconciliation:
     ) -> None:
         """Test that deleting a blocked provider root still recreates its links."""
 
-        materialize_rule(workspace, "sample")
+        materialize_rule(
+            workspace.agents_dir / "rules/sample.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
         external = workspace.root / "external"
         external_rules = external / "rules"
         external_rules.mkdir(parents=True)
