@@ -25,6 +25,18 @@ class ExternalSkill(BaseModel):
 
         return value
 
+    @field_validator("skill")
+    @classmethod
+    def validate_skill(cls, value: str | None) -> str | None:
+        """Reject upstream skill selectors that are not safe slugs."""
+
+        if value is not None and not SAFE_SLUG_PATTERN.fullmatch(value):
+            raise ValueError(
+                f"Invalid upstream skill '{value}' (must match {SAFE_SLUG_PATTERN.pattern})"
+            )
+
+        return value
+
     @property
     def upstream_skill(self) -> str:
         """Return the skill slug to request from the source repo (defaults to the local name)."""

@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agent_sync.config import ACTION_CONFIG
+
 
 class Workspace(BaseModel):
     """Describe one repository and its canonical agent source directory."""
@@ -35,10 +37,8 @@ class Workspace(BaseModel):
     def resolve(cls, root: str | None, agents_dirname: str | None) -> "Workspace":
         """Resolve CLI options, environment values, and defaults into a workspace."""
 
-        resolved_root = root or os.environ.get("AGENT_SYNC_ROOT") or os.getcwd()
-        resolved_agents_dirname = (
-            agents_dirname or os.environ.get("AGENT_SYNC_AGENTS_DIR") or ".agents"
-        )
+        resolved_root = root or ACTION_CONFIG.root or Path.cwd()
+        resolved_agents_dirname = agents_dirname or ACTION_CONFIG.agents_dir
 
         return cls(
             root=Path(resolved_root).resolve(),

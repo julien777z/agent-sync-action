@@ -105,8 +105,7 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
         content = workspace.read_text(path)
 
         if content is None:
-            logger.warning("Missing SKILL.md in %s.", directory)
-            continue
+            raise AgentSyncError(f"Missing SKILL.md in {directory}")
 
         front_matter, _ = parse_markdown(content, SkillFrontMatter, str(path))
 

@@ -100,6 +100,17 @@ class TestSkillGeneration:
         with pytest.raises(AgentSyncError):
             load_context(workspace)
 
+    def test_rejects_skill_directories_without_skill_documents(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that every canonical skill directory contains its required document."""
+
+        (workspace.agents_dir / "skills/sample-skill").mkdir(parents=True)
+
+        with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
+            load_context(workspace)
+
 
 class TestDocumentGeneration:
     """Verify agents, rules, and hooks use their artifact formats."""

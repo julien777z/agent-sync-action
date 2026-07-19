@@ -33,6 +33,18 @@ class TestExternalSkillModel:
         with pytest.raises(ValidationError):
             ExternalSkill(name=name, repo="example/sample", automatic_updates=True)
 
+    @pytest.mark.parametrize("skill", ["Bad Name", "UPPER", "../escape"])
+    def test_invalid_upstream_skill_names_fail(self, skill: str) -> None:
+        """Test that unsafe upstream skill selectors are rejected."""
+
+        with pytest.raises(ValidationError):
+            ExternalSkill(
+                name="sample",
+                repo="example/sample",
+                skill=skill,
+                automatic_updates=True,
+            )
+
     def test_automatic_updates_is_required(self) -> None:
         """Test that every registry entry chooses its update behavior explicitly."""
 
@@ -50,8 +62,14 @@ class TestExternalSkillBoundaries:
         """Test that future CLI versions can be selected without code changes."""
 
         monkeypatch.setenv("AGENT_SYNC_SKILLS_CLI_VERSION", "9.9.9")
+        monkeypatch.setenv("AGENT_SYNC_ROOT", "/tmp/consumer")
+        monkeypatch.setenv("AGENT_SYNC_AGENTS_DIR", "agent-sources")
 
-        assert ActionConfig().skills_cli_version == "9.9.9"
+        config = ActionConfig()
+
+        assert config.skills_cli_version == "9.9.9"
+        assert config.root == Path("/tmp/consumer")
+        assert config.agents_dir == "agent-sources"
 
     def test_revision_resolution_returns_exact_head(
         self,

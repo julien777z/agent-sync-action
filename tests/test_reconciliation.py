@@ -1,4 +1,6 @@
 import os
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -136,6 +138,34 @@ class TestReconciliation:
         )
 
         assert stale_path in plan.stale_paths
+
+    @pytest.mark.parametrize(
+        "target_kind",
+        ["file", "symlink"],
+    )
+    def test_owned_directory_blockers_are_replaced(
+        self,
+        workspace: Workspace,
+        rule_file_factory: Callable[..., Path],
+        target_kind: str,
+    ) -> None:
+        """Test that a non-directory owned path cannot block reconciliation."""
+
+        rule_file_factory("sample")
+        directory = workspace.root / ".claude/rules"
+        directory.parent.mkdir(parents=True)
+
+        if target_kind == "file":
+            directory.write_text("blocker\n")
+        else:
+            external = workspace.root / "external"
+            external.mkdir()
+            directory.symlink_to(external, target_is_directory=True)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert directory.is_dir()
+        assert not directory.is_symlink()
+        assert (directory / "sample.md").is_symlink()
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that provider settings cannot outlive their source configuration."""

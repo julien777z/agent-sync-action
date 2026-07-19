@@ -105,7 +105,9 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     for provider, directory_name in owned_provider_directories():
         directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
 
-        if directory.exists():
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            stale.add(directory)
+        elif directory.is_dir():
             stale.update(path for path in directory.iterdir() if path not in expected)
 
     for registration in ARTIFACT_REGISTRY.values():

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,8 @@ class ActionConfig(BaseSettings):
     )
 
     skills_cli_version: str = "1.5.13"
+    root: Path | None = None
+    agents_dir: str = ".agents"
 
 
 ACTION_CONFIG = ActionConfig()
