@@ -13,6 +13,15 @@ class TestAction:
 
         assert action["name"] == "Agent Sync Action"
 
+    def test_uses_clear_marketplace_description(self) -> None:
+        """Test that the action explains its benefit in plain language."""
+
+        action = yaml.safe_load(Path("action.yml").read_text(encoding="utf-8"))
+
+        assert action["description"] == (
+            "Keep your AI coding assistants in sync from a single shared setup."
+        )
+
     def test_keeps_the_public_input_contract(self) -> None:
         """Test that action inputs and defaults remain stable through the refactor."""
 
