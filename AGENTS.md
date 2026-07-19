@@ -53,7 +53,7 @@ The canonical project rules live in `.agents/rules/`.
 ## Project Configuration
 
 - Target Python 3.12 and use Poetry 2.x with PEP 621 `[project]` metadata; do not use legacy `[tool.poetry]` metadata or dependency tables.
-- Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
+- Declare runtime dependencies in `[project.dependencies]`, development dependencies in Poetry `[dependency-groups].dev`, and console entry points in `[project.scripts]`.
 - Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python 3.12 target inferred from `[project.requires-python]`.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
