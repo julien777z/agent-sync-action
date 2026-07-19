@@ -727,8 +727,12 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 
 - Define test helper functions at module level.
 - Keep helper docstrings to a single line.
-- **Builders belong in `conftest.py`, not in test files.** A "builder" is any helper whose job is to construct a domain object (Pydantic model, ORM row, request/response payload, mock with structured fields, file/path artifact, etc.) for use in tests. Common forms — `make_*`, `build_*`, `insert_*`, `create_*`, `fake_*` — must be promoted to `<noun>_*_factory` fixtures in the nearest shared `conftest.py`.
-- Module-level helpers are allowed only for trivial, non-construction utilities scoped to one file (predicates, small formatters, `to_comparable_string`-style assertion adapters). When in doubt, move it to `conftest.py`.
+- Use Polyfactory for structured test-data factories, selecting the factory base that matches the real model type; use `ModelFactory` for Pydantic models.
+- Define concrete Polyfactory classes in the nearest shared `factories.py`, set `__model__`, provide deterministic defaults, and call `.build(**overrides)` directly from tests.
+- Never use `Protocol` to describe test factories or wrap factory classes in callable pytest fixtures solely for dependency injection.
+- Keep `conftest.py` focused on pytest-managed setup, teardown, and dependency lifecycles.
+- Use explicit shared materialization helpers for filesystem or other I/O artifacts; accept typed factory-built models and explicit target paths.
+- Module-level helpers inside test files are allowed only for trivial, non-construction utilities scoped to that file (predicates, small formatters, `to_comparable_string`-style assertion adapters).
 
 - For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize with `model_dump(...)`.
 - Prefer `model_dump(mode="json", exclude_unset=True, exclude_none=True)` unless the endpoint contract needs different dump options.
@@ -737,16 +741,14 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Use enum members in model payloads instead of hardcoded enum strings.
 - For invalid-request tests, derive from a valid model payload and then mutate/remove fields intentionally to assert validation behavior.
 
-- Do not create module-level helper factories inside test files for reusable objects. This includes the first invocation — even a one-off "I'll just put it here for now" builder belongs in `conftest.py` from day one.
-- Follow the canonical factory shape: a `@pytest.fixture` named `<noun>_*_factory` (for example `order_factory`, `customer_factory`, `payment_payload_factory`, `task_factory`) that returns an inner `_build(**overrides) -> Noun` closure. Use the `*_orm_factory` suffix specifically for SQLAlchemy ORM rows.
-- Put shared factories in `conftest.py` and prefer `@pytest.fixture` for setup.
-- Helper functions that appear in multiple test files must be extracted to the nearest shared `conftest.py` or a `utils.py` in the test service folder.
+- Do not create module-level helper factories inside test files for reusable objects; add a concrete class to the nearest shared `factories.py` from the first call site.
+- Helper functions that appear in multiple test files must be extracted to the nearest shared helper module.
 - When multiple tests in a suite need the same config overrides, expose a reusable fixture helper (for example, `mock_config` returning `_mock_config(**overrides)`) in `conftest.py` instead of repeating `monkeypatch.setattr(...)` in each test.
-- Common payload creation functions (for example, `make_create_payload`) should be defined in the service-specific `conftest.py` and exposed as `@pytest.fixture` when a default payload is sufficient.
+- Common payload creation belongs in a Polyfactory class for the real request model, not a free-floating `make_*` function.
 - Keep `conftest.py` at shared test boundaries instead of scattering many topic-local `conftest.py` files.
-- If tests need additional properties that belong to shared fixture models, add the missing field in the shared fixture or factory instead of hardcoding literals in test payloads.
-- Prefer shared fixtures and `*_orm_factory` fixtures over ad-hoc object setup in test modules.
-- Keep reusable fixture helpers in shared `conftest.py` instead of duplicating setup in each test.
+- If tests need additional properties that belong to shared fixture models, add the missing field in the shared model or Polyfactory class instead of hardcoding literals in test payloads.
+- Prefer shared concrete factories over ad-hoc object setup in test modules.
+- Keep reusable setup fixtures in shared `conftest.py` instead of duplicating setup in each test.
 - Use fixture-backed values instead of hardcoded IDs/names/emails/tax IDs when fixtures provide them.
 - Do not hardcode business-profile values when a shared fixture or factory can provide them; extend the shared fixture first when needed.
 
@@ -832,31 +834,8 @@ class TreeNode(BaseModel):
     children: list["TreeNode"] = Field(default_factory=list)
 ```
 
-- Use `*_orm_factory` fixtures to create real ORM instances (for example: `user_orm_factory`, `account_orm_factory`, `order_orm_factory`, `subscription_orm_factory`).
-- ORM factory fixtures must live in shared `conftest.py` files, not inside individual test modules.
-- Factory fixtures should return real model instances with fixture-backed defaults and allow overrides via keyword arguments.
-- For related entities, build real nested relationships in the factory (for example, attach a real `Customer` instance to `Order.customer`).
-
-```python
-# Good: reusable fixture-backed ORM factory in conftest.py
-@pytest.fixture
-def order_orm_factory(order_fixture, customer_fixture, customer_orm_factory):
-    """Build Order ORM instances with nested real Customer relation."""
-
-    def _build(**overrides):
-        customer = customer_orm_factory()
-        order = Orders(
-            id=order_fixture.id,
-            customer_id=customer_fixture.id,
-            status=OrderStatus.PENDING,
-        )
-        order.customer = customer
-        for key, value in overrides.items():
-            setattr(order, key, value)
-        return order
-
-    return _build
-```
+- Use Polyfactory's `SQLAlchemyFactory` for ORM models and keep those concrete classes in the shared `factories.py` module.
+- Factory-built ORM instances must use realistic defaults, accept `.build(**overrides)`, and construct real nested relationships.
 
 ## Assertions and Mocking
 
@@ -865,7 +844,7 @@ def order_orm_factory(order_fixture, customer_fixture, customer_orm_factory):
 
 - Prefer third-party fakes first, then reusable test utilities, then patch-based mocks.
 - Use `AsyncMock` for async functions.
-- Avoid `MagicMock` for ORM/domain entities; use `*_orm_factory` fixtures that return real instances.
+- Avoid `MagicMock` for ORM/domain entities; use concrete Polyfactory classes that return real instances.
 - `MagicMock` is acceptable for external boundaries (SDK/client response containers, subprocess handles, and network wrappers).
 - For mocked third-party libraries, raise the real library exception types (for example `stripe.error.StripeError`) instead of mock-specific custom exceptions.
 - In reusable mock library/fake implementations, prefer real SDK/HTTP models and response objects over `MagicMock` whenever practical.
@@ -890,9 +869,9 @@ def order_orm_factory(order_fixture, customer_fixture, customer_orm_factory):
   - `UUID("00000000-...")` -> `entity_fixture.id`
   - `name="John Doe"` -> `name=user_fixture.name`
   - `email="test@example.com"` -> `email=user_fixture.email`
-- **SimpleNamespace as fake domain model** - Do not build test entities with `SimpleNamespace`; use fixture-backed models, ORM factory fixtures, or test-only `BaseModel` types.
-- **Local duplicate fixtures/builders** - Do not define ad-hoc helper constructors in test modules when a shared fixture or factory already covers the use case.
-- **Inline `make_*`/`build_*`/`insert_*`/`create_*` builders in test files** - Domain-object/payload/ORM/mock construction belongs in `conftest.py` as a `<noun>_*_factory` fixture, even for the first call site. Test files should compose fixtures, not define them.
-- **Duplicate domain-object setup** - If the same domain object construction appears in multiple tests, extract it to a shared `*_orm_factory` fixture in the nearest `conftest.py`.
+- **SimpleNamespace as fake domain model** - Do not build test entities with `SimpleNamespace`; use factory-built models or test-only `BaseModel` types.
+- **Local duplicate fixtures/builders** - Do not define ad-hoc helper constructors in test modules when a shared Polyfactory class or materializer already covers the use case.
+- **Inline `make_*`/`build_*`/`insert_*`/`create_*` builders in test files** - Structured test-data construction belongs in a shared concrete Polyfactory class, even for the first call site.
+- **Duplicate domain-object setup** - If the same domain object construction appears in multiple tests, extract it to a shared concrete Polyfactory class.
 
 - Do not duplicate helper models or utility types across multiple test files. Put shared models in a shared test helper module instead.
