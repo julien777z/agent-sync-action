@@ -2,6 +2,7 @@ import logging
 
 from agent_sync.document import render_front_matter
 from agent_sync.generation.context import GenerationContext
+from agent_sync.generation.marker import GENERATED_FILE_NOTICE
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
 from agent_sync.models.output import Provider
 from agent_sync.providers import PROVIDER_LAYOUTS
@@ -21,11 +22,14 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
         front_matter = source.front_matter.model_copy(
             update={"model": resolve_agent_model(source.slug, provider, context.source_config)}
         )
+        generated_body = "\n\n".join(
+            part for part in (f"<!-- {GENERATED_FILE_NOTICE} -->", source.body) if part
+        )
 
         outputs.append(
             GeneratedFile(
                 target_path=root / "agents" / f"{source.slug}.md",
-                content=render_front_matter(front_matter, source.body),
+                content=render_front_matter(front_matter, generated_body),
                 artifact=ArtifactKind.AGENT,
                 source_path=source.path,
                 provider=provider,
