@@ -27,6 +27,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
         front_matter = source.front_matter.model_copy(
             update={"model": resolve_agent_model(source.slug, provider, context.source_config)}
         )
+
         generated_body = "\n\n".join(
             part for part in (f"<!-- {GENERATED_FILE_NOTICE} -->", source.body) if part
         )
