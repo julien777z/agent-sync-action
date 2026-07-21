@@ -4,8 +4,8 @@ import tomllib
 
 from agent_sync.config import CodexSettings, PlatformSettings
 from agent_sync.errors import AgentSyncError
+from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.context import GenerationContext
-from agent_sync.generation.marker import GENERATED_FILE_NOTICE
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.utils import ensure_trailing_newline
