@@ -4,6 +4,7 @@ import tomllib
 
 from agent_sync.config import CodexSettings, PlatformSettings
 from agent_sync.errors import AgentSyncError
+from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.providers import PROVIDER_LAYOUTS
@@ -27,7 +28,13 @@ def generate_claude_settings(
         GeneratedFile(
             target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.root) / "settings.json",
             content=ensure_trailing_newline(
-                json.dumps(settings.model_dump(exclude_none=True), indent=2)
+                json.dumps(
+                    {
+                        "$comment": GENERATED_FILE_NOTICE,
+                        **settings.model_dump(exclude_none=True, exclude={"$comment"}),
+                    },
+                    indent=2,
+                )
             ),
             artifact=ArtifactKind.SETTING,
             source_path=context.workspace.settings_dir / f"{provider.value}.json",
@@ -76,7 +83,7 @@ def generate_codex_settings(
 def render_codex_settings(settings: CodexSettings) -> str:
     """Render the complete generated Codex TOML file."""
 
-    lines: list[str] = []
+    lines = [f"# {GENERATED_FILE_NOTICE}"]
 
     if settings.model:
         lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
