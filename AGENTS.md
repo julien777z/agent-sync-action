@@ -26,6 +26,12 @@ The canonical project rules live in `.agents/rules/`.
 - Use conventional commit messages when applicable and keep commits atomic and focused.
 - Do not commit generated files unless the repository explicitly requires them.
 
+## Dependency Installation
+
+- Declare project dependencies used by workflows in the repository's dependency manifests and commit their lockfiles.
+- Run project-level installation commands such as `poetry install` or `npm install` in workflows.
+- Do not install individual project packages or embed their versions directly in workflow commands.
+
 ## README
 
 - Describe available capabilities without assuming how consumers will use the project or framing guidance as prohibitions such as "never do X."
@@ -41,6 +47,11 @@ The canonical project rules live in `.agents/rules/`.
 - In cron-based examples, use a conventional schedule such as every Monday and add an inline comment translating the cron expression into that plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
 - Include a Local Development section with the commands needed to install, run, and validate the project locally.
+
+### Titles
+
+- Write the top-level heading in every `README.md` in title case.
+- Convert slug-style project names into readable words, such as `example-service` becoming `Example Service`.
 
 ## Guardrails
 
@@ -92,7 +103,7 @@ build-backend = "poetry.core.masonry.api"
 ## Generated Outputs
 
 - Agents never stage generated provider output.
-- Only the repository Agent Sync workflow may generate and commit provider output while validating the checked-out action.
+- Only the repository's Agent Sync workflow may generate and commit provider output.
 
 ## PR Monitoring And Background Timers
 
@@ -284,6 +295,12 @@ class Report(BaseModel):
 - Put generic reusable functions in the package's `utils.py`, even when they currently have one caller; keep domain-specific behavior in its owning module, and extract a focused module or package only when a cohesive domain or external boundary warrants it.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
+### Entrypoints
+
+- Keep `__main__.py` and script entrypoints thin.
+- Entrypoints only bootstrap and call a `main()` function from a dedicated runtime or service module.
+- Keep orchestration loops, transaction flow, and business logic in regular modules rather than entrypoint files.
+
 ```python
 # Bad: shim module that only re-exports symbols
 from .http_transport import fetch, fetch_with_cache
@@ -341,6 +358,7 @@ ACTION_CONFIG = ActionConfig()
 - Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
 - Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
+- Compile regular expressions once at module scope and call methods on the compiled pattern instead of passing pattern strings repeatedly to `re.match`, `re.search`, `re.fullmatch`, or `re.sub`.
 - When a mutable object is annotated with `Final`, complete any setup-time mutation in the same expression as initialization instead of binding it first and mutating it on the next line.
 - Only extract literals when they are reused or carry domain meaning; keep trivial single-use literals inline (for example, delimiters like `"-"` or `"."`).
 - Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
@@ -695,6 +713,7 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 
 - Use the `logging` module instead of `print()` for debugging, status, progress, or diagnostics in any code, including scripts and CLI tools.
 - Configure a logger at the top of each module: `logger = logging.getLogger(__name__)`.
+- Treat logger instances as runtime collaborators: name them `logger`, never `LOGGER`, and do not annotate them as `Final`.
 - Use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
 
 ## Guardrails

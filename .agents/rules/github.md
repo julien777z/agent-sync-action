@@ -23,6 +23,12 @@ alwaysApply: true
 - Use conventional commit messages when applicable and keep commits atomic and focused.
 - Do not commit generated files unless the repository explicitly requires them.
 
+## Dependency Installation
+
+- Declare project dependencies used by workflows in the repository's dependency manifests and commit their lockfiles.
+- Run project-level installation commands such as `poetry install` or `npm install` in workflows.
+- Do not install individual project packages or embed their versions directly in workflow commands.
+
 ## README
 
 - Describe available capabilities without assuming how consumers will use the project or framing guidance as prohibitions such as "never do X."
@@ -38,6 +44,11 @@ alwaysApply: true
 - In cron-based examples, use a conventional schedule such as every Monday and add an inline comment translating the cron expression into that plain-language schedule.
 - For reusable GitHub Actions, include an Inputs table with the input name, default value, and purpose.
 - Include a Local Development section with the commands needed to install, run, and validate the project locally.
+
+### Titles
+
+- Write the top-level heading in every `README.md` in title case.
+- Convert slug-style project names into readable words, such as `example-service` becoming `Example Service`.
 
 ## Guardrails
 
