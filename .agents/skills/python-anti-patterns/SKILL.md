@@ -5,6 +5,10 @@ description: Common Python anti-patterns to avoid. Use as a checklist when revie
 
 # Python Anti-Patterns Checklist
 
+## Dependencies
+
+- `python-design-patterns` — provides the positive architecture guidance referenced by this anti-pattern guide.
+
 A reference checklist of common mistakes and anti-patterns in Python code. Review this before finalizing implementations to catch issues early.
 
 ## When to Use This Skill
