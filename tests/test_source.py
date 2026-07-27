@@ -2,6 +2,7 @@ import pytest
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
+from agent_sync.skill import load_skills
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
@@ -82,3 +83,24 @@ class TestWorkspace:
         path.write_text("second")
 
         assert workspace.read_text(path) == "second"
+
+
+class TestSkills:
+    """Test the public canonical skill loader."""
+
+    def test_loads_native_skill_metadata(self, workspace: Workspace) -> None:
+        """Load a valid skill from the canonical agent directory."""
+
+        skill_directory = workspace.agents_dir / "skills/dependency-updates"
+        skill_directory.mkdir(parents=True)
+        (skill_directory / "SKILL.md").write_text(
+            "---\n"
+            "name: dependency-updates\n"
+            "description: Update repository dependencies.\n"
+            "---\n\n"
+            "Inspect and update the dependency graph.\n"
+        )
+
+        skills = load_skills(workspace)
+
+        assert [skill.slug for skill in skills] == ["dependency-updates"]
