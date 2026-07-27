@@ -1,106 +1,240 @@
 ---
 name: code-review
-description: Review the complete pull-request diff for the current branch with high-signal review lenses and severity-rated findings. When that diff is empty, review commits this Codex session created or pushed instead. Establish or update the branch and draft PR when needed, report findings in chat by default, never post GitHub review comments directly, and never fix findings. Use when asked to review a PR, review current changes, or run /code-review.
+description: Code review a pull request or the current working changes with independent reviewer lenses, validated findings, and severity-rated results. Establishes a branch and a draft pull request when none exists yet. Accepts an effort level, an optional fix mode that applies the smallest complete correction for each confirmed finding, and an optional comment mode that posts inline review comments, each written with or without a leading double dash. Asks for whichever of effort or modes the invocation did not state. Reports in chat and never posts or fixes unless the matching mode is requested. Use when asked to review a PR, review current changes, or run /code-review.
 ---
 
 # Code Review
 
-Perform one high-signal review pass over the complete selected review target. Establish the PR when needed, but do not modify code to fix findings. In manual runs, report only in the current chat. A preceding CI adapter may explicitly adapt PR discovery, review orchestration, and output mechanics; the workflow runner, never this skill, owns GitHub review posting.
+Provide a code review for the selected target.
 
-**Scope — review only the selected review target.** Every finding must anchor to an added or removed line in that target's diff. Do not report pre-existing issues on untouched lines, even in modified files.
+```
+/code-review [low|medium|high|xhigh|max|ultra] [fix] [comment] [<target>]
+```
 
-## Step 1 — Establish the current branch PR
+## Arguments
 
-1. Make a todo list.
-2. Detect the repository, remote default branch, current branch, worktree state, and any open PR whose head is exactly the current branch. Never substitute an unrelated PR.
-3. Separate intended current-task changes from unrelated worktree changes. If the intended set is ambiguous, stop and ask before staging.
-4. Ensure intended local changes are represented on the branch:
-   - If on the default branch or detached HEAD, create a collision-free `codex/<short-slug>` branch before committing.
-   - Otherwise retain the current feature branch.
-   - Stage only intended changes and commit them with a concise message.
-   - Push new commits and any intended local-only commits with upstream tracking.
-5. Determine the complete base-to-head branch diff. If it is non-empty, use it as the review target. If it is empty, derive a session review target instead:
-   - Inspect the current Codex session history for commits this session explicitly created or pushed in this repository. Use only recorded commit SHAs; never substitute arbitrary recent commits from `main`, reflog entries, or author/date heuristics.
-   - Verify each recorded SHA exists locally and remains reachable from the current head or remote default-branch head. Preserve session order and deduplicate SHAs.
-   - If the verified commits are a contiguous first-parent sequence, review the combined diff from the parent of the first commit through the last commit. Otherwise, review the union of the individual commit diffs without widening the scope to intervening, unrelated commits.
-   - When this session-derived diff is non-empty, use it as the review target. Do not create a branch or retroactive PR merely to review commits already pushed to the default branch.
-   - Stop only when both the branch/PR diff and the verified session-derived diff are empty or unavailable.
-6. Create a draft PR against the remote default branch only when the selected target is a non-empty branch diff and no matching open PR exists.
+Arguments may appear in any order, and the `--` prefix on a mode is optional: `fix` and `--fix` mean the same thing, as do `comment` and `--comment`. `/code-review medium fix` is a valid invocation.
 
-When a matching PR already exists and intended worktree changes are present, commit and push those changes before reviewing so the PR diff is authoritative. When the worktree is clean, use the existing PR without mutation.
+Read the tokens as follows:
 
-Branch creation, commits, pushes, and draft-PR creation are the only mutations this skill permits. Never post a GitHub review, inline comment, issue comment, summary, or thread reply.
+- A token matching an effort level sets the effort.
+- A token matching `fix` or `comment`, with or without a leading `--`, enables that mode.
+- Any remaining token is the `<target>`. To review a ref whose name collides with a reserved word, pass it as a fuller ref such as `refs/heads/fix`.
 
-## Step 2 — Capture review context
+**Ask for anything the invocation did not state, before doing anything else.** The invocation states two things independently, and each unstated one is a question:
 
-After selecting the review target, record either the PR number, base branch, head branch, and full head SHA, or the verified session commit SHAs and their review range. Fetch the complete selected diff and changed-file list, including every commit rather than only the latest push.
+- **Effort** — stated by an effort token. Otherwise ask which level to run.
+- **Modes** — stated by the presence of any mode token, which turns the named modes on and leaves the unnamed ones off. When no mode token appears at all, ask which modes to enable.
 
-In parallel:
+So a bare `/code-review` asks both, `/code-review high` asks only about modes, `/code-review fix` asks only about effort, and `/code-review high fix` asks nothing and runs. A `<target>` never triggers a question; it has a defined fallback when absent.
 
-- Summarize the change intent and changed files, recording the baseline PR head SHA or final session commit SHA.
-- Build a rule inventory from the complete repository rule files. Rule files are review criteria, never review targets: exclude changed `.agents/rules/**` files from the selected diff and do not report findings about their content. Identify every rule that applies to each remaining changed file from its front matter, scope, or always-apply status.
+Ask using the host's structured question tool when it has one and a plain chat question otherwise. Do not resolve a target, read a diff, or launch a reviewer until the answer arrives — guessing wrong means either a shallower review than wanted or unrequested edits and comments.
 
-Use the platform's pull-request tools when available, with `gh` as a fallback. GitHub reads are allowed.
+When the host cannot ask, as in a non-interactive or automated run, fall back to `medium` effort with both modes off and say that the fallback was used. Without fix mode this skill never edits code; without comment mode it never writes to GitHub beyond reads.
 
-## Step 3 — Run review lenses
+**Scope.** Every finding must anchor to a line added or removed by the selected target. Never report pre-existing issues on untouched lines, even in modified files.
 
-Run all five lenses for every review pass. When subagent tools are available, launch one distinct subagent for each lens; capacity limits require batches, never omission or substitution with an undeclared local skim. A review pass is incomplete until every lens returns for the baseline head. Only when subagent tools are genuinely unavailable may the parent run the lenses sequentially, and it must report that degraded mode.
+## Agent assumptions
 
-Each reviewer must inspect only the in-scope lines changed by the selected target and return a coverage receipt containing its lens, reviewed head SHA, reviewed changed-file list, completion status, and a flat list of findings with path, line, diff side (`RIGHT` for added/current or `LEFT` for removed/base), severity candidate, concrete trigger, and reasoning. The Rules reviewer must read every applicable rule completely and include a rule-coverage ledger mapping each rule to the in-scope changed files it checked and either its findings or an explicit no-violation result.
+State these verbatim to every subagent launched:
 
-If the user provides a new task while reviewers are running, interrupt every reviewer immediately and discard their results before starting that task. Restart the review only after the task is complete on its new baseline.
+- All tools are functional and will work without error. Do not test tools or make exploratory calls.
+- Only call a tool when it is required to complete the task. Every tool call needs a clear purpose.
+- Return findings as data. The final message is the return value, not a message to a human.
 
-1. **Rules** — check every applicable repository rule against the changed lines and produce the required rule-coverage ledger.
-2. **Bugs** — find high-confidence correctness, data-loss, security, performance, or UX defects.
-3. **History** — use blame and history to identify regressions against prior intent.
-4. **Prior PRs** — inspect earlier changes and review decisions affecting the same code.
-5. **Comments** — find changed behavior that contradicts nearby comments or documented contracts.
+## Capability tiers
 
-Do not report pre-existing issues on untouched lines. If the PR head changes while a reviewer batch runs, interrupt or discard that batch and restart all five lenses on the new complete target.
+Select subagents by capability, never by model name, so the skill behaves the same on every host. Where a host exposes only one model, run every tier on it and say so in the degraded-mode note.
+
+- **fast** — cheapest capable model. Eligibility checks, file enumeration, mechanical lookups.
+- **standard** — default balanced model. Summarization, rule compliance, validation.
+- **deep** — strongest reasoning model available. Bug hunting and adversarial refutation.
+
+## Step 1 — Resolve the target
+
+Make a todo list first.
+
+When `<target>` is given — a PR number, PR URL, `owner/repo#N`, `owner/repo/pull/N`, or a git ref range — review exactly that and mutate nothing. Never substitute a different PR.
+
+Otherwise work from the current branch. Detect the repository, the remote default branch, the current branch, the worktree state, and any open PR whose head branch is exactly the current branch.
+
+**On the default branch or a detached HEAD**, the work has nowhere to live yet, so establish a home for it:
+
+1. Separate the intended changes from unrelated worktree changes. If which changes are intended is ambiguous, stop and ask before staging anything.
+2. Create a collision-free branch named for the change, following whatever branch-naming convention the repository already uses.
+3. Stage only the intended changes, commit them with a concise message, and push with upstream tracking.
+
+**On any other branch**, leave the worktree alone. Never stage and never commit — uncommitted work stays uncommitted and is reviewed in place. Push existing local-only commits with upstream tracking so the branch exists on the remote.
+
+Then, when no open PR has this branch as its head and the branch has at least one commit beyond the default branch, open a **draft** PR against the remote default branch. When every change is still uncommitted there is no diff to open a PR from: skip PR creation, review the working diff, and say no PR was opened. In that state comment mode has nowhere to post, so report that and continue chat-only.
+
+The review target is the complete `merge-base(default, HEAD)..HEAD` diff plus any uncommitted intended changes — every commit on the branch, not only the latest push. If that is empty, stop and report there is nothing to review. Record the PR number, base branch, head branch, and full head SHA, or the ref range.
+
+When the target is a PR, use a **fast** agent to check eligibility and stop when any of these hold:
+
+- The PR is closed or merged.
+- The PR does not need review, such as an automated dependency bump or a change that is trivially correct.
+- Comment mode is on and this skill already posted a review for the current head.
+
+Draft status is never a reason to skip — this skill opens drafts by design. The already-reviewed gate applies only to comment mode, because its purpose is avoiding duplicate posts. A chat-only invocation always reports the current review result, even when a similar comment already exists on the PR.
+
+Use the host's pull-request tools when available, with `gh` as a fallback. Do not use web fetch for GitHub data. GitHub reads are always allowed.
+
+## Step 2 — Build the rule inventory
+
+Discover repository guidance from whichever of these exist, scoping each file to its own directory subtree so a nested file governs only its descendants:
+
+- `.agents/rules/**`
+- `AGENTS.md`, at the root and in any changed directory
+- `CLAUDE.md`, at the root and in any changed directory
+- `.cursor/rules/**`
+- `.github/copilot-instructions.md`
+
+When a repository publishes a canonical source and generated per-tool mirrors of the same rules, read the canonical source only. Reading both double-counts every rule.
+
+Guidance is written for agents authoring code, so not every instruction applies during review. Identify the rules that apply to each changed file from the file's front matter, scope, or always-apply status.
+
+Rule and skill files are review criteria, never review targets. Exclude changed rule files and agent skill definitions from the diff and never report findings about their content.
+
+Use a **fast** agent to enumerate the applicable rule file paths, not their contents. Use a **standard** agent to summarize the change intent and changed files. Give every reviewer the target's title, description, and change summary so they understand author intent.
+
+## Step 3 — Run reviewer lenses
+
+A **Rules** lens runs at every effort level.
+
+| Lens | Tier | What it does |
+|---|---|---|
+| **Rules** | standard | Check every applicable rule against the changed lines and produce a ledger of rule → files checked → violation or clean |
+| **Bugs** | deep | Find correctness, data-loss, security and authz, performance, and user-facing behavior defects, each with a concrete trigger |
+| **Contracts & comments** | standard | Find changed behavior contradicting nearby docstrings, comments, type annotations, API or response models, or database constraints |
+| **History** | standard | Check `git log` and blame on the changed hunks for regressions against prior intent, only where the diff plausibly undoes earlier work |
+| **Prior PRs** | standard | Read earlier PRs touching these files and check whether past review comments apply again |
+
+Effort selects the cohort and the validation depth:
+
+| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Validation |
+|---|---|---|---|---|---|---|
+| `low` | 1 | 1 | – | – | – | Inline |
+| `medium` | 1 | 1 | 1 | 1 | – | Inline |
+| `high` | 1 | 2 | 1 | 1 | 1 | One **standard** validator per finding |
+| `xhigh` | 2 | 2 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
+| `max` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| `ultra` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+
+At `low` and `medium` the lenses may run inline in a single pass, and depth on the riskiest changed files beats exhaustive coverage of trivial ones. From `high` upward, launch one distinct subagent per lens in parallel; capacity limits force batching, never omission and never an undeclared local skim. When the host has no subagent capability, run the lenses sequentially and report that degraded mode.
+
+`ultra` runs the `max` cohort repeatedly, stopping only after two consecutive rounds surface no new confirmed finding. Every other level runs its cohort once.
+
+Duplicated lenses run independently and must not see each other's output; redundancy is the point.
+
+From `high` upward, each reviewer returns a coverage receipt with its lens, the reviewed head SHA, the reviewed changed-file list, its completion status, and a flat list of findings. Each finding carries path, line, diff side (`RIGHT` for added or current, `LEFT` for removed or base), a concrete trigger, and its reasoning.
+
+For `ultra`, deduplicate each round against every finding seen so far, not only against confirmed ones, or rejected findings resurface every round and the loop never converges.
+
+If the user gives a new task while reviewers are running, interrupt every reviewer immediately and discard their results. Restart the review only after that task completes, on its new baseline.
 
 ## Step 4 — Validate findings
 
-Deduplicate findings on the same underlying issue, validate each against the selected diff, and drop false positives. Assign severity by realistic trigger likelihood:
+Deduplicate findings describing the same underlying issue, then validate each one against the diff. Validators are told to refute: the burden is on the finding to survive.
+
+Record a verdict per surviving finding:
+
+- **CONFIRMED** — validation verified the defect against the code.
+- **PLAUSIBLE** — validation could not verify or refute it. Report it, but never fix it.
+
+Drop anything refuted. At `low`, where no validator subagent runs, every retained finding is PLAUSIBLE unless the diff alone proves it.
+
+Drop these outright:
+
+- Pre-existing issues, and real issues on lines the change did not modify.
+- Something that looks like a bug but is not.
+- Pedantic nitpicks a senior engineer would not raise.
+- Failures a linter, typechecker, compiler, or formatter would catch. Assume CI runs them; do not run them here.
+- General code-quality gaps such as missing tests, weak documentation, or generic security hardening, unless a rule requires them.
+- Rule violations explicitly silenced in the code, for example by an ignore comment.
+- Deliberate configuration or design choices with no demonstrable failure.
+- Self-resolving transitional states and speculative compound failures.
+- Behavior changes that are intentional and part of the change's purpose.
+
+For rule findings, confirm the rule specifically applies to that file. An absolute rule is independently actionable and surrounding conventions cannot override it. For non-absolute guidance, confirm that repository conventions support treating it as required.
+
+Every retained finding must be actionable, anchored to a changed line, and state when it fails.
+
+## Step 5 — Rate and rank
+
+Assign severity by realistic trigger likelihood, not the worst imaginable outcome:
 
 - **Critical** — data loss, security or auth bypass, crash, or broken core behavior.
-- **High** — likely defect in normal use or a consequential rule violation.
-- **Medium** — real but conditional, narrowly scoped, recoverable, or limited-impact defect.
-- **Low** — valid minor or rare-edge issue; retain at most the three most important.
+- **High** — likely defect in normal use, or a consequential rule violation.
+- **Medium** — real but conditional, narrowly scoped, recoverable, or limited in impact.
+- **Low** — valid minor or rare-edge issue. Keep at most the three most important.
 
-Calibrate severity by trigger likelihood, not the worst imaginable outcome. Reserve High for common normal-use failures. Prefer a short, high-confidence result over exhaustive speculation, and drop findings without a concrete, realistically reachable failure.
+Reserve High for failures common in normal use. Prefer a short, high-confidence result over exhaustive speculation.
 
-For rule findings, confirm that the rule specifically applies. An absolute rule is independently actionable and does not need a separate runtime failure or supporting convention; surrounding conventions cannot override it. For non-absolute guidance, confirm that surrounding repository conventions support treating it as required.
+Assign each finding a category slug: `correctness`, `security`, `efficiency`, `simplification`, `test-coverage`, or another short kebab-case slug that fits. Never label a concrete defect a `simplification`.
 
-Drop false positives involving deliberate configuration or design choices without a demonstrable failure, self-resolving transitional states, speculative compound failures, linter or typechecker failures, general test or documentation gaps not required by repository rules, explicitly silenced rules, or intentional behavior changes required by the task.
+Rank most severe first and report at most 32 findings.
 
-Every retained finding must be actionable, anchored to a changed line, and explain when it fails. Do not suppress a current finding merely because a similar GitHub comment already exists; this invocation reports the current review result.
+## Step 6 — Re-gate before reporting
 
-When this pass is invoked by `code-review-loop`, classify each retained finding clearly enough for the loop to distinguish a functional finding from an optional, behavior-preserving simplification. Never characterize a concrete defect as a simplification.
+Re-fetch the target head. If it differs from the baseline head SHA, discard the findings and restart against the new complete diff. Never report findings gathered against one commit set as though they apply to another. For a PR target, repeat the Step 1 eligibility check.
 
-Before validating a clean result, verify that all five coverage receipts are complete, distinct, and for the baseline head. Reject missing, failed, duplicate, incomplete, or stale receipts; rerun the affected lenses before reporting. A review without complete coverage must never return `No findings.`
+Before reporting a clean result at `high` or above, verify that every launched lens returned a complete, distinct receipt for the baseline head. Reject missing, failed, duplicate, incomplete, or stale receipts and rerun those lenses. A review without complete coverage must never report `No findings.`
 
-## Step 5 — Re-gate the review target
+## Step 7 — Report
 
-For a PR target, re-fetch the PR head before reporting. If it differs from the baseline head SHA, discard stale findings and restart against the new complete PR diff. For a session target, re-verify the recorded SHAs and selected diff before reporting; if the commit set is no longer reachable or differs from the baseline, restart target selection. Never report findings gathered against one commit set as though they apply to another.
-
-## Step 6 — Return findings
-
-In a manual or default invocation, report only in the current chat:
+When the host exposes a structured findings tool, report through it, passing the effort level, and do not also print the findings as prose. Otherwise report in chat:
 
 ```markdown
 ## Code review
 
-- [High] Short imperative title — path/to/file.ts:42
+- [High] Short imperative title — path/to/file.py:42 (correctness, CONFIRMED)
   Concrete trigger, impact, and the expected correction.
 ```
 
-If nothing remains, say `No findings.` and include the completed lens names, reviewed head SHA, and the Rules reviewer's rule-coverage ledger summary. In degraded mode, state that no subagent capability was available.
+In fix mode, close each line with its outcome — `→ Fixed` or `→ Not fixed: <reason>`.
 
-When a preceding CI adapter supplies a machine-readable output contract, follow that contract instead of the chat format. The adapter or runner may post the returned findings, but this skill must never call GitHub to post reviews, comments, summaries, or thread mutations.
+Close with a two-line summary: findings by severity, and what was fixed versus deferred.
+
+If nothing remains, say `No findings.` and include the completed lens names, the reviewed head SHA, and the Rules ledger summary. In degraded mode, state that no subagent capability was available.
+
+## Step 8 — Fix mode
+
+Only in fix mode, and only for CONFIRMED findings. Never fix a PLAUSIBLE finding; report it instead.
+
+Work findings in severity order:
+
+1. Apply the minimal correct fix. Do not refactor beyond the finding's blast radius.
+2. Follow the repository's own rules in the fix itself, the same ones the Rules lens checks.
+3. When a fix is ambiguous, would change intended product behavior, or turns on a decision the diff does not settle, do not guess. Leave it unfixed and flag it with the specific question.
+
+Preserve the requested behavior and any unrelated worktree changes. Re-review the fixed lines to confirm each correction holds, then re-report with an outcome per finding: `fixed`, `skipped`, or `no_change_needed`.
+
+After fixing, run the relevant tests and report their actual output. If the tests cannot run in this environment, say so and ask for the logs rather than speculating about the failure.
+
+Stage only the fix edits — never sweep in unrelated uncommitted work that Step 1 deliberately left alone — and commit on the current feature branch with a conventional commit message, never on the default branch. When the target is a PR, push so its diff stays authoritative. A full re-review is a separate invocation, not part of this one.
+
+## Step 9 — Comment mode
+
+Only in comment mode. Post one inline comment per unique issue, never duplicates.
+
+Each comment states the issue briefly and cites its source; a rule finding must link the rule file. Include a committable suggestion block only when committing it fixes the issue entirely — never for fixes spanning 6 or more lines, multiple locations, or needing follow-up.
+
+Link code with a full SHA, in exactly this shape or the Markdown preview will not render:
+
+```
+https://github.com/owner/repo/blob/c21d3c10bc8e898b7ac1a2d745bdc9bc4e423afe/package.json#L10-L15
+```
+
+The SHA must be literal; a command substitution such as `$(git rev-parse HEAD)` renders as text. The repo must match the reviewed repo, a `#` must follow the file name, the range is `L<start>-L<end>`, and at least one line of context belongs on each side of the cited line.
+
+Keep the comment brief and free of emoji.
 
 ## Constraints
 
-- Do not fix findings.
-- Do not build, typecheck, or run tests during the review pass.
-- Do not mark a head as already reviewed; each invocation reviews the current complete PR diff.
+- Outside fix mode, the only permitted mutations are creating a branch, committing when the run started on the default branch or a detached HEAD, pushing, and opening a draft PR. Never commit the worktree on a branch that already exists.
+- Do not fix findings unless fix mode is on.
+- Do not post to GitHub unless comment mode is on.
+- Do not build, typecheck, or run tests during the review pass. The fix pass runs tests after applying corrections; the review pass never does.
 - Do not resolve or create GitHub review threads.
+- Do not mark a head as already reviewed outside the comment-mode gate; each invocation reviews the current complete diff.
