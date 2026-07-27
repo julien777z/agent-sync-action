@@ -28,6 +28,8 @@ Read the tokens as follows:
 
 So a bare `/code-review` asks both, `/code-review high` asks only about modes, `/code-review fix` asks only about effort, and `/code-review high fix` asks nothing and runs. A `<target>` never triggers a question; it has a defined fallback when absent.
 
+When asking for effort, list every accepted value explicitly: `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Never summarize the effort values as a range such as `low`–`ultra`.
+
 Ask using the host's structured question tool when it has one and a plain chat question otherwise. Do not resolve a target, read a diff, or launch a reviewer until the answer arrives — guessing wrong means either a shallower review than wanted or unrequested edits and comments.
 
 When the host cannot ask, as in a non-interactive or automated run, fall back to `medium` effort with both modes off and say that the fallback was used. Without fix mode this skill never edits code; without comment mode it never writes to GitHub beyond reads.
@@ -58,15 +60,17 @@ When `<target>` is given — a PR number, PR URL, `owner/repo#N`, `owner/repo/pu
 
 Otherwise work from the current branch. Detect the repository, the remote default branch, the current branch, the worktree state, and any open PR whose head branch is exactly the current branch.
 
-**On the default branch or a detached HEAD**, the work has nowhere to live yet, so establish a home for it:
+What happens next turns on whether the branch already carries commits of its own — commits beyond the remote default branch — not on its name.
+
+**When it carries none**, the work has nowhere to live yet. This covers the default branch, a detached HEAD, and a freshly created feature branch still level with the default branch. Give the work a home:
 
 1. Separate the intended changes from unrelated worktree changes. If which changes are intended is ambiguous, stop and ask before staging anything.
-2. Create a collision-free branch named for the change, following whatever branch-naming convention the repository already uses.
+2. When the current branch is the default branch or HEAD is detached, create a collision-free branch named for the change, following whatever branch-naming convention the repository already uses. When already on a non-default branch, keep it.
 3. Stage only the intended changes, commit them with a concise message, and push with upstream tracking.
 
-**On any other branch**, leave the worktree alone. Never stage and never commit — uncommitted work stays uncommitted and is reviewed in place. Push existing local-only commits with upstream tracking so the branch exists on the remote.
+**When it already carries commits**, leave the worktree alone. Never stage and never commit — uncommitted work stays uncommitted and is reviewed in place. Push existing local-only commits with upstream tracking so the branch exists on the remote.
 
-Then, when no open PR has this branch as its head and the branch has at least one commit beyond the default branch, open a **draft** PR against the remote default branch. When every change is still uncommitted there is no diff to open a PR from: skip PR creation, review the working diff, and say no PR was opened. In that state comment mode has nowhere to post, so report that and continue chat-only.
+Then open a **draft** PR against the remote default branch when no open PR already has this branch as its head. Committing the first change above is what makes this always possible: a branch reaches this point with at least one commit, so there is never a state where a review runs with no PR behind it. If there is genuinely nothing to review — no commits and no uncommitted changes — stop before any of this.
 
 The review target is the complete `merge-base(default, HEAD)..HEAD` diff plus any uncommitted intended changes — every commit on the branch, not only the latest push. If that is empty, stop and report there is nothing to review. Record the PR number, base branch, head branch, and full head SHA, or the ref range.
 
@@ -232,7 +236,7 @@ Keep the comment brief and free of emoji.
 
 ## Constraints
 
-- Outside fix mode, the only permitted mutations are creating a branch, committing when the run started on the default branch or a detached HEAD, pushing, and opening a draft PR. Never commit the worktree on a branch that already exists.
+- Outside fix mode, the only permitted mutations are creating a branch, committing when the branch carries no commits of its own, pushing, and opening a draft PR. Never commit the worktree of a branch that already carries commits.
 - Do not fix findings unless fix mode is on.
 - Do not post to GitHub unless comment mode is on.
 - Do not build, typecheck, or run tests during the review pass. The fix pass runs tests after applying corrections; the review pass never does.
