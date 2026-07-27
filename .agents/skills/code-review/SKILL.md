@@ -28,7 +28,16 @@ Read the tokens as follows:
 
 So a bare `/code-review` asks both, `/code-review high` asks only about modes, `/code-review fix` asks only about effort, and `/code-review high fix` asks nothing and runs. A `<target>` never triggers a question; it has a defined fallback when absent.
 
-When asking for effort, list every accepted value explicitly: `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Never summarize the effort values as a range such as `low`–`ultra`.
+When asking for effort, list every accepted value explicitly and describe its actual coverage and validation depth:
+
+- `low` — Run one Rules lens and one Bugs lens with inline validation for a quick review of small, low-risk changes.
+- `medium` — Run one Rules, Bugs, Contracts & comments, and History lens for a routine contextual review, with inline validation.
+- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, and one Prior PRs lens, then have one standard validator try to refute every finding.
+- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, and Prior PRs lens, then use two standard validators per finding with majority rule.
+- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, and two Prior PRs lenses in one pass, then use three deep refuters per finding with majority rule.
+- `ultra` — Repeat the `max` cohort until two consecutive rounds find nothing new, using the same three deep refuters per finding.
+
+Keep each description to one or two sentences. Never summarize the effort values as a range such as `low`–`ultra` or replace the concrete descriptions with vague labels such as "quick," "thorough," or "broad."
 
 Ask using the host's structured question tool when it has one and a plain chat question otherwise. Do not resolve a target, read a diff, or launch a reviewer until the answer arrives — guessing wrong means either a shallower review than wanted or unrequested edits and comments.
 
