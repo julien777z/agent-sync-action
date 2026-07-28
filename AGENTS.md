@@ -63,9 +63,10 @@ The canonical project rules live in `.agents/rules/`.
 
 ## Project Configuration
 
-- Target Python 3.12 and use Poetry 2.x with PEP 621 `[project]` metadata; do not use legacy `[tool.poetry]` metadata or dependency tables.
+- For single-consumer, non-library repositories, require Python 3.12 or newer and prefer the latest stable Python release when the repository's runtime and dependencies are compatible. For public libraries, prefer the widest feasible supported range with a minimum no earlier than Python 3.11.
+- Use Poetry 2.x with PEP 621 `[project]` metadata; do not use legacy `[tool.poetry]` metadata or dependency tables.
 - Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
-- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python 3.12 target inferred from `[project.requires-python]`.
+- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python targets inferred from the full `[project.requires-python]` range.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
 ```toml
@@ -79,7 +80,7 @@ build-backend = "poetry.core.masonry.api"
 ## Application Structure
 
 - Prefer separate focused modules over monoliths, organizing code under `clients/`, `services/`, `models/`, and `core/` as applicable.
-- Prefer PEP 695 generic syntax when it improves a Python 3.12 interface.
+- Prefer PEP 695 generic syntax when it improves an interface and the repository's minimum Python version is 3.12 or newer; otherwise use modern typing syntax supported across the declared range.
 - Give every function and class a one-line imperative docstring followed by a blank line.
 - Services may be plain functions. Pass clients, sessions, and configuration explicitly rather than storing module-level runtime globals.
 - Use `aiohttp` for HTTP I/O, inject a `ClientSession` configured with a sensible timeout, create long-lived sessions at application startup, enable `raise_for_status` when appropriate, and parse responses asynchronously with `json()` or `text()`.
@@ -220,6 +221,7 @@ class WidgetPosition(BaseModel):
 
 ## Syntax and Typing
 
+- For single-consumer, non-library repositories, require Python 3.12 or newer and prefer the latest stable Python release when the repository's runtime and dependencies are compatible. For public libraries, prefer the widest feasible supported range with a minimum no earlier than Python 3.11.
 - Use modern type hints: `str | None` instead of `Optional[str]`.
 - Use built-in generics: `list[T]`, `dict[K, V]` instead of `List[T]`, `Dict[K, V]`.
 - Use `Self` from `typing` for class method return types.
@@ -231,7 +233,7 @@ class WidgetPosition(BaseModel):
 - Prefer real SDK and model types over `cast(...)`; reserve a narrowly scoped cast for information the type system genuinely cannot express.
 - Do not "fix" typing by expanding simple transformations into repetitive key-by-key copy blocks (for example, manually assigning each dict key only to satisfy pyright). Fix the source type hints (or add a precise cast/narrowing at the boundary) so the transformation can stay concise and readable.
 - For persistence/update payloads (for example, `upsert(...)`), define a dedicated `TypedDict` and construct it inline at the call site. Do not add free-floating `build_*`/`make_*` helper functions whose only role is constructing a payload from another shape; the same no-free-floating-builders rule that applies to `BaseModel` applies here.
-- When a `TypedDict` types a module-level constant or other shared blob (for example a CVA style config), build the value by **calling** the TypedDict constructor with keyword arguments (`MyTypedDict(field=value, ...)`) instead of assigning an annotated plain dict literal (`name: MyTypedDict = {...}`). Use the same for nested TypedDict rows inside lists (for example `CompoundVariantRule(match={...}, class_name="...")`). This keeps the type as the construction site, not only a static annotation on a dict literal. Requires Python 3.12+.
+- When a `TypedDict` types a module-level constant or other shared blob (for example a CVA style config), build the value by **calling** the TypedDict constructor with keyword arguments (`MyTypedDict(field=value, ...)`) instead of assigning an annotated plain dict literal (`name: MyTypedDict = {...}`). Use the same for nested TypedDict rows inside lists (for example `CompoundVariantRule(match={...}, class_name="...")`). This keeps the type as the construction site, not only a static annotation on a dict literal.
 
 - Group parameters that always travel together and describe one concept into a single typed object, then pass that object rather than threading its fields through every signature and call site.
 
@@ -292,7 +294,9 @@ class Report(BaseModel):
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
-- Put generic reusable functions in the package's `utils.py`, even when they currently have one caller; keep domain-specific behavior in its owning module, and extract a focused module or package only when a cohesive domain or external boundary warrants it.
+- Place generic, stateless, cross-cutting helpers in a `utils.py` module or `utils/` package.
+- Use a `utils.py` module for a small cohesive set of utilities; use a `utils/` package when separate focused utility modules are warranted.
+- Keep domain and orchestration behavior in their owning modules. Do not use utilities as a dumping ground.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
 ### Entrypoints
@@ -395,6 +399,12 @@ def get_auth_secret(config: Settings | None = None) -> str:
 ```
 
 ## Architecture and Boundaries
+
+### Model Placement
+
+- Define Pydantic `BaseModel` classes and other application data models under the package's `models/` directory.
+- Split models into intuitively named files by concept, such as `models/configuration.py` or `models/submission.py`.
+- Do not place models beside operational code or collect unrelated models in a catch-all `models.py` module.
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
 - Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
