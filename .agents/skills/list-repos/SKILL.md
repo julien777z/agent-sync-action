@@ -1,9 +1,9 @@
 ---
-name: link-repo
-description: List the repository web URLs for every repository changed during the entire current session. Use when the user invokes /link-repo or $link-repo, or asks for links to all repositories touched, modified, committed, pushed, or otherwise changed during the session.
+name: list-repos
+description: List the repository web URLs for every repository changed during the entire current session. Use when the user invokes /list-repos or $list-repos, or asks for links to all repositories touched, modified, committed, pushed, or otherwise changed during the session.
 ---
 
-# Link Repositories
+# List Repositories
 
 Return a deduplicated list of repository URLs covering the entire current session, not only the latest turn.
 
