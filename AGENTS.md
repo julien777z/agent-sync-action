@@ -10,7 +10,10 @@ The canonical project rules live in `.agents/rules/`.
 
 ## Workflows
 
+- Keep `run` steps declarative. Invoke checked-in scripts for control flow, validation, filesystem changes, or other implementation logic instead of embedding arbitrary shell or program code in workflow YAML; place those scripts under `.github/scripts/` and prefer Python.
 - Do not hard-code runtime versions when a shared action, reusable workflow, or repository version file supplies them; omit `python-version` when shared Python automation provides it, and use `node-version-file: ".nvmrc"` for Node.js workflows.
+- Do not add glue steps that only read versions or forward setup data. Pass repository-owned version files and inputs directly to the action that uses them whenever supported.
+- Keep workflow files concise: merge related setup and dependency commands into one clearly named generic step when their execution order and conditions allow it. Do not split tool or package installation into separate steps merely by dependency.
 - Add an explanatory comment when an edge case requires an explicit version override.
 - Use version-tagged GitHub Actions such as `actions/checkout@v4` and `actions/setup-python@v5`, not full commit SHAs.
 
@@ -56,6 +59,20 @@ The canonical project rules live in `.agents/rules/`.
 ## Guardrails
 
 - Never commit or push agent-authored changes directly to the default branch. If the checkout is on the default branch or detached, create a descriptive non-default branch; otherwise retain the current branch and deliver through its pull request.
+
+<!-- Source: .agents/rules/global.md -->
+
+# Global Rules
+
+## Agent Prompts
+
+- In repositories that provide an agent CLI or otherwise interact with agents, store every agent prompt in a dedicated Markdown file rather than inline in application code so it is easy to find, review, and maintain. Application code may load a prompt file and interpolate runtime values into it.
+
+## User Approvals
+
+- After initiating an approval that requires user interaction, wait up to 10 minutes without polling or interacting with the approval surface.
+- Treat it as failed only after that window or an explicit failure from the user.
+- A failure is not approval; wait until the user resumes the task before prompting again.
 
 <!-- Source: .agents/rules/poetry.md -->
 
@@ -301,9 +318,11 @@ class Report(BaseModel):
 
 ### Entrypoints
 
-- Keep `__main__.py` and script entrypoints thin.
-- Entrypoints only bootstrap and call a `main()` function from a dedicated runtime or service module.
-- Keep orchestration loops, transaction flow, and business logic in regular modules rather than entrypoint files.
+- Keep command-line parsing and execution together in `__main__.py`; do not create a separate `cli.py`
+  or a trivial `main()` wrapper solely to delegate from the module guard.
+- Invoke package CLIs with `python -m <package>` when no independently reusable console entrypoint is
+  required.
+- Do not layer `run()`, `main()`, and an `if __name__ == "__main__":` guard for the same entrypoint.
 
 ```python
 # Bad: shim module that only re-exports symbols
