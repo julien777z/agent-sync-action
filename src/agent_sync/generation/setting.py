@@ -2,6 +2,8 @@ import json
 import logging
 import tomllib
 
+import tomli_w
+
 from agent_sync.config import CodexSettings, PlatformSettings
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
@@ -83,13 +85,8 @@ def generate_codex_settings(
 def render_codex_settings(settings: CodexSettings) -> str:
     """Render the complete generated Codex TOML file."""
 
-    lines = [f"# {GENERATED_FILE_NOTICE}"]
-
-    if settings.model:
-        lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
-
-    lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
-    rendered = ensure_trailing_newline("\n".join(lines))
+    settings_toml = tomli_w.dumps(settings.model_dump(exclude_none=True))
+    rendered = ensure_trailing_newline(f"# {GENERATED_FILE_NOTICE}\n{settings_toml}")
 
     try:
         tomllib.loads(rendered)
