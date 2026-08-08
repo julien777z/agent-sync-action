@@ -21,6 +21,14 @@ alwaysApply: true
 - Query the current branch's pull request before creating one. Reuse it while it is open, or create one from the current branch when none exists.
 - Create a separate branch only when the user asks or the current branch's pull request is already merged; start post-merge work from the default branch.
 
+### Merge Authorization
+
+- Agents may create branches and pull requests, commit, and push scoped changes without additional approval.
+- Merging any pull request requires explicit user authorization in the current request or an explicitly invoked skill.
+- An action-skill merge authorization applies only to its original target pull request, including one created during the skill's initial setup. Pull requests created afterward, including follow-up fixes, dependencies, replacements, and reapplications after a corrective revert, require separate current-request authorization.
+- Never enable auto-merge for any pull request unless the user explicitly authorizes it in the current request or an explicitly invoked skill requires it.
+- If an agent mistakenly merges a pull request, it may auto-merge the focused revert pull request that corrects that erroneous merge without separate authorization.
+
 ## Commits
 
 - Use conventional commit messages when applicable and keep commits atomic and focused.

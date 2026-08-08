@@ -150,12 +150,15 @@ If the user gives a new task while reviewers are running, interrupt every review
 
 Deduplicate findings describing the same underlying issue, then validate each one against the diff. Validators are told to refute: the burden is on the finding to survive.
 
-Record a verdict per surviving finding:
+**Every finding resolves to CONFIRMED or refuted. There is no third verdict.** A defect either exists or it does not, and which one is a fact about the code that reading the code settles. "Could not verify" is a statement about how far the validation got, not about the code, and reporting it hands the reader an unfinished investigation to run themselves — the one thing the review was for.
 
-- **CONFIRMED** — validation verified the defect against the code.
-- **PLAUSIBLE** — validation could not verify or refute it. Report it, but never fix it.
+So when a validator cannot decide from the diff, it keeps going until it can: read the full file and every caller, read the library or SDK source the finding depends on, check the lock file for the resolved version, read the rule the finding cites in full, search the history for when the line was introduced, and run the code — construct the input, execute the branch, and observe the result. Uncertainty is a signal to look at something specific that has not been looked at yet. Name that thing and look at it.
 
-Drop anything refuted. At `low`, where no validator subagent runs, every retained finding is PLAUSIBLE unless the diff alone proves it.
+Only one situation ends validation undecided, and it is never uncertainty about the code: the answer turns on intent that exists nowhere in the repository — which of two contracts the author meant, whether a behavior change is wanted. Do not invent a verdict for that and do not report it as a finding with a hedge. Ask the user, in the shape step 8 uses for an ambiguous fix.
+
+Drop anything refuted, including anything a full investigation leaves unsupported. A finding that survives only because nobody finished checking it is not evidence of a defect.
+
+This bar does not move with effort. A cheaper level runs fewer validators over a smaller cohort, so it searches less; the inline validation at `low` and `medium` still resolves every finding it keeps.
 
 Drop these outright:
 
@@ -196,7 +199,9 @@ Before reporting a clean result at `high` or above, verify that every launched l
 
 ## Step 7 — Report
 
-When the host exposes a structured findings tool, report through it, passing the effort level, and do not also print the findings as prose. Otherwise report in chat:
+When the host exposes a structured findings tool, report through it, passing the effort level, and do not also print the findings as prose. Where its schema offers a verdict meaning unverified, leave that value unused — nothing surviving step 4 has one. Prose carries no qualifier either: no "possibly", no "may", no request that the reader go check.
+
+Otherwise report in chat:
 
 ```markdown
 ## Code review
@@ -213,13 +218,18 @@ If nothing remains, say `No findings.` and include the completed lens names, the
 
 ## Step 8 — Fix mode
 
-Only in fix mode, and only for CONFIRMED findings. Never fix a PLAUSIBLE finding; report it instead.
+Only in fix mode. Every reported finding is CONFIRMED, because step 4 refutes everything else.
+
+**Every CONFIRMED finding gets fixed.** Surviving validation is what makes a finding legitimate, and a legitimate finding left unfixed in fix mode is the review failing at the only thing fix mode is for. "Out of scope", "pre-existing root cause", "larger than this diff", and "the obvious fix conflicts with another rule" are descriptions of the work, not permission to skip it. Report a finding as unfixed only after the escalation in step 4 below, and never as a first response to difficulty.
+
+When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Before fixing a finding whose correction would introduce, preserve, or migrate backward-compatible runtime or data behavior, stop and ask the user for approval. This applies only to compatibility fallbacks, legacy-shape support, migrations, or preservation paths for already-deployed behavior or persisted data; it does not apply to code organization, file moves, module paths, or internal package exports.
 
 Work findings in severity order:
 
 1. Apply the minimal correct fix. Do not refactor beyond the finding's blast radius.
 2. Follow the repository's own rules in the fix itself, the same ones the Rules lens checks.
-3. When a fix is ambiguous, would change intended product behavior, or turns on a decision the diff does not settle, do not guess. Leave it unfixed and flag it with the specific question.
+3. When the minimal fix does not resolve the finding, fix its cause. A defect whose root lies outside the diff is still this review's to fix, and a rule the code knowingly breaks is resolved by correcting one of them, not by recording the contradiction. Where two rules genuinely conflict, make the governing rule state the real contract rather than leaving code that violates it.
+4. Escalate only a decision that is genuinely the user's: a change to intended product behavior, or a choice between defensible designs that the diff does not settle. Ask the specific question through the host's question tool and act on the answer. An unanswered question is the only route to reporting a CONFIRMED finding unfixed, and the report must say what was asked.
 
 Preserve the requested behavior and any unrelated worktree changes. Re-review the fixed lines to confirm each correction holds, then re-report with an outcome per finding: `fixed`, `skipped`, or `no_change_needed`.
 

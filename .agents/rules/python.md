@@ -92,6 +92,7 @@ class Report(BaseModel):
 - Invoke package CLIs with `python -m <package>` when no independently reusable console entrypoint is
   required.
 - Do not layer `run()`, `main()`, and an `if __name__ == "__main__":` guard for the same entrypoint.
+- Model reusable command outcomes with a descriptive enum. Convert that outcome to an integer exit code only at the CLI boundary; never carry or return bare status integers through application code.
 
 ```python
 # Bad: shim module that only re-exports symbols
@@ -148,6 +149,7 @@ ACTION_CONFIG = ActionConfig()
 
 - Define constants at the top of the file, after imports.
 - Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
+- When assembling a structured string from variable parts, define one named template and use `str.format(...)` rather than composing separate prefix and suffix constants. Use native template strings only when they are supported across the project's full Python version range.
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
 - Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
 - Compile regular expressions once at module scope and call methods on the compiled pattern instead of passing pattern strings repeatedly to `re.match`, `re.search`, `re.fullmatch`, or `re.sub`.
@@ -167,6 +169,7 @@ Avoid trivial wrapper functions that add no value. A function that just returns 
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
 - Do not rebind function arguments to a second local name when the value is unchanged (for example, `profile = obj`); name the parameter correctly at the signature instead.
 - Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `APPLICATION_CONFIG` in every call); read from that source directly where the value is used.
+- Give domain-specific parsers and converters domain-qualified names so imports from multiple domains cannot silently shadow one another. Keep unqualified names only for genuinely domain-independent transformations.
 
 - Prefer normal attribute assignment over `object.__setattr__(...)` when mutating Pydantic models in validators or helper methods.
 - Only use `object.__setattr__(...)` when normal assignment is genuinely unavailable (for example frozen models or descriptor bypass requirements), and keep that escape hatch explicit and justified.
@@ -187,6 +190,12 @@ def get_auth_secret(config: Settings | None = None) -> str:
 ```
 
 ## Architecture and Boundaries
+
+### Client Dependency Injection
+
+- Pass runtime clients and other stateful collaborators explicitly through constructors or function parameters. Do not hide them behind module globals, service-locator getters, or default parameter values.
+- Centralize dependency-container wiring at the application boundary. Request-scoped frameworks may inject clients into routes, while worker, RPC, and tool entrypoints receive their long-lived collaborators from startup wiring.
+- Keep one patchable client seam at the owning boundary rather than requiring tests to patch a separately imported client in every consumer module.
 
 ### Model Placement
 
@@ -429,6 +438,10 @@ except Exception as exc:
 - Banned terms and what to use instead:
   - **"best effort"** — state the real contract. A function that swallows failures and reports the outcome should say so: name it `try_<verb>` (for example `try_send_email`) and document it as "returning whether it succeeded", not "best-effort".
   - **"seed" / "seeds" / "seeding"** (for test data or sample records) — name the helper for what it builds: a `<noun>_*_factory` fixture, `create_*`, or "sample data". Do not call setup data a "seed".
+  - **"holder"** (for a model or object that carries a field) — name it for the thing it models, such as `ApiCredential`, `StateRecord`, or `AliasSet`.
+  - **"stub"** (in application-code identifiers) — use "client". Keep a generated `*Stub` class name only when referring to that external type.
+  - **"lease" / "leased"** (for work handed to a worker) — use `claim`, `claimed_job`, or `ClaimedJob`. Reserve "lock" for lock ownership and expiry.
+  - **"*orm_factory"** (in test fixtures and helpers) — name the domain action directly, such as `create_payment` or `create_invoice`; do not encode persistence implementation in the name.
 - If you reach for a placeholder-ish term a future reader could not decode from the name alone, pick a more intuitive name instead of adding it to this list.
 
 - Add a blank line after each docstring.
