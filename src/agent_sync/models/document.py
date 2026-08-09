@@ -1,6 +1,14 @@
 import logging
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    computed_field,
+    field_validator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +20,7 @@ class SkillFrontMatter(BaseModel):
 
     name: str
     description: str
+    metadata: dict[str, JsonValue] | None = None
 
     @field_validator("name", "description")
     @classmethod

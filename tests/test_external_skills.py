@@ -11,11 +11,8 @@ from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 from agent_sync.workspace import Workspace
 from tests.factories import (
     ExternalSkillFactory,
-    SkillLockEntryFactory,
-    SkillsLockFactory,
     SkillsRegistryFactory,
     materialize_registry,
-    materialize_skills_lock,
 )
 
 
@@ -180,13 +177,37 @@ class TestExternalSkillBoundaries:
 
         source_root = tmp_path / "source/repository"
         source_root.mkdir(parents=True)
-        (source_root / "SKILL.md").write_text("source\n")
+        (source_root / "SKILL.md").write_text(
+            "---\nname: source\ndescription: Source skill.\n---\n\nSource.\n"
+        )
 
         installed = tmp_path / ".staging/skills/sample"
         installed.mkdir(parents=True)
-        (installed / "SKILL.md").write_text("installed\n")
+        (installed / "SKILL.md").write_text(
+            "---\nname: sample\ndescription: Installed skill.\n---\n\nInstalled.\n"
+        )
 
-        assert installer.locate_installed_skill(tmp_path, source_root, "sample") == installed
+        assert (
+            installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root)
+            == installed
+        )
+
+    def test_source_skill_discovery_uses_metadata_for_a_root_skill(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Test that root skills are found among sibling skill documents."""
+
+        (tmp_path / "SKILL.md").write_text(
+            "---\nname: root-skill\ndescription: Root skill.\n---\n\nRoot.\n"
+        )
+        nested = tmp_path / "skills/nested"
+        nested.mkdir(parents=True)
+        (nested / "SKILL.md").write_text(
+            "---\nname: nested\ndescription: Nested skill.\n---\n\nNested.\n"
+        )
+
+        assert installer.locate_skill_directory(tmp_path, "root-skill") == tmp_path
 
     def test_one_snapshot_drives_installation_and_assets(
         self,
@@ -216,7 +237,9 @@ class TestExternalSkillBoundaries:
             observed.append(("snapshot", downloaded_revision))
             source_root = destination / "repository"
             source_root.mkdir(parents=True)
-            (source_root / "SKILL.md").write_text("content\n")
+            (source_root / "SKILL.md").write_text(
+                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
+            )
 
             return source_root
 
@@ -237,13 +260,6 @@ class TestExternalSkillBoundaries:
             )
 
         monkeypatch.setattr(installer, "install_skill", fake_install)
-
-        def fake_read_skill_path(working_directory: Path) -> str:
-            """Return the synthetic installed skill path."""
-
-            return "SKILL.md"
-
-        monkeypatch.setattr(installer, "read_skill_path", fake_read_skill_path)
 
         def fake_supplement(destination: Path, source_root: Path) -> None:
             """Record the snapshot used for supplemental assets."""
@@ -276,7 +292,13 @@ class TestExternalSkillBoundaries:
         installed = tmp_path / "react-best-practices"
         installed.mkdir()
         (installed / "SKILL.md").write_text(
-            "---\nname: vercel-react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
+            "---\n"
+            "name: vercel-react-best-practices\n"
+            "description: React guidance.\n"
+            "metadata:\n"
+            "  category: frontend\n"
+            "---\n\n"
+            "# React\n"
         )
         skill = ExternalSkill(
             name="react-best-practices",
@@ -288,7 +310,14 @@ class TestExternalSkillBoundaries:
         sync.normalize_skill_metadata(installed, skill)
 
         assert (installed / "SKILL.md").read_text() == (
-            "---\nname: react-best-practices\ndescription: React guidance.\n---\n\n# React\n"
+            "---\n"
+            "name: react-best-practices\n"
+            "description: React guidance.\n"
+            "metadata:\n"
+            "  category: frontend\n"
+            "  source: https://github.com/vercel-labs/agent-skills\n"
+            "---\n\n"
+            "# React\n"
         )
 
     def test_root_assets_do_not_restore_upstream_metadata(
@@ -340,13 +369,6 @@ class TestExternalSkillBoundaries:
 
         monkeypatch.setattr(installer, "install_skill", fake_install)
 
-        def fake_read_skill_path(directory: Path) -> str:
-            """Return a root-level lock path."""
-
-            return "SKILL.md"
-
-        monkeypatch.setattr(installer, "read_skill_path", fake_read_skill_path)
-
         assert sync.update_external_skill(
             workspace,
             skill,
@@ -354,8 +376,68 @@ class TestExternalSkillBoundaries:
             dry_run=False,
         )
         assert (workspace.agents_dir / "skills/local-skill/SKILL.md").read_text() == (
-            "---\nname: local-skill\ndescription: A skill.\n---\n\nContent.\n"
+            "---\n"
+            "name: local-skill\n"
+            "description: A skill.\n"
+            "metadata:\n"
+            "  source: https://github.com/example/repository\n"
+            "---\n\n"
+            "Content.\n"
         )
+
+    def test_vendor_preserves_root_legal_files_for_nested_skills(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that nested external skills retain repository legal files."""
+
+        skill = ExternalSkillFactory.build()
+
+        def fake_resolve(repository: str) -> str:
+            """Return a stable synthetic revision."""
+
+            return "a" * 40
+
+        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+
+        def fake_download(repository: str, revision: str, destination: Path) -> Path:
+            """Create a nested synthetic skill and root license."""
+
+            source_root = destination / "repository"
+            source_skill = source_root / "skills/sample"
+            source_skill.mkdir(parents=True)
+            (source_skill / "SKILL.md").write_text(
+                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
+            )
+            (source_root / "LICENSE").write_text("License text.\n")
+
+            return source_root
+
+        monkeypatch.setattr(github, "download_snapshot", fake_download)
+
+        def fake_install(
+            installed_skill: ExternalSkill,
+            working_directory: Path,
+            source_root: Path,
+        ) -> None:
+            """Create a synthetic installed skill."""
+
+            installed = working_directory / ".staging/skills" / installed_skill.name
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text(
+                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
+            )
+
+        monkeypatch.setattr(installer, "install_skill", fake_install)
+
+        assert sync.update_external_skill(
+            workspace,
+            skill,
+            workspace.agents_dir / "skills",
+            dry_run=False,
+        )
+        assert (workspace.agents_dir / "skills/sample/LICENSE").read_text() == "License text.\n"
 
 
 class TestExternalSkillService:
@@ -428,21 +510,3 @@ class TestExternalSkillService:
 
         assert sync.sync_external_skills(workspace, dry_run=False) is False
         assert local_skill.read_text() == "local\n"
-
-
-class TestInstallerState:
-    """Test that installer lock reading works."""
-
-    def test_reads_the_only_lock_entry(
-        self,
-        tmp_path: Path,
-    ) -> None:
-        """Test that one lock entry resolves regardless of its key."""
-
-        lock = SkillsLockFactory.build(
-            skills={"upstream": SkillLockEntryFactory.build(skill_path="skills/sample/SKILL.md")}
-        )
-
-        materialize_skills_lock(tmp_path / "skills-lock.json", lock)
-
-        assert installer.read_skill_path(tmp_path) == "skills/sample/SKILL.md"

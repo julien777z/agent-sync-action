@@ -69,22 +69,6 @@ class SkillsRegistry(BaseModel):
         return self
 
 
-class SkillLockEntry(BaseModel):
-    """Validate one skill installer lock entry."""
-
-    model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
-
-    skill_path: str = Field(alias="skillPath")
-
-
-class SkillsLock(BaseModel):
-    """Validate the temporary lock file emitted by the skill installer."""
-
-    model_config = ConfigDict(extra="allow", strict=True)
-
-    skills: dict[str, SkillLockEntry]
-
-
 class ExternalSkillResult(BaseModel):
     """The outcome of updating one external skill in .agents/skills/."""
 

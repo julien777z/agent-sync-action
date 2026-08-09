@@ -134,6 +134,9 @@ For example, this installs the
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/skills.json`.
 
+Vendored skills include a `metadata.source` URL in their `SKILL.md` frontmatter and retain
+repository-root license, copying, and notice files from the same immutable source revision.
+
 ## Rule Scope
 
 A rule applies to every task by default. Give it file patterns and set

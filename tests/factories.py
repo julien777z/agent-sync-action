@@ -4,12 +4,7 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
-from agent_sync.models.registry import (
-    ExternalSkill,
-    SkillLockEntry,
-    SkillsLock,
-    SkillsRegistry,
-)
+from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
@@ -57,26 +52,6 @@ class SkillsRegistryFactory(ModelFactory[SkillsRegistry]):
         return []
 
 
-class SkillLockEntryFactory(ModelFactory[SkillLockEntry]):
-    """Build deterministic installer lock entries."""
-
-    __model__ = SkillLockEntry
-
-    skill_path = "skills/sample/SKILL.md"
-
-
-class SkillsLockFactory(ModelFactory[SkillsLock]):
-    """Build deterministic installer lock files."""
-
-    __model__ = SkillsLock
-
-    @classmethod
-    def skills(cls) -> dict[str, SkillLockEntry]:
-        """Build one default installer lock entry."""
-
-        return {"skill": SkillLockEntryFactory.build()}
-
-
 def materialize_skill(
     path: Path,
     front_matter: SkillFrontMatter,
@@ -112,15 +87,6 @@ def materialize_registry(path: Path, registry: SkillsRegistry) -> None:
     """Write one external-skill registry into canonical sources."""
 
     path.write_text(registry.model_dump_json(), encoding="utf-8")
-
-
-def materialize_skills_lock(path: Path, lock: SkillsLock) -> None:
-    """Write one installer lock file."""
-
-    path.write_text(
-        lock.model_dump_json(by_alias=True),
-        encoding="utf-8",
-    )
 
 
 def materialize_tree(base: Path, files: dict[str, str]) -> None:
