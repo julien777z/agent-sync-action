@@ -929,7 +929,7 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Prefer shared fixtures and domain-named creation fixtures over ad-hoc object setup in test modules.
 - Keep reusable fixture helpers in shared `conftest.py` instead of duplicating setup in each test.
 - Use fixture-backed values instead of hardcoded IDs/names/emails/tax IDs when fixtures provide them.
-- Do not hardcode business-profile values when a shared fixture or factory can provide them; extend the shared fixture first when needed.
+- Do not hardcode domain-specific values when a shared fixture or factory can provide them; extend the shared fixture first when needed.
 - Do not declare reusable request, response, persistence-payload, or fixture models inside one test module. Use the production boundary model when it exists; otherwise place the shared test contract in the nearest fixture module or `conftest.py`.
 - Name shared test modules for the domain or boundary they own. Do not introduce generic `models.py`, `helpers.py`, or `utils.py` catch-alls when a focused fixture module is the natural home.
 
