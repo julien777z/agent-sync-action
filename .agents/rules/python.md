@@ -70,6 +70,11 @@ class Report(BaseModel):
 - Inside an entity package, do not repeat the entity in module names: `resource/sync.py`, never `resource/resource_sync.py`.
 - Compound nouns that name a single concept are one entity, not two — `access_control.py`, `request_metadata.py`, and `audit_trail.py` are all fine.
 - When the entity package needs a module for its primary/orchestration surface, name it after the package (`resource/resource.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- This rule governs Python modules only. Generated packages and source files owned by another toolchain follow that toolchain's naming conventions; do not reorganize them to satisfy it.
+- Moving a module into a new subpackage invalidates every relative import inside it and any path it derives from `__file__`. Convert those imports to absolute imports and re-anchor the path instead of adding `.parent` until it happens to work.
+
+- Give domain-specific module-level parsers, builders, formatters, and validators domain-qualified names. A generic name such as `parse_response` or `build_payload` falsely promises that a domain helper accepts any compatible input and creates collisions when multiple domains are imported together.
+- Reserve unqualified transformation names for genuinely domain-independent helpers in `utils/` whose signatures name no domain type.
 
 - Do not start Python files with module docstrings. Begin with imports, or leave package `__init__.py` files empty when they have no public surface.
 - Keep ALL imports at the top of the file.
@@ -82,6 +87,9 @@ class Report(BaseModel):
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
 - Place generic, stateless, cross-cutting helpers in a `utils.py` module or `utils/` package.
 - Use a `utils.py` module for a small cohesive set of utilities; use a `utils/` package when separate focused utility modules are warranted.
+- Never use a `*_utils.py` module-name suffix such as `datetime_utils.py`; name the module by its topic inside `utils/`.
+- Give a `utils/` package topic-named modules such as `utils/datetime.py` and `utils/pagination.py` rather than one flat module.
+- Keep `utils/__init__.py` empty or limited to imports and `__all__`; consumers import from the specific submodule.
 - Keep domain and orchestration behavior in their owning modules. Do not use utilities as a dumping ground.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
@@ -167,6 +175,8 @@ ACTION_CONFIG = ActionConfig()
 Avoid trivial wrapper functions that add no value. A function that just returns its argument or applies a trivial fallback is noise:
 
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
+- Return an enum for an outcome with more than two states or states whose names carry meaning. Never return bare integers as application status codes.
+- A subprocess return code is an external value and may remain an `int` at that boundary. Convert it into the domain outcome enum before carrying it through the application.
 - Do not rebind function arguments to a second local name when the value is unchanged (for example, `profile = obj`); name the parameter correctly at the signature instead.
 - Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `APPLICATION_CONFIG` in every call); read from that source directly where the value is used.
 - Give domain-specific parsers and converters domain-qualified names so imports from multiple domains cannot silently shadow one another. Keep unqualified names only for genuinely domain-independent transformations.
@@ -205,6 +215,10 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
 - Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
+
+- Do not convert between models you own with `Target(**source.model_dump())`, `Target.model_validate(source.model_dump())`, or `Target(**source.__dict__)`. These dictionary-shaped conversions erase the relationship between the source and target contracts, can collide with explicitly supplied fields, and may re-run normalization or encryption.
+- Put the conversion on the target in a typed `from_<source>` or `build_*` classmethod that names the fields. If the copy becomes long, consolidate the models or carry the source model as a nested field instead of flattening it.
+- Reserve `model_dump()` for boundaries that leave the typed model layer, such as JSON, persistence, caches, and logs.
 
 - Application code (a function, method, property, class, constant, or field) with **zero non-test consumers** is dead code and must be deleted, along with the tests that only exist to exercise it.
 - **Tests do not justify keeping otherwise-unused application code.** A test that asserts a symbol no other application code reads is testing a fabricated contract; delete the symbol and that test together rather than preserving the symbol "because it's covered".
