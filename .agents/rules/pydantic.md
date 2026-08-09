@@ -36,7 +36,6 @@ if not policy.can_access_admin:
 - Never use `Protocol` for data models that hold data.
 - Use `Protocol` only for structural typing of interfaces (callbacks, duck typing).
 
-- Create response models with `from_orm_model` class method for ORM conversion.
 - Use `Self` return type for class methods.
 
 ## Validation and Configuration
