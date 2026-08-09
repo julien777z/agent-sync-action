@@ -1,20 +1,32 @@
 ---
 name: list-skills
-description: List the names of skills in the canonical .agents skills folder. Use when the user asks to list available repository skills.
+description: List and reconcile canonical skills across a bounded collection of local repositories. Use when the user asks which skills repositories have, where they occur, or whether a shared skill has conflicting language.
 ---
 
 # List Skills
 
-Read the canonical `.agents/skills` folder and return the name of each direct child skill folder.
+## Dependencies
+
+- `coordinate-repositories` — identifies the bounded repository collection and safely gathers the canonical artifacts.
+
+Read each applicable repository's canonical `.agents/skills/<name>/SKILL.md` files. Exclude repositories whose primary purpose is developing, packaging, testing, or operating the agent-synchronization system itself unless the user explicitly includes them.
+
+For each skill name, merge the repository names that contain it. Compare complete canonical `SKILL.md` text, including frontmatter. Group identical texts and use the largest group as the baseline. If any other group exists, report every repository outside that baseline as having conflicting language. If two or more groups tie for largest, report all tied groups as conflicting rather than choosing an arbitrary baseline.
 
 ## Output
 
-Return only this heading and Markdown list, sorted alphabetically, with no status summary or extra prose:
+Return only these headings and sorted Markdown lists, with no status summary or extra prose:
 
 ```markdown
 Skills
 
+- skill-name — (repo-one, repo-two)
+
+## Conflicting Skill Language
+
 - skill-name
+  - Baseline: repo-one, repo-two
+  - Different language: repo-three
 ```
 
-If no skills exist, return `- None`.
+Omit `## Conflicting Skill Language` when no differences exist. If no skills exist, return `- None` under `Skills`.

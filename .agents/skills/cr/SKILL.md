@@ -7,6 +7,10 @@ description: Run the multi-subagent code-review workflow at high effort with fix
 
 Run the complete high-effort fix review before merging the current branch's pull request.
 
+## Dependencies
+
+- `code-review` — run the complete review and fix workflow before the merge gate.
+
 ## GitHub Transport
 
 Use GitHub's REST API through `gh api` by default. Never call a `gh` subcommand that uses GraphQL, including `gh pr`, `gh repo`, and `gh search`.

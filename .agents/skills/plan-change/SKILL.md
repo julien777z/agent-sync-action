@@ -1,12 +1,16 @@
 ---
 name: plan-change
-description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan while handling incidental fixes, durable deferrals, and repository-provided code-simplification workflows.
+description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan with incidental fixes, durable deferrals, and mandatory code simplification after each meaningful batch and before delivery.
 ---
 
 # Plan Change
 
 Keep plan approval explicit, resolve small encountered issues, record genuine deferrals durably,
 and simplify implementation as it develops.
+
+## Dependencies
+
+- `code-simplify` — simplify each meaningful implementation batch and the complete diff before delivery.
 
 ## Plan Approval
 
@@ -57,14 +61,13 @@ When identified work will consciously remain undone, record the decision when it
 
 ## Ongoing Simplification
 
-When the repository provides a `code-simplify` skill, read and invoke it after each meaningful
-implementation batch and once across the complete diff before delivery.
+Read and invoke `code-simplify` after each meaningful implementation batch and once across the
+complete diff before delivery.
 
 - Scope an intermediate pass to the current batch and the final pass to the complete change.
 - Apply behavior-preserving simplifications that meet the localized, low-risk, one-focused-pass
   standard.
 - Ask the user about larger or decision-dependent simplifications before applying them.
-- Do not install or synthesize `code-simplify` when the repository does not provide it.
 
 ## Completion
 

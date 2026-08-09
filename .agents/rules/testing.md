@@ -28,7 +28,7 @@ alwaysApply: true
 - Use clearly synthetic data that is unique to each test or parametrized case unless an exact protocol or catalog literal is the contract under test; never paste exact user-provided examples into tests, and preserve only the shape or edge case being verified when inventing replacements.
 - Define test helper functions at module level.
 - Keep helper docstrings to a single line.
-- Prefer Polyfactory for structured Pydantic and SQLAlchemy test data when the repository uses it. Define concrete `ModelFactory` or `SQLAlchemyFactory` classes in the nearest shared `factories.py`, set `__model__`, provide deterministic domain defaults, and call `.build(**overrides)` directly from tests.
+- Use Polyfactory for structured Pydantic and SQLAlchemy test data. Define concrete `ModelFactory` or `SQLAlchemyFactory` classes in the nearest shared `factories.py`, set `__model__`, provide deterministic domain defaults, and call `.build(**overrides)` directly from tests.
 - Let Polyfactory generate incidental valid values. Express domain constraints and cross-field relationships without replacing its generation with a large manual `build()` implementation.
 - Do not wrap Polyfactory classes in callable pytest fixtures solely for dependency injection, and do not use `Protocol` to describe them.
 - Use pytest factory fixtures for setup or construction that Polyfactory does not cover, including persisted flows, filesystem materialization, dependency lifecycles, and multi-object scenarios. Put reusable pytest builders in the nearest shared `conftest.py`, not in test modules.
@@ -207,7 +207,20 @@ def create_order(order_fixture, customer_fixture, create_customer):
 ## Environments
 
 - A cloud workspace snapshot restores files, not running processes. A failing `docker info` at session start means the daemon may need to be started; it does not by itself prove Docker is unavailable.
-- Prefer the repository's service-startup helper or skill. Otherwise start the daemon explicitly, wait for `docker info` to succeed, and report Docker as unavailable only when the CLI is missing or the daemon still fails with its log available.
+- Prefer the repository's service-startup helper or skill. Otherwise start the daemon explicitly and wait for `docker info` to succeed:
+
+```bash
+sudo systemctl start docker 2>/dev/null \
+  || sudo service docker start 2>/dev/null \
+  || (sudo dockerd > /tmp/dockerd.log 2>&1 & disown)
+
+for attempt in $(seq 1 15); do
+  docker info > /dev/null 2>&1 && break
+  sleep 1
+done
+```
+
+- Report Docker as unavailable only when the CLI is missing or `docker info` still fails after the explicit start attempt, and include the daemon log in that report.
 - Browser-automation daemons may start browsers with fresh temporary profiles. Save authenticated session state explicitly and restore it after a daemon restart instead of assuming cookies survive.
 
 ## Agent Configuration Changes

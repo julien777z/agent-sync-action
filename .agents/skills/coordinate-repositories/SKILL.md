@@ -10,8 +10,8 @@ Carry out the caller's task consistently across the selected repository collecti
 ## Workflow
 
 1. Determine the bounded repository collection from the current repository, accessible sibling repositories, and the user's scope. Discover Git repositories independently of task-specific files, normalize their remote identities, and deduplicate multiple checkouts or worktrees of the same remote. Do not crawl unrelated locations.
-2. Fetch each candidate and inspect its current remote default branch. Use that authoritative tree to read the relevant files and enough guidance to understand whether the task applies; never let a stale, dirty, or non-default local checkout exclude a repository or determine applicability. Keep behavior justified by that repository's product, stack, tooling, or workflow local to that repository.
-3. When the caller identifies canonical artifacts, inspect every applicable repository before finalizing them. Fold reusable repository-neutral guidance from any consumer into the canonical source, reconcile generic conflicts using explicit intent and authoritative lineage, validate the source first, and then distribute the canonical semantics to every applicable repository. Canonical convergence is part of the authorized task and requires no separate approval; byte-identical files are not required when a target retains repository-specific additions.
+2. Fetch each candidate and inspect its current remote default branch. Use that authoritative tree to read the relevant files and enough guidance to understand whether the task applies; never let a stale, dirty, or non-default local checkout exclude a repository or determine applicability. Keep repository-specific rule behavior only in that repository's `project.md`; product-specific skills may remain local.
+3. When the caller identifies canonical artifacts, inspect every applicable repository before finalizing them. Fold reusable repository-neutral guidance from any consumer into the canonical source, present genuine generic conflicts to the user for an explicit decision, validate the source first, and then distribute every non-project rule and included generic skill directory byte-for-byte to each applicable repository. Never classify one side of a generic conflict as project-specific merely to avoid asking the user.
 4. Choose the task mode:
    - For a read-only task, gather evidence from every applicable repository and merge it into one clearly attributed result.
    - For a change or review-and-fix task, work only in an isolated worktree based on that repository's remote default branch. Leave the original checkout, branch, and unrelated dirty work untouched.
@@ -23,7 +23,8 @@ Carry out the caller's task consistently across the selected repository collecti
 
 ## Guardrails
 
-- Preserve repository-specific instructions and report contradictions for the caller to resolve.
+- Preserve repository-specific instructions in `project.md` and report contradictions for the caller to resolve.
+- Keep every non-project rule and included generic skill directory byte-identical across applicable repositories.
 - Treat the fetched remote default branch as authoritative for discovery and applicability.
 - Never leave reusable repository-neutral guidance stranded in one consumer when the task has a canonical source; update the source and every applicable target as part of the same authorized task.
 - Do not commit, push, or open pull requests unless the user authorized persistent changes.
