@@ -1,12 +1,12 @@
 ---
 name: plan-change
-description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan with incidental fixes, durable deferrals, mandatory code simplification, and independent delivery metadata for each repository.
+description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan with incidental fixes, mandatory code simplification, and independent delivery metadata for each repository.
 ---
 
 # Plan Change
 
-Keep plan approval explicit, resolve small encountered issues, record genuine deferrals durably,
-and simplify implementation as it develops.
+Keep plan approval explicit, resolve small encountered issues, and simplify implementation as it
+develops.
 
 ## Dependencies
 
@@ -39,27 +39,6 @@ proactive audit of the whole repository.
 - When asking, state the trigger, impact, expected work, recommendation, and concrete choices.
 - Continue independent approved work when the unresolved issue does not block it.
 
-## Durable Deferrals
-
-When identified work will consciously remain undone, record the decision when it is made.
-
-1. Inspect the repository for an authoritative deferral system before leaving the item only in
-   chat, a plan, or a pull-request description.
-2. Prefer a dedicated repository skill such as `.agents/skills/add-deferral/SKILL.md`. Read its
-   complete instructions and invoke it immediately.
-3. When the repository also provides a deferral-listing skill such as `get-deferrals`, use it
-   against the fetched remote default branch before recording work so an existing matching
-   deferral or running ledger is reused.
-4. If no dedicated skill exists, follow another deferral workflow explicitly documented in the
-   repository's canonical rules or guidance.
-5. Let that workflow own storage, supporting evidence, duplicate detection, branch isolation,
-   pull-request delivery, and reporting. Reuse an existing matching deferral instead of creating
-   a duplicate.
-6. Treat work the user declines to fix, and identified work left unresolved by an external
-   blocker, as deferrals.
-7. When the repository has no documented deferral system, do not invent one. Report that no
-   durable mechanism was available and include the user's defer decision in the task summary.
-
 ## Ongoing Simplification
 
 Read and invoke `code-simplify` after each meaningful implementation batch and once across the
@@ -88,7 +67,6 @@ Before declaring the plan implemented:
 
 1. Verify every planned outcome and every automatic incidental fix.
 2. Confirm every accepted simplification still preserves behavior and external contracts.
-3. Confirm every consciously deferred item used the repository's deferral system when one exists.
-4. Confirm multi-repository delivery artifacts describe only their owning repository.
-5. Report the implementation, encountered fixes, simplification passes, deferrals, validation,
-   and any unresolved decision awaiting the user.
+3. Confirm multi-repository delivery artifacts describe only their owning repository.
+4. Report the implementation, encountered fixes, simplification passes, validation, and any
+   unresolved decision awaiting the user.
