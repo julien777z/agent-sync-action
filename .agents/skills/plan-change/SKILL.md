@@ -5,7 +5,7 @@ description: Present plans for explicit approval and implement approved plans wi
 
 # Plan Change
 
-Keep plan approval explicit, resolve small encountered issues, and simplify implementation as it
+Keep plan approval explicit, resolve encountered issues, and simplify implementation as it
 develops.
 
 ## Dependencies
@@ -29,13 +29,19 @@ Apply this policy to issues encountered while implementing the plan. Do not turn
 proactive audit of the whole repository.
 
 - Never dismiss an issue solely because it is pre-existing or outside the original task.
-- Fix and verify it when the correction is localized, low-risk, behavior-preserving, and can be
-  completed in one focused pass using existing patterns and tests.
+- Fix and verify it when the correction can be completed in one focused pass and produces an
+  overall net improvement, including fixing a defect, removing a code smell, simplifying the
+  implementation, or intentionally replacing an inferior contract. A behavior change or
+  compatibility break is not by itself a reason to preserve the existing implementation.
+- Use the repository's relevant tests as the primary regression guardrail. Add or update tests for
+  the intended contract and run them; do not preserve a defect solely because an existing test
+  asserts the old behavior. When coverage is absent or insufficient, use the strongest available
+  validation and account explicitly for the uncovered behavior.
 - One focused pass means the correction needs no separate research or design phase and is not
   expected to require multiple implementation iterations.
 - Ask the user before fixing an issue that requires architectural work, a broad refactor,
   migration, new dependency, substantial investigation, product intent, destructive action,
-  expanded authority, or a public or compatibility-contract decision.
+  or expanded authority.
 - When asking, state the trigger, impact, expected work, recommendation, and concrete choices.
 - Continue independent approved work when the unresolved issue does not block it.
 
@@ -45,8 +51,9 @@ Read and invoke `code-simplify` after each meaningful implementation batch and o
 complete diff before delivery.
 
 - Scope an intermediate pass to the current batch and the final pass to the complete change.
-- Apply behavior-preserving simplifications that meet the localized, low-risk, one-focused-pass
-  standard.
+- Apply simplifications that produce an overall net improvement and can be completed and verified
+  in one focused pass. Do not require them to preserve an inferior implementation or compatibility
+  contract.
 - Ask the user about larger or decision-dependent simplifications before applying them.
 
 ## Multi-Repository Delivery
@@ -66,7 +73,8 @@ context.
 Before declaring the plan implemented:
 
 1. Verify every planned outcome and every automatic incidental fix.
-2. Confirm every accepted simplification still preserves behavior and external contracts.
+2. Confirm tests and relevant validation cover every incidental fix and simplification, and that
+   intentional contract changes are reflected in the expected behavior.
 3. Confirm multi-repository delivery artifacts describe only their owning repository.
 4. Report the implementation, encountered fixes, simplification passes, validation, and any
    unresolved decision awaiting the user.

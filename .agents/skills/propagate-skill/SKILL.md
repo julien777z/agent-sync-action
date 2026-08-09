@@ -63,6 +63,9 @@ list, then stop. Do not discover repositories or mutate files for a listing-only
 ## Guardrails
 
 - Preserve dirty worktrees and unrelated changes.
+- When the user explicitly removes a canonical or consumer agent artifact, delete it directly and
+  rely on Git history for recovery. Do not retain a Trash copy, backup directory, or temporary
+  recoverable duplicate.
 - Never change application code, package source, dependency manifests, tests, runtime configuration, or repository behavior during propagation. Report noncompliance and recommend a separate focused follow-up instead.
 - Never reuse, alter, or clean a non-default working branch to perform propagation. Keep the original checkout intact and isolate the carry-over of canonical agent-system work.
 - Treat the fetched remote default branch as authoritative for discovery and applicability; a stale or non-default local checkout must never exclude a repository.
