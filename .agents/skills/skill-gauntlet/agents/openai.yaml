@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Gauntlet"
+  short_description: "Benchmark and upgrade installed skills"
+  default_prompt: "Use $skill-gauntlet to inventory installed skills, let me select candidates, and autonomously benchmark, upgrade, or retire them."
