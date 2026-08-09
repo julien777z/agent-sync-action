@@ -30,33 +30,6 @@ alwaysApply: true
 - Treat it as failed only after that window or an explicit failure from the user.
 - A failure is not approval; wait until the user resumes the task before prompting again.
 
-## Deferrals
-
-- Every deferral is recorded through the `add-deferral` skill, which writes it under `deferrals/`
-  and opens a pull request containing only that deferral, branched from the default branch.
-- Record it when the decision to defer is made, not at the end of the task.
-- Classifying a finding as pre-existing, out of scope, or not caused by the current change **is**
-  that decision. Confirming a failure predates the change is the trigger to record it, not an
-  exemption from recording it.
-- When a running ledger already covers that class of finding, add to it instead of opening a
-  second deferral.
-- A deferral stated only in chat, in a pull request body, or in a plan is not recorded. Chat is
-  not durable and a pull request body is read once, at review.
-- Do not fold a deferral into the branch that produced it. It must be mergeable while that
-  change is still in flight.
-- Carry the documents the deferral depends on into its directory, so it stays readable after the
-  branch it came from is gone.
-- Read the recorded set with the `get-deferrals` skill.
-
-- When the deferred work is actually done, retire its record in the same breath, without being
-  asked. A deferral that outlives the work it describes sends the next reader after a problem
-  that no longer exists.
-  - Close any still-open pull request for that deferral, saying in the closing comment that the
-    work landed and where. Closing a superseded deferral needs no separate approval; this is the
-    one case that does not wait. Merging still does.
-  - Delete the deferral's directory in the change that completes the work when its pull request
-    already merged.
-
 ## Rule Files
 
 - Every rule file except `project.md` states guidance that holds in any repository using that
