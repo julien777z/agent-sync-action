@@ -68,11 +68,17 @@ def update_external_skill(
         )
 
         installer.install_skill(skill, working_directory, source_root)
-        installed = installer.locate_installed_skill(working_directory, source_root, skill.name)
-        skill_path = installer.read_skill_path(working_directory)
+        installed = installer.locate_skill_directory(
+            working_directory,
+            skill.name,
+            excluded_root=source_root,
+        )
+        source_skill = installer.locate_skill_directory(source_root, skill.upstream_skill)
 
-        if skill_path is not None and "/" not in skill_path:
+        if source_skill == source_root:
             installer.supplement_root_assets(installed, source_root)
+
+        installer.copy_legal_files(installed, source_root)
 
         normalize_skill_metadata(installed, skill)
 
@@ -93,8 +99,19 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
     document = installed / "SKILL.md"
     content = document.read_text(encoding="utf-8")
     front_matter, body = parse_markdown(content, SkillFrontMatter, str(document))
+    metadata = dict(front_matter.metadata or {})
+    metadata["source"] = f"https://github.com/{skill.repo}"
+
     document.write_text(
-        render_front_matter(front_matter.model_copy(update={"name": skill.name}), body),
+        render_front_matter(
+            front_matter.model_copy(
+                update={
+                    "name": skill.name,
+                    "metadata": metadata,
+                }
+            ),
+            body,
+        ),
         encoding="utf-8",
     )
 
