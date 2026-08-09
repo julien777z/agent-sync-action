@@ -18,7 +18,6 @@ from agent_sync.utils import ensure_trailing_newline, serialized_field_names
 
 logger = logging.getLogger(__name__)
 
-# A rule is identified by its filename slug, so an authored name never persists.
 DISCARDED_RULE_KEYS: Final[frozenset[str]] = frozenset({"name"})
 
 
