@@ -27,10 +27,10 @@ def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
 
         return False
 
-    updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
+    updatable_skills = [skill for skill in registry.skills if skill.update_on_sync]
 
     if not updatable_skills:
-        logger.info("No external skills have automatic updates enabled; nothing to update.")
+        logger.info("No external skills are enabled for sync; nothing to update.")
 
         return False
 

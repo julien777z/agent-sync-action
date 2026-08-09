@@ -35,7 +35,7 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
     name = "sample"
     repo = "example/repository"
     skill = None
-    automatic_updates = True
+    update_on_sync = True
 
 
 class SkillsRegistryFactory(ModelFactory[SkillsRegistry]):

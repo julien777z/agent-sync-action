@@ -15,7 +15,7 @@ class ExternalSkill(BaseModel):
     name: str
     repo: str
     skill: str | None = None
-    automatic_updates: bool
+    update_on_sync: bool
 
     @field_validator("name")
     @classmethod
