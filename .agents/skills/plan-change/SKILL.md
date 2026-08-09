@@ -29,6 +29,8 @@ Apply this policy to issues encountered while implementing the plan. Do not turn
 proactive audit of the whole repository.
 
 - Never dismiss an issue solely because it is pre-existing or outside the original task.
+- Never reject a fix solely because it is described as high risk. Assess its expected net effect,
+  concrete failure modes, and available validation instead of treating the label as a stop rule.
 - Fix and verify it when the correction can be completed in one focused pass and produces an
   overall net improvement, including fixing a defect, removing a code smell, simplifying the
   implementation, or intentionally replacing an inferior contract. A behavior change or
