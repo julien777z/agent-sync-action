@@ -8,7 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to each supported provider.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
-- Scopes a rule to matching files from one authored key, emitting `globs` for Cursor and `paths` for Claude.
+- Scopes a rule to matching files from one declaration, kept consistent across every provider's front matter.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
@@ -69,8 +69,9 @@ jobs:
 
 ### Scope A Rule To Matching Files
 
-Claude and Cursor link the same canonical rule file but read different keys, so
-declare the scope once under either name and both are written on the next sync.
+Providers link the same canonical rule file but expect different metadata, so
+declare the scope once and the next sync keeps every provider's front matter
+consistent.
 
 ```markdown
 ---
