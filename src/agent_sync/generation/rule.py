@@ -27,7 +27,7 @@ def normalize_rule(front_matter: BaseModel, body: str) -> str:
         front_matter.model_dump(by_alias=True, exclude_none=True)
     ).root
 
-    known_keys = ("description", "globs", "alwaysApply", "starlark")
+    known_keys = ("description", "globs", "paths", "alwaysApply", "starlark")
     normalized = {
         key: values[key] for key in known_keys if key in values and values[key] not in (None, "")
     }
@@ -130,12 +130,9 @@ def render_instruction_section(
     """Render one canonical rule inside the generated root instructions."""
 
     scope = ""
+    patterns = front_matter.scope_patterns
 
-    if front_matter.globs:
-        patterns = (
-            [front_matter.globs] if isinstance(front_matter.globs, str) else front_matter.globs
-        )
-
+    if patterns:
         scope = "> Applies only to files matching: " + ", ".join(
             f"`{pattern}`" for pattern in patterns
         )

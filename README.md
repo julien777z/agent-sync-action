@@ -8,6 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to each supported provider.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
+- Scopes a rule to matching files from one authored key, emitting `globs` for Cursor and `paths` for Claude.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
@@ -64,6 +65,19 @@ jobs:
       - uses: julien777z/agent-sync-action@v0
         with:
           refresh-external-skills: true
+```
+
+### Scope A Rule To Matching Files
+
+Claude and Cursor link the same canonical rule file but read different keys, so
+declare the scope once under either name and both are written on the next sync.
+
+```markdown
+---
+description: Python conventions.
+globs: "**/*.py"
+alwaysApply: false
+---
 ```
 
 ## Layout
