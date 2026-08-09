@@ -1,8 +1,6 @@
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from agent_sync.document import FrontMatterValues, render_front_matter
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.context import GenerationContext
@@ -20,7 +18,7 @@ from agent_sync.utils import ensure_trailing_newline
 logger = logging.getLogger(__name__)
 
 
-def normalize_rule(front_matter: BaseModel, body: str) -> str:
+def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
     """Render a rule with deterministic source front matter."""
 
     values = FrontMatterValues.model_validate(
