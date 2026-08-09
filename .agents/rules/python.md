@@ -66,10 +66,11 @@ class Report(BaseModel):
 
 ## Imports and Modules
 
-- Never name a module by joining two different concepts with an underscore — `resource_export.py` is "resource" + "export". Create a package for the entity and a topic module inside it: `resource/export.py`. The same applies when adding a second module for an entity that already has one (`resource.py` + `resource_access.py` must become the package `resource/` with `resource.py` and `access.py` inside).
-- Inside an entity package, do not repeat the entity in module names: `resource/sync.py`, never `resource/resource_sync.py`.
-- Compound nouns that name a single concept are one entity, not two — `access_control.py`, `request_metadata.py`, and `audit_trail.py` are all fine.
-- When the entity package needs a module for its primary/orchestration surface, name it after the package (`resource/resource.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- When a module name combines an owning concept with a distinct topic, split ownership into the package: `<owner>_<topic>.py` becomes `<owner>/<topic>.py`.
+- When an existing `<owner>.py` gains another owner-specific module, convert it to an `<owner>/` package containing `<owner>.py` for the primary surface and `<topic>.py` for the additional topic.
+- Inside an owner package, do not repeat the owner in module names: use `<owner>/<topic>.py`, never `<owner>/<owner>_<topic>.py`.
+- Split at the semantic owner/topic boundary, not at every underscore. A compound noun whose words jointly name one established concept remains one module; for example, `access_control.py` is clearer than `access/control.py`.
+- When the owner package needs a primary or orchestration module, name it after the package (`<owner>/<owner>.py`) with an empty `__init__.py`; consumers import the specific submodule.
 - This rule governs Python modules only. Generated packages and source files owned by another toolchain follow that toolchain's naming conventions; do not reorganize them to satisfy it.
 - Moving a module into a new subpackage invalidates every relative import inside it and any path it derives from `__file__`. Convert those imports to absolute imports and re-anchor the path instead of adding `.parent` until it happens to work.
 
@@ -87,8 +88,9 @@ class Report(BaseModel):
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
 - Place generic, stateless, cross-cutting helpers in a `utils.py` module or `utils/` package.
 - Use a `utils.py` module for a small cohesive set of utilities; use a `utils/` package when separate focused utility modules are warranted.
-- Never use a `*_utils.py` module-name suffix such as `datetime_utils.py`; name the module by its topic inside `utils/`.
-- Give a `utils/` package topic-named modules such as `utils/datetime.py` and `utils/pagination.py` rather than one flat module.
+- Apply the owner/topic rule to owner-specific utilities: `<owner>_utils.py` becomes `<owner>/utils.py`.
+- Put cross-cutting utility topics under `utils/`: `<topic>_utils.py` becomes `utils/<topic>.py`.
+- Give a `utils/` package topic-named modules rather than one flat module.
 - Keep `utils/__init__.py` empty or limited to imports and `__all__`; consumers import from the specific submodule.
 - Keep domain and orchestration behavior in their owning modules. Do not use utilities as a dumping ground.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
