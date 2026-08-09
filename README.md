@@ -88,7 +88,7 @@ jobs:
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories linked into provider layouts. |
-| `skills.json` | Registry of external skills available for automatic updates. |
+| `skills.json` | Registry of external skills that Agent Sync can update. |
 
 Only the directories and files your repository uses are required.
 
@@ -107,7 +107,7 @@ Only the directories and files your repository uses are required.
 
 To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
 `.agents/skills.json`. Use its source repository and upstream slug, choose the local skill
-directory name you want, and set `automatic_updates` to keep it current.
+directory name you want, and set `update_on_sync` to keep it current.
 
 For example, this installs the
 [React best-practices](https://www.skills.sh/vercel-labs/agent-skills/vercel-react-best-practices) skill as
@@ -121,7 +121,7 @@ For example, this installs the
       "name": "react-best-practices",
       "repo": "vercel-labs/agent-skills",
       "skill": "vercel-react-best-practices",
-      "automatic_updates": true
+      "update_on_sync": true
     }
   ]
 }
@@ -130,7 +130,7 @@ For example, this installs the
 - `name`: local directory under `.agents/skills/`.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
-- `automatic_updates`: required. Set this to `true` to install the skill whenever external
+- `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/skills.json`.
 
