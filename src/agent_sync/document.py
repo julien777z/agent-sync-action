@@ -48,6 +48,15 @@ def parse_markdown[T: BaseModel](content: str, model: type[T], source: str) -> t
     return front_matter, body.strip()
 
 
+class ExpandedDumper(yaml.SafeDumper):
+    """Write every value in full, so shared objects never become YAML anchors."""
+
+    def ignore_aliases(self, data: object) -> bool:
+        """Report that no value is ever emitted as an alias."""
+
+        return True
+
+
 def render_front_matter(front_matter: BaseModel | YamlMapping, body: str) -> str:
     """Render validated YAML front matter followed by a Markdown body."""
 
@@ -62,8 +71,9 @@ def render_front_matter(front_matter: BaseModel | YamlMapping, body: str) -> str
         values = front_matter
 
     rendered = (
-        yaml.safe_dump(
+        yaml.dump(
             values,
+            Dumper=ExpandedDumper,
             sort_keys=False,
             default_flow_style=False,
             width=10_000,

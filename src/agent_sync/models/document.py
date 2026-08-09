@@ -1,7 +1,6 @@
 import logging
-from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +41,11 @@ class RuleFrontMatter(BaseModel):
     model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
 
     description: str | None = None
-    globs: str | list[str] | None = None
-    paths: str | list[str] | None = None
+    globs: str | list[str] | None = Field(
+        default=None, validation_alias=AliasChoices("globs", "paths")
+    )
     always_apply: bool = Field(default=True, alias="alwaysApply")
     starlark: str | None = None
-
-    @model_validator(mode="after")
-    def mirror_scope_patterns(self) -> Self:
-        """Carry an authored file scope into the key each provider reads."""
-
-        if self.globs is not None and self.paths is None:
-            self.paths = self.globs
-        elif self.paths is not None and self.globs is None:
-            self.globs = self.paths
-
-        return self
 
     @property
     def scope_patterns(self) -> list[str]:

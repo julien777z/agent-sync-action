@@ -27,6 +27,10 @@ def normalize_rule(front_matter: BaseModel, body: str) -> str:
         front_matter.model_dump(by_alias=True, exclude_none=True)
     ).root
 
+    # Cursor reads globs and Claude reads paths, off the one file both link to.
+    if "globs" in values:
+        values["paths"] = values["globs"]
+
     known_keys = ("description", "globs", "paths", "alwaysApply", "starlark")
     normalized = {
         key: values[key] for key in known_keys if key in values and values[key] not in (None, "")
