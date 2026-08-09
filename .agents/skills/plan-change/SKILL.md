@@ -1,6 +1,6 @@
 ---
 name: plan-change
-description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan with incidental fixes, durable deferrals, and mandatory code simplification after each meaningful batch and before delivery.
+description: Present plans for explicit approval and implement approved plans without silently ignoring encountered issues. Use whenever an agent presents a plan, resumes after a plan timeout or missing response, or implements an approved plan with incidental fixes, durable deferrals, mandatory code simplification, and independent delivery metadata for each repository.
 ---
 
 # Plan Change
@@ -11,6 +11,7 @@ and simplify implementation as it develops.
 ## Dependencies
 
 - `code-simplify` — simplify each meaningful implementation batch and the complete diff before delivery.
+- `generic-push` — keep each repository's publishing metadata independent during multi-repository changes.
 
 ## Plan Approval
 
@@ -69,6 +70,18 @@ complete diff before delivery.
   standard.
 - Ask the user about larger or decision-dependent simplifications before applying them.
 
+## Multi-Repository Delivery
+
+When one change spans multiple repositories, treat each repository as an independent delivery
+context.
+
+- Invoke `generic-push` separately for each repository before committing or publishing.
+- Write every branch name, commit message, pull-request title, pull-request description, review
+  comment, code comment, and repository-local report solely from that repository's perspective.
+- Do not name, link, describe, or explain another involved repository, its branch, pull request,
+  implementation, or coordination context in those artifacts.
+- Keep cross-repository coordination and combined status reporting in user chat.
+
 ## Completion
 
 Before declaring the plan implemented:
@@ -76,5 +89,6 @@ Before declaring the plan implemented:
 1. Verify every planned outcome and every automatic incidental fix.
 2. Confirm every accepted simplification still preserves behavior and external contracts.
 3. Confirm every consciously deferred item used the repository's deferral system when one exists.
-4. Report the implementation, encountered fixes, simplification passes, deferrals, validation,
+4. Confirm multi-repository delivery artifacts describe only their owning repository.
+5. Report the implementation, encountered fixes, simplification passes, deferrals, validation,
    and any unresolved decision awaiting the user.

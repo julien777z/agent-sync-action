@@ -1,4 +1,4 @@
 interface:
   display_name: "Plan Change"
-  short_description: "Implement plans without silent deferrals"
-  default_prompt: "Use $plan-change to implement this plan with explicit approval, encountered-issue handling, durable deferrals, and mandatory simplification after each meaningful batch and before delivery."
+  short_description: "Implement plans with explicit, isolated delivery"
+  default_prompt: "Use $plan-change to implement this plan with explicit approval, encountered-issue handling, durable deferrals, mandatory simplification after each meaningful batch and before delivery, and independent delivery metadata for every repository."
