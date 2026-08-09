@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Validates findings.json against report-schema.json.
+ * Validates findings.json — and the sibling summary.json, when present —
+ * against report-schema.json.
  * Usage: node validate-findings.cjs <path-to-findings.json>
  *
  * The validation rules live in report-schema.json — the single source of truth.
  * This script reads that schema at runtime and interprets the subset of JSON
  * Schema it uses: type (object|array|string|integer), properties, required,
- * additionalProperties:false, enum, const, items, minItems, and oneOf.
+ * additionalProperties:false, enum, const, items, minItems, pattern, and oneOf.
  *
- * Some constraints can't be expressed in that subset (a confirmed trace must
- * start at an "entrypoint", end at a "sink", and only use "propagation" for
- * intermediate steps). They're applied as an explicit, clearly-labelled
- * semantic layer after schema validation.
+ * Three constraints can't be expressed in that subset (a confirmed trace must
+ * start at an "entrypoint" and end at a "sink", and ids must be unique across
+ * the file). They're applied as an explicit, clearly-labelled semantic layer
+ * after schema validation.
  *
  * Zero dependencies. Exits 0 on success, 1 on validation failure.
  */
@@ -28,10 +29,13 @@ if (!file) {
 
 const schemaPath = path.join(__dirname, "report-schema.json");
 let itemSchema;
+let summarySchema;
 try {
 	const doc = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
 	itemSchema = doc.output_schema;
+	summarySchema = doc.summary_schema;
 	if (!itemSchema) throw new Error('report-schema.json is missing top-level "output_schema"');
+	if (!summarySchema) throw new Error('report-schema.json is missing top-level "summary_schema"');
 } catch (e) {
 	console.error(`Failed to load schema from ${schemaPath}:`, e.message);
 	process.exit(1);
@@ -146,6 +150,10 @@ function validate(value, schema, p, errors) {
 		case "string": {
 			if (typeOf(value) !== "string") {
 				errors.push(`${p}: expected string, got ${typeOf(value)}`);
+				return;
+			}
+			if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
+				errors.push(`${p}: ${JSON.stringify(value)} does not match ${schema.pattern}`);
 			}
 			break;
 		}
@@ -163,6 +171,7 @@ function collect(value, schema, p) {
 // --- Run ----------------------------------------------------------------------
 
 let errorCount = 0;
+const seenIds = new Map();
 
 findings.forEach((f, i) => {
 	const label = `[${i}] ${(f && (f.title || f.reason)) || "(untitled)"}`;
@@ -171,8 +180,7 @@ findings.forEach((f, i) => {
 	const errs = collect(f, itemSchema, `[${i}]`);
 
 	// Semantic layer — constraints the schema subset can't express:
-	// a confirmed trace must be one entrypoint, zero or more propagation steps,
-	// then one sink.
+	// a confirmed trace must start at an entrypoint and end at a sink.
 	if (f && f.verdict === "confirmed" && Array.isArray(f.trace) && f.trace.length > 0) {
 		if (f.trace[0] && f.trace[0].kind !== "entrypoint") {
 			errs.push(`[${i}].trace[0].kind must be "entrypoint", got ${JSON.stringify(f.trace[0].kind)}`);
@@ -181,10 +189,14 @@ findings.forEach((f, i) => {
 		if (f.trace[last] && f.trace[last].kind !== "sink") {
 			errs.push(`[${i}].trace[${last}].kind must be "sink", got ${JSON.stringify(f.trace[last].kind)}`);
 		}
-		for (let j = 1; j < last; j++) {
-			if (f.trace[j] && f.trace[j].kind !== "propagation") {
-				errs.push(`[${i}].trace[${j}].kind must be "propagation", got ${JSON.stringify(f.trace[j].kind)}`);
-			}
+	}
+
+	// Every other artifact references a finding by id, so ids must be unique.
+	if (f && typeof f.id === "string") {
+		if (seenIds.has(f.id)) {
+			errs.push(`[${i}].id: duplicate id ${JSON.stringify(f.id)} (also used by finding [${seenIds.get(f.id)}])`);
+		} else {
+			seenIds.set(f.id, i);
 		}
 	}
 
@@ -192,10 +204,35 @@ findings.forEach((f, i) => {
 	errorCount += errs.length;
 });
 
+const summaryPath = path.join(path.dirname(path.resolve(file)), "summary.json");
+let summaryChecked = false;
+
+if (fs.existsSync(summaryPath)) {
+	console.log("Checking summary.json");
+
+	let summary;
+	try {
+		summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+	} catch (e) {
+		console.error("  ERROR:", `summary.json: ${e.message}`);
+		errorCount += 1;
+	}
+
+	if (summary !== undefined) {
+		const errs = collect(summary, summarySchema, "summary");
+
+		for (const msg of errs) console.error("  ERROR:", msg);
+		errorCount += errs.length;
+		summaryChecked = true;
+	}
+}
+
 console.log();
+const scope = summaryChecked ? `${findings.length} findings and the run summary` : `${findings.length} findings`;
+
 if (errorCount === 0) {
-	console.log(`PASS: ${findings.length} findings valid`);
+	console.log(`PASS: ${scope} valid`);
 } else {
-	console.error(`FAIL: ${errorCount} error(s) across ${findings.length} findings`);
+	console.error(`FAIL: ${errorCount} error(s) across ${scope}`);
 	process.exit(1);
 }

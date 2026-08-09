@@ -1,4 +1,4 @@
-# Reconnaissance
+# Phase 1: Understand the Application
 
 ### Phase 1: Understand the application
 

@@ -79,6 +79,10 @@ Think about these angles:
     that reveal whether a record exists. Response size differences. HTTP headers that
     disclose versions. Debug endpoints that survived into production.
 
+YOU CAN SPAWN SUB-AGENTS. If you need to understand a subsystem in depth to evaluate
+a potential finding — use the Task tool to launch a research agent. Don't try to hold
+everything in your own context. Go deep where it matters.
+
 11. WHAT PARAMETERS OVERRIDE SECURITY-RELEVANT DEFAULTS?
     Where a default is safe but a user-supplied parameter can change it. Look for
     every input that overrides a security-relevant default and check if the override
@@ -87,12 +91,6 @@ Think about these angles:
 12. WHERE DO UNVERIFIED CLAIMS DRIVE TRUST DECISIONS?
     Anywhere self-declared identity, capability, or metadata influences an access
     or trust decision without independent verification.
-
-GO DEEP, AND PROVE IT. You can spawn sub-agents: if evaluating a candidate finding needs
-deep understanding of a subsystem, use the Task tool to launch a research agent instead of
-holding everything in one context. And where the code is locally runnable, don't just reason
-about it — extract the suspect function into a minimal harness (or build and run the target)
-and test the hypothesis directly. A reproduced result beats an argued one.
 
 YOUR SCOPE IS YOUR PRIMARY FOCUS, NOT A BOUNDARY.
 If while investigating your assigned area you notice something wrong in a different

@@ -4,21 +4,12 @@
 
 Select attack classes relevant to the application type. Not every class applies to every codebase. The list below is a starting point — add application-specific ones based on Phase 1. For large codebases, split classes per subsystem.
 
-> **Native / binary / kernel targets** (C/C++/Rust-unsafe, kernel modules, parsers and decoders, reverse-engineering tooling, runtimes/JITs, firmware): the web-oriented classes below fit poorly. Use the memory-safety, binary, and kernel classes in [MEMORY-SAFETY-AND-BINARY.md](MEMORY-SAFETY-AND-BINARY.md) instead of or alongside them.
->
-> **AI / LLM / agent targets** (chatbots, RAG pipelines, tool-calling agents, MCP servers/clients, anything that builds prompts from untrusted input or acts on model output): use the prompt-injection, agency, and output-handling classes in [AI-AND-LLM.md](AI-AND-LLM.md) alongside the classes below.
->
-> **HTTP-protocol and auth targets** (reverse proxies, CDNs, API gateways, custom HTTP parsers, and anything implementing sessions, JWT, OAuth/OIDC, or SAML): use the request-framing, cache, and auth-protocol classes in [WEB-PROTOCOL-AND-AUTH.md](WEB-PROTOCOL-AND-AUTH.md) alongside the classes below.
->
-> **Client-side / browser targets** (SPAs, browser extensions, embedded webviews, anything using `postMessage`, CORS, or WebSockets, or that renders untrusted content in the DOM): use the DOM-injection, messaging-trust, and UI-redress classes in [CLIENT-SIDE.md](CLIENT-SIDE.md) alongside the classes below.
-
 **Injection** (subagent_type: `general`)
 Trace untrusted input from entry point to dangerous sink. What counts as a "dangerous sink" depends on the application:
 - Web apps: SQL queries, HTML output, shell commands, template engines, file paths, HTTP redirects, deserialization
 - Libraries: any function that processes caller-supplied data without validation — buffer operations, parsers, format strings
 - CLI tools: shell command construction, file path handling, environment variable interpolation
 - Services: query construction, message serialization, log injection, LDAP/XPATH queries
-- Client-side (browser/JS): DOM XSS, prototype pollution, `postMessage`/origin trust, and other browser-side classes — see [CLIENT-SIDE.md](CLIENT-SIDE.md)
 
 Don't just check the obvious direct paths. Look for indirect injection: data stored safely, then retrieved and used in a dangerous context by different code. Look for injection through field names, keys, headers, and metadata — not just values. Look for injection into secondary systems (logs, caches, search indexes, analytics).
 

@@ -84,12 +84,6 @@
       "repo": "wshobson/agents",
       "skill": "python-type-safety",
       "update_on_sync": false
-    },
-    {
-      "name": "security-audit",
-      "repo": "cloudflare/security-audit-skill",
-      "skill": "security-audit",
-      "update_on_sync": true
     }
   ]
 }

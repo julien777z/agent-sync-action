@@ -1,11 +1,16 @@
 {
-  "$comment": "Single source of truth for findings.json structure (see SKILL.md Phase 5). validate-findings.cjs reads this file directly and interprets it — there is no second copy of these rules to keep in sync.",
+  "$comment": "Single source of truth for every audit artifact (see VALIDATION-AND-REPORTING.md Phases 4-7). output_schema types each entry in findings.json; summary_schema types summary.json, which carries the run-level narrative. validate-findings.cjs reads this file directly; render-artifacts.cjs generates REPORT.md, FINDINGS-DETAIL.md and PLAN.md from those two inputs, so no prose artifact is ever hand-synced.",
   "output_schema": {
     "oneOf": [
       {
         "type": "object",
-        "description": "Confirmed vulnerability — provide the complete, independently verified report.",
+        "description": "Confirmed vulnerability \u2014 provide the complete, independently verified report.",
         "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^F[0-9]+$",
+            "description": "Stable finding id (F1, F2, ...), unique within the file. Every other artifact references a finding by this id, never by array position or title."
+          },
           "verdict": {
             "type": "string",
             "const": "confirmed"
@@ -34,7 +39,11 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["entrypoint", "propagation", "sink"]
+                  "enum": [
+                    "entrypoint",
+                    "propagation",
+                    "sink"
+                  ]
                 },
                 "file": {
                   "type": "string",
@@ -52,10 +61,16 @@
                   "description": "Factual description of the state change or data movement."
                 }
               },
-              "required": ["kind", "file", "line", "scope", "description"],
+              "required": [
+                "kind",
+                "file",
+                "line",
+                "scope",
+                "description"
+              ],
               "additionalProperties": false
             },
-            "description": "Sequential code trace from entrypoint to sink, verified against actual source code. The first step must be kind 'entrypoint', the last must be kind 'sink', and any intermediate steps must be kind 'propagation' (enforced by the validator)."
+            "description": "Sequential code trace from entrypoint to sink, verified against actual source code. The first step must be kind 'entrypoint' and the last must be kind 'sink' (enforced by the validator)."
           },
           "conditions": {
             "type": "array",
@@ -64,13 +79,26 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["authentication_level", "authorization_role", "user_interaction", "system_configuration", "network_routing", "environmental_dependency", "data_state", "timing_dependency", "third_party_dependency"]
+                  "enum": [
+                    "authentication_level",
+                    "authorization_role",
+                    "user_interaction",
+                    "system_configuration",
+                    "network_routing",
+                    "environmental_dependency",
+                    "data_state",
+                    "timing_dependency",
+                    "third_party_dependency"
+                  ]
                 },
                 "description": {
                   "type": "string"
                 }
               },
-              "required": ["kind", "description"],
+              "required": [
+                "kind",
+                "description"
+              ],
               "additionalProperties": false
             },
             "description": "Factual prerequisites for exploitation. Empty array if exploitable by default."
@@ -101,7 +129,12 @@
                 "description": "Observable outcome confirming successful exploitation."
               }
             },
-            "required": ["attacker_perspective", "payloads", "instructions", "expected_result"],
+            "required": [
+              "attacker_perspective",
+              "payloads",
+              "instructions",
+              "expected_result"
+            ],
             "additionalProperties": false
           },
           "remediation": {
@@ -110,6 +143,18 @@
               "strategy": {
                 "type": "string",
                 "description": "High-level explanation of the fix."
+              },
+              "blast_radius": {
+                "type": "string",
+                "description": "What the fix touches and how far the change reaches."
+              },
+              "test": {
+                "type": "string",
+                "description": "The check that proves the fix works and would fail without it."
+              },
+              "migration": {
+                "type": "string",
+                "description": "Database or data migration the fix requires, or 'none'."
               },
               "code_changes": {
                 "type": "array",
@@ -123,12 +168,17 @@
                       "type": "string"
                     }
                   },
-                  "required": ["file_name", "fixed_code"],
+                  "required": [
+                    "file_name",
+                    "fixed_code"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["strategy"],
+            "required": [
+              "strategy"
+            ],
             "additionalProperties": false
           },
           "severity": {
@@ -139,13 +189,22 @@
                 "properties": {
                   "score": {
                     "type": "string",
-                    "enum": ["informational", "low", "medium", "high", "critical"]
+                    "enum": [
+                      "informational",
+                      "low",
+                      "medium",
+                      "high",
+                      "critical"
+                    ]
                   },
                   "reason": {
                     "type": "string"
                   }
                 },
-                "required": ["score", "reason"],
+                "required": [
+                  "score",
+                  "reason"
+                ],
                 "additionalProperties": false
               },
               "impact": {
@@ -153,21 +212,40 @@
                 "properties": {
                   "score": {
                     "type": "string",
-                    "enum": ["informational", "low", "medium", "high", "critical"]
+                    "enum": [
+                      "informational",
+                      "low",
+                      "medium",
+                      "high",
+                      "critical"
+                    ]
                   },
                   "reason": {
                     "type": "string"
                   }
                 },
-                "required": ["score", "reason"],
+                "required": [
+                  "score",
+                  "reason"
+                ],
                 "additionalProperties": false
               },
               "overall_severity": {
                 "type": "string",
-                "enum": ["informational", "low", "medium", "high", "critical"]
+                "enum": [
+                  "informational",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
               }
             },
-            "required": ["likelihood", "impact", "overall_severity"],
+            "required": [
+              "likelihood",
+              "impact",
+              "overall_severity"
+            ],
             "additionalProperties": false
           },
           "confidence": {
@@ -175,24 +253,97 @@
             "properties": {
               "score": {
                 "type": "string",
-                "enum": ["low", "medium", "high"]
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
               },
               "reason": {
                 "type": "string",
                 "description": "Why you scored the confidence this way. Mention any missing files, complex routing, or ambiguous data flows."
               }
             },
-            "required": ["score", "reason"],
+            "required": [
+              "score",
+              "reason"
+            ],
             "additionalProperties": false
+          },
+          "decision": {
+            "type": "object",
+            "description": "Remediation decision recorded in Phase 7. Absent means the finding has not been decided yet.",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "approved",
+                  "deferred",
+                  "dropped",
+                  "implemented"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "description": "Why the decision was made, or where the fix landed."
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "consequence": {
+            "type": "string",
+            "description": "One terse clause naming what the finding costs in practice; the 'where it bites' column of the report table."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Finding-specific commentary that is not part of the trace, execution or remediation -- for example a real-world baseline comparison or a correction to a related field."
           }
         },
-        "required": ["verdict", "title", "description", "root_cause", "intended_behavior", "trace", "conditions", "execution", "remediation", "severity", "confidence"],
+        "required": [
+          "id",
+          "verdict",
+          "title",
+          "description",
+          "root_cause",
+          "intended_behavior",
+          "trace",
+          "conditions",
+          "execution",
+          "remediation",
+          "severity",
+          "confidence"
+        ],
         "additionalProperties": false
       },
       {
         "type": "object",
-        "description": "Rejected finding — the described behavior is factually incorrect or the code path does not exist.",
+        "description": "Rejected finding \u2014 the described behavior is factually incorrect or the code path does not exist.",
         "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^F[0-9]+$",
+            "description": "Stable finding id (F1, F2, ...), unique within the file. Every other artifact references a finding by this id, never by array position or title."
+          },
           "verdict": {
             "type": "string",
             "const": "rejected"
@@ -200,11 +351,139 @@
           "reason": {
             "type": "string",
             "description": "Explain which specific claims in the finding are factually wrong (e.g., code path doesn't exist, mitigation prevents the described flow, trace is incorrect)."
+          },
+          "decision": {
+            "type": "object",
+            "description": "Remediation decision recorded in Phase 7. Absent means the finding has not been decided yet.",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "approved",
+                  "deferred",
+                  "dropped",
+                  "implemented"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "description": "Why the decision was made, or where the fix landed."
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
           }
         },
-        "required": ["verdict", "reason"],
+        "required": [
+          "id",
+          "verdict",
+          "reason"
+        ],
         "additionalProperties": false
       }
     ]
+  },
+  "summary_schema": {
+    "type": "object",
+    "description": "Run-level narrative for summary.json \u2014 everything in REPORT.md that is not a per-finding entry.",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "REPORT.md top-level heading, identifying the repository and the run."
+      },
+      "preamble": {
+        "type": "string",
+        "description": "Markdown placed directly under the heading: audited commit, scope, method, and any caveat about the snapshot."
+      },
+      "executive_summary": {
+        "type": "string",
+        "description": "Honest one-to-few-paragraph assessment of the codebase's security posture."
+      },
+      "baseline": {
+        "type": "string",
+        "description": "The identified comparable application and how this codebase compares to it."
+      },
+      "context_sections": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "body"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Run-specific narrative sections rendered between the baseline and the findings, in order."
+      },
+      "hardening_notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^H[0-9]+$"
+            },
+            "note": {
+              "type": "string"
+            },
+            "decision": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "approved",
+                    "deferred",
+                    "dropped",
+                    "pending"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "note"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Defence-in-depth suggestions that are explicitly NOT findings, each with its own id and decision."
+      },
+      "positive_patterns": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "What the codebase does well. Calibrates trust in the findings."
+      },
+      "coverage": {
+        "type": "string",
+        "description": "What this run did and did not examine."
+      }
+    },
+    "required": [
+      "title",
+      "executive_summary",
+      "baseline"
+    ],
+    "additionalProperties": false
   }
 }
