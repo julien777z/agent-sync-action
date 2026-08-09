@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Final
 
 from agent_sync.document import FrontMatterValues, render_front_matter
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
@@ -13,9 +14,12 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.providers import PROVIDER_LAYOUTS
-from agent_sync.utils import ensure_trailing_newline
+from agent_sync.utils import ensure_trailing_newline, serialized_field_names
 
 logger = logging.getLogger(__name__)
+
+# A rule is identified by its filename slug, so an authored name never persists.
+DISCARDED_RULE_KEYS: Final[frozenset[str]] = frozenset({"name"})
 
 
 def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
@@ -25,16 +29,12 @@ def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
         front_matter.model_dump(by_alias=True, exclude_none=True)
     ).root
 
-    # Cursor reads globs and Claude reads paths, off the one file both link to.
-    if "globs" in values:
-        values["paths"] = values["globs"]
-
-    known_keys = ("description", "globs", "paths", "alwaysApply", "starlark")
+    declared_keys = serialized_field_names(RuleFrontMatter)
     normalized = {
-        key: values[key] for key in known_keys if key in values and values[key] not in (None, "")
+        key: values[key] for key in declared_keys if key in values and values[key] not in (None, "")
     }
 
-    for key in sorted(set(values) - set(known_keys) - {"name"}):
+    for key in sorted(set(values) - set(declared_keys) - DISCARDED_RULE_KEYS):
         normalized[key] = values[key]
 
     return render_front_matter(normalized, body)

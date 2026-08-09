@@ -1,6 +1,6 @@
 import logging
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,13 @@ class RuleFrontMatter(BaseModel):
     )
     always_apply: bool = Field(default=True, alias="alwaysApply")
     starlark: str | None = None
+
+    @computed_field
+    @property
+    def paths(self) -> str | list[str] | None:
+        """Mirror the file scope under the key the other providers read."""
+
+        return self.globs
 
     @property
     def scope_patterns(self) -> list[str]:
