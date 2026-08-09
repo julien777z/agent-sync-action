@@ -1,6 +1,8 @@
 ---
 description: Follow modern Python typing, import, formatting, error handling, and maintainability conventions.
-alwaysApply: true
+globs:
+- '**/*.py'
+alwaysApply: false
 ---
 
 # Python Rules

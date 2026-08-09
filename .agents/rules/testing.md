@@ -1,5 +1,9 @@
 ---
-alwaysApply: true
+globs:
+- '**/tests/**'
+- '**/test_*.py'
+- '**/conftest.py'
+alwaysApply: false
 ---
 
 # Testing Rules

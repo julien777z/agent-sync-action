@@ -1,5 +1,9 @@
 ---
-alwaysApply: true
+globs:
+- pyproject.toml
+- poetry.lock
+- '**/*.py'
+alwaysApply: false
 ---
 
 # Poetry Project Rules
