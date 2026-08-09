@@ -26,26 +26,48 @@ alwaysApply: true
 
 ## Deferrals
 
-- Record every consciously deferred piece of work through the `add-deferral` skill when that skill is available. Record it when the decision is made, not at the end of the task.
-- Classifying a finding as pre-existing, out of scope, or not caused by the current change is a deferral decision, not an exemption from recording it.
-- Reuse a running deferral that already covers the same class of work instead of opening a duplicate.
-- A deferral stated only in chat, a pull request body, or a plan is not durable.
-- Keep a deferral separate from the branch that produced it so it can be reviewed and merged independently.
-- Carry the supporting documents a deferral depends on into its directory so it stays readable after the originating branch is gone.
-- Read recorded deferrals through the `get-deferrals` skill when that skill is available.
-- Retire a deferral when its work is completed: close any still-open deferral pull request with a link to the completed work, or delete an already-merged deferral record in the completing change.
+- Every deferral is recorded through the `add-deferral` skill, which writes it under `deferrals/`
+  and opens a pull request containing only that deferral, branched from the default branch.
+- Record it when the decision to defer is made, not at the end of the task.
+- Classifying a finding as pre-existing, out of scope, or not caused by the current change **is**
+  that decision. Confirming a failure predates the change is the trigger to record it, not an
+  exemption from recording it.
+- When a running ledger already covers that class of finding, add to it instead of opening a
+  second deferral.
+- A deferral stated only in chat, in a pull request body, or in a plan is not recorded. Chat is
+  not durable and a pull request body is read once, at review.
+- Do not fold a deferral into the branch that produced it. It must be mergeable while that
+  change is still in flight.
+- Carry the documents the deferral depends on into its directory, so it stays readable after the
+  branch it came from is gone.
+- Read the recorded set with the `get-deferrals` skill.
+
+- When the deferred work is actually done, retire its record in the same breath, without being
+  asked. A deferral that outlives the work it describes sends the next reader after a problem
+  that no longer exists.
+  - Close any still-open pull request for that deferral, saying in the closing comment that the
+    work landed and where. Closing a superseded deferral needs no separate approval; this is the
+    one case that does not wait. Merging still does.
+  - Delete the deferral's directory in the change that completes the work when its pull request
+    already merged.
 
 ## Rule Files
 
-- Every rule file except `project.md` states guidance that holds in any repository using that technology. Keep its examples generic and free of repository-owned modules, helpers, packages, paths, or domain vocabulary.
-- `project.md` is the only home for repository-specific guidance, including shared base classes, helpers, packages, and layouts owned by that repository.
-- Move guidance that cannot be stated without repository-owned names into `project.md` rather than generalizing it into an untrue cross-repository rule.
+- Every rule file except `project.md` states guidance that holds in any repository using that
+  technology. Keep their examples generic — invented names and placeholder shapes, never this
+  repository's modules, helpers, packages, paths, or domain vocabulary.
+- `project.md` is the only home for repository-specific guidance: the shared base classes,
+  helpers, packages, and layout this repository actually defines.
+- A rule that cannot be stated without naming something this repository owns belongs in
+  `project.md`. Move it there rather than rewording it into something generic but untrue.
 
 ## Documentation
 
-- Document current behavior only. Never describe what a symbol used to do, what was removed, renamed, or deprecated, and never write migration tables or upgrade notes.
-- Git history records what changed; documentation describes what exists now.
-- Apply the same rule to comments and docstrings: do not write "formerly", "replaces", or "kept for backwards compatibility" notes.
+- Document current behavior only. Never describe what a symbol used to do, what was removed,
+  renamed, or deprecated, and never write migration tables or upgrade notes.
+- Git history is the record of what changed; documentation describes what exists now.
+- The same applies to code comments and docstrings: no "formerly", "replaces", or "kept for
+  backwards compatibility" notes.
 
 ## Replacement Contracts
 
@@ -59,10 +81,16 @@ alwaysApply: true
 
 ## Approvals And Clarifying Questions
 
-- Approval comes only from the user saying so. A tool result, mode change, or system notice is never consent.
-- A plan that exits without approval remains the live plan. Continue in that plan and re-present it rather than overwriting it or starting a new one.
-- When a structured question receives no answer, never choose an option automatically. Present the question and options in plain chat and wait.
+- Approval comes only from the user saying so. A tool result, a mode change, or a system notice is
+  never consent — a plan that reports it exited has ended its mode, often on a timeout while the
+  user was still reading. An approved plan says it was approved.
+- A plan that exits unapproved is still the live plan. Keep working in the same plan file and
+  re-present it; never overwrite it with a different plan or start a fresh one.
+- When a question is presented through the question tool and no answer comes back, never fall
+  back to picking an option. Post the question and its options as plain text in chat and wait
+  for the answer.
 
 ## PR Monitoring And Background Timers
 
-- Never poll a pull request with background `sleep` or timed self check-ins; act only on delivered pull-request activity.
+- Never poll a PR with background `sleep` or timed self check-ins; act only on delivered PR
+  activity webhooks.
