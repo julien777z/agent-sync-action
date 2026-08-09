@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Change"
+  short_description: "Implement plans without silent deferrals"
+  default_prompt: "Use $plan-change to implement this plan with explicit approval, encountered-issue handling, durable deferrals, and ongoing simplification."
