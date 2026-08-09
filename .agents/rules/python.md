@@ -3,6 +3,8 @@ description: Follow modern Python typing, import, formatting, error handling, an
 globs:
 - '**/*.py'
 alwaysApply: false
+paths:
+- '**/*.py'
 ---
 
 # Python Rules

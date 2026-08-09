@@ -2,6 +2,8 @@
 globs:
 - '**/*.py'
 alwaysApply: false
+paths:
+- '**/*.py'
 ---
 
 # Pydantic Rules

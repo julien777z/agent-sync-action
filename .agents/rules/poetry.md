@@ -4,6 +4,10 @@ globs:
 - poetry.lock
 - '**/*.py'
 alwaysApply: false
+paths:
+- pyproject.toml
+- poetry.lock
+- '**/*.py'
 ---
 
 # Poetry Project Rules

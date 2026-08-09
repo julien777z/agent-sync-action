@@ -145,6 +145,8 @@ The canonical project rules live in `.agents/rules/`.
 
 <!-- Source: .agents/rules/poetry.md -->
 
+> Applies only to files matching: `pyproject.toml`, `poetry.lock`, `**/*.py`
+
 # Poetry Project Rules
 
 ## Project Configuration
@@ -199,6 +201,8 @@ build-backend = "poetry.core.masonry.api"
 - Never poll a PR with background `sleep` or timed self check-ins; act only on delivered PR activity webhooks.
 
 <!-- Source: .agents/rules/pydantic.md -->
+
+> Applies only to files matching: `**/*.py`
 
 # Pydantic Rules
 
@@ -312,6 +316,8 @@ class WidgetPosition(BaseModel):
 ```
 
 <!-- Source: .agents/rules/python.md -->
+
+> Applies only to files matching: `**/*.py`
 
 # Python Rules
 
@@ -859,6 +865,8 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - If style-cleanup instructions conflict with clear feature intent, preserve behavior first and ask a clarifying question instead of removing the feature code.
 
 <!-- Source: .agents/rules/testing.md -->
+
+> Applies only to files matching: `**/tests/**`, `**/test_*.py`, `**/conftest.py`
 
 # Testing Rules
 

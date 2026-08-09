@@ -4,6 +4,10 @@ globs:
 - '**/test_*.py'
 - '**/conftest.py'
 alwaysApply: false
+paths:
+- '**/tests/**'
+- '**/test_*.py'
+- '**/conftest.py'
 ---
 
 # Testing Rules
