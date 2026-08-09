@@ -67,20 +67,6 @@ jobs:
           refresh-external-skills: true
 ```
 
-### Scope A Rule To Matching Files
-
-A rule applies to every task by default. Give it file patterns and set
-`alwaysApply: false` to load it only while matching files are in play. Write the
-patterns once; the next sync keeps each provider's front matter consistent.
-
-```markdown
----
-description: Python conventions.
-globs: "**/*.py"
-alwaysApply: false
----
-```
-
 ## Layout
 
 ```text
@@ -147,6 +133,20 @@ For example, this installs the
 - `automatic_updates`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/skills.json`.
+
+## Rule Scope
+
+A rule applies to every task by default. Give it file patterns and set
+`alwaysApply: false` to load it only while matching files are in play. Write the
+patterns once; the next sync keeps each provider's front matter consistent.
+
+```markdown
+---
+description: Python conventions.
+globs: "**/*.py"
+alwaysApply: false
+---
+```
 
 ## Local Development
 
