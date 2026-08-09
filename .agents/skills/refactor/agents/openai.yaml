@@ -1,4 +1,0 @@
-interface:
-  display_name: "Large-Scale Refactor"
-  short_description: "Refactor entire repositories safely"
-  default_prompt: "Use $refactor to simplify and consolidate this repository while preserving behavior."

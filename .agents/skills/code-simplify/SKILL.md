@@ -15,9 +15,11 @@ This skill does not stop at review: **apply the simplifications you identify dir
 
 **Preserve observable behavior and the external contracts tests can't see — including on the default pre-push pass.** The pre-push pass runs automatically and cannot assume a full test run, so while simplifying do not change a contract that code or systems outside this diff depend on: public routes and their request/response shapes, durable identifiers (handler, event, queue, and state keys), persisted on-disk or on-the-wire formats (DB columns, migrations, serialized payloads), and cross-package shared DTOs or config keys. Do not introduce pass-through shims to fake an unchanged signature — adjust the real call sites instead. When a worthwhile simplification would alter one of these, leave a written note rather than applying it silently. The exception is a deliberate, test-verified caller (for example the **refactor** skill): when the suite proves behavior is preserved, internal structure and in-repo API shape may be restructured freely.
 
-## Diff scope for the pre-push pass
+## Scope
 
-When run as the pre-push pass (for example from the Stop hook), audit the **same scope as code-review's local / pre-push mode**: `git diff $(git merge-base <base> HEAD)` plus any untracked files the branch adds, where `<base>` is the repository's remote default branch (for example `origin/main` — use the actual default branch name; fall back to the local default branch if no remote is configured). This covers branch commits and uncommitted working-tree changes without unrelated upstream commits.
+**What a scope contains.** A scope is never the diff hunks alone. Resolving any scope — the pre-push merge-base diff or one a caller names — yields three things: the **diff** itself, the **full contents of every file it touches**, and the **sibling modules in those files' packages**. Hunks show what changed; the whole file shows what the change now sits inside; the siblings show where the logic should have lived. A code-judo move is usually only visible in the third, and the rubric below applies to everything the scope resolves to, not only to lines the diff added.
+
+When run as the pre-push pass (for example from the Stop hook), start from the **same diff as code-review's local / pre-push mode**: `git diff $(git merge-base <base> HEAD)` plus any untracked files the branch adds, where `<base>` is the repository's remote default branch (for example `origin/main` — use the actual default branch name; fall back to the local default branch if no remote is configured). This covers branch commits and uncommitted working-tree changes without unrelated upstream commits. Then resolve it into the three things above.
 
 When a caller provides a **broader scope** instead — for example the **refactor** skill (the whole repository) or a user who names specific directories or files — apply this rubric across **that** scope, not the pre-push diff. The merge-base diff above is only the default for the Stop-hook pre-push pass; always honor an explicit scope from the caller, while preserving external contracts (routes, response shapes, durable identifiers, persisted formats) and reporting anything that would spill outside the scope you were given.
 
@@ -42,10 +44,10 @@ Apply the baseline prompt above, plus these explicit review rules:
    - Assume there is often a "code judo" move available: a re-organization that uses the existing architecture more effectively and makes the change dramatically simpler and more elegant.
    - If you see a path to delete complexity rather than rearrange it, push hard for that path.
 
-1. **Do not let a PR push a file from under 1k lines to over 1k lines without a very strong reason.**
-   - Treat this as a strong code-quality smell by default.
+1. **Decompose any file in scope that is over 1000 lines.**
+   - Treat this as a strong code-quality smell by default, whether or not the current change is what pushed the file over. A file already over the line when you arrive is still over it when you leave unless you act.
    - Prefer extracting helpers, subcomponents, modules, or local abstractions instead of letting a file sprawl past 1000 lines.
-   - If the diff crosses that threshold, explicitly ask whether the code should be decomposed first.
+   - Relocate the extracted pieces to the module or package that already owns the concept, rather than leaving a thin file beside the original purely to reduce a line count.
    - Only waive this if there is a compelling structural reason and the resulting file is still clearly organized.
 
 2. **Do not allow random spaghetti growth in existing code.**
@@ -98,7 +100,7 @@ For every meaningful change, ask:
 - Did the diff add branching complexity where a better abstraction should exist?
 - Did a previously cohesive module become more coupled, more stateful, or harder to scan?
 - Is this logic living in the right file and layer?
-- Did this change enlarge a file or component past a healthy size boundary?
+- Is any file or component in scope past a healthy size boundary?
 - Are there repeated conditionals that signal a missing model or missing helper?
 - Is the implementation direct and legible, or does it rely on special cases and incidental control flow?
 - Is this abstraction actually earning its keep, or is it just a wrapper?
@@ -112,7 +114,7 @@ Escalate findings when you see:
 
 - A complicated implementation where a cleaner reframing could delete whole categories of complexity.
 - Refactors that move code around but fail to reduce the number of concepts a reader must hold in their head.
-- A file crossing 1000 lines due to the PR, especially if the new code could be split out.
+- A file over 1000 lines anywhere in scope, whatever put it there.
 - New conditionals bolted onto unrelated code paths.
 - One-off booleans, nullable modes, or flags that complicate existing control flow.
 - Feature-specific logic leaking into general-purpose modules.
@@ -161,7 +163,7 @@ If the implementation missed an opportunity for a dramatic simplification, say t
 
 Good phrases:
 
-- `this pushes the file past 1k lines. can we decompose this first?`
+- `this file is past 1k lines. let's decompose it and move the pieces to the module that owns them.`
 - `this adds another special-case branch into an already busy flow. can we move this behind its own abstraction?`
 - `this works, but it makes the surrounding code more spaghetti. let's keep the behavior and restructure the implementation.`
 - `this feels like feature logic leaking into a shared path. can we isolate it?`
@@ -203,7 +205,7 @@ The bar for approval is:
 Treat these as presumptive blockers unless the author can justify them clearly:
 
 - the PR preserves a lot of incidental complexity when there is a plausible code-judo move that would delete it
-- the PR pushes a file from below 1000 lines to above 1000 lines
+- a file in scope is over 1000 lines and was not decomposed
 - the PR adds ad-hoc branching that makes an existing flow more tangled
 - the PR solves a local problem by scattering feature checks across shared code
 - the PR adds an unnecessary abstraction, wrapper, or cast-heavy contract that makes the design more indirect

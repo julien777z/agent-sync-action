@@ -1,4 +1,0 @@
-interface:
-  display_name: "Security Audit"
-  short_description: "Find exploitable security vulnerabilities"
-  default_prompt: "Use $security-audit to investigate this codebase for exploitable vulnerabilities with concrete impact."

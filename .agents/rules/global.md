@@ -5,6 +5,12 @@ alwaysApply: true
 
 # Global Rules
 
+## Repository Skills
+
+- Never add `agents/openai.yaml` to a repository skill. Repository skills contain `SKILL.md` and
+  only the scripts, references, or assets required by the skill itself; provider UI metadata stays
+  outside repositories and is never propagated.
+
 ## Agent Prompts
 
 - In repositories that provide an agent CLI or otherwise interact with agents, store every agent prompt in a dedicated Markdown file rather than inline in application code so it is easy to find, review, and maintain. Application code may load a prompt file and interpolate runtime values into it.
