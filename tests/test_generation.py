@@ -218,6 +218,50 @@ class TestDocumentGeneration:
         assert not generate_rule_links(context, Provider.CLAUDE)
         assert not generate_rule_links(context, Provider.CURSOR)
 
+    @pytest.mark.parametrize("authored_key", ["globs", "paths"])
+    def test_rules_mirror_one_authored_scope_across_provider_keys(
+        self,
+        workspace: Workspace,
+        authored_key: str,
+    ) -> None:
+        """Test that a scope authored under either key is emitted under both."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(f'---\n{authored_key}: "**/*.py"\n---\n\n# Rule\n')
+
+        context = load_context(workspace)
+        outputs = generate_shared_rule_outputs(context)
+        normalized = next(
+            output
+            for output in outputs
+            if isinstance(output, GeneratedFile) and output.target_path == source
+        )
+
+        assert "globs: '**/*.py'\n" in normalized.content
+        assert "paths: '**/*.py'\n" in normalized.content
+
+    def test_rules_scope_annotation_reads_a_paths_only_rule(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a Claude-style paths scope annotates the root instructions."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            '---\npaths: ["**/*.py", "**/*.pyi"]\nalwaysApply: false\n---\n\n# Rule\n'
+        )
+
+        context = load_context(workspace)
+        instructions = next(
+            output
+            for output in generate_shared_rule_outputs(context)
+            if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
+        )
+
+        assert "> Applies only to files matching: `**/*.py`, `**/*.pyi`" in instructions.content
+
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""
 

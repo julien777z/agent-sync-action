@@ -8,6 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to each supported provider.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
+- Scopes a rule to matching files from one declaration, kept consistent across every provider's front matter.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
@@ -132,6 +133,20 @@ For example, this installs the
 - `automatic_updates`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/skills.json`.
+
+## Rule Scope
+
+A rule applies to every task by default. Give it file patterns and set
+`alwaysApply: false` to load it only while matching files are in play. Changes
+are propagated to each provider in their accepted format.
+
+```markdown
+---
+description: Python conventions.
+globs: "**/*.py"
+alwaysApply: false
+---
+```
 
 ## Local Development
 
