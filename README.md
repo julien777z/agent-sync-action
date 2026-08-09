@@ -137,8 +137,8 @@ For example, this installs the
 ## Rule Scope
 
 A rule applies to every task by default. Give it file patterns and set
-`alwaysApply: false` to load it only while matching files are in play. Write the
-patterns once; the next sync keeps each provider's front matter consistent.
+`alwaysApply: false` to load it only while matching files are in play. Changes
+are propagated to each provider in their accepted format.
 
 ```markdown
 ---
