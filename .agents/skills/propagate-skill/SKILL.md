@@ -32,12 +32,15 @@ list, then stop. Do not discover repositories or mutate files for a listing-only
    Before treating an included skill directory as repository-owned canonical content, search
    [skills.sh](https://skills.sh/) for the same skill name and compare the complete semantics and
    supporting files. When the local skill is the same or substantially the same as a published
-   skill, use the skills.sh source repository and upstream slug in `.agents/skills.json`, enable
-   automatic updates, and remove the manually maintained local definition. The published skill
-   wins wholesale: do not retain local additions, wording changes, or supporting files as a fork.
-   Ask the user before choosing between plausible upstream identities or classifying a similar
-   local skill as meaningfully distinct. Let Agent Sync vendor the registered upstream artifact;
-   do not copy the deleted local definition between repositories.
+   skill, use the skills.sh source repository and upstream slug in `.agents/skills.json` and
+   remove the manually maintained local definition. Set `update_on_sync` to `true` for sources
+   owned by companies or organizations and to `false` for sources owned by personal accounts.
+   Keep `petergyang/no-ai-slop` enabled as the explicit personal-account exception. Verify source
+   ownership and ask the user when it is ambiguous. The published skill wins wholesale: do not
+   retain local additions, wording changes, or supporting files as a fork. Ask the user before
+   choosing between plausible upstream identities or classifying a similar local skill as
+   meaningfully distinct. Let Agent Sync vendor the registered upstream artifact; do not copy the
+   deleted local definition between repositories.
 
    Include every broadly useful repository-neutral skill in the propagation set even when the user did not name it, and always include `code-simplify`. For every included skill, read its declared `## Dependencies` section, add each dependency, and repeat recursively until the graph is complete. Deduplicate dependencies and report cycles. Inventory the canonical `.agents/rules/*.md` files as candidate companion artifacts; every non-project rule that applies to a target's stack, tooling, or workflow belongs in that target even when the user named only skills. Never copy `project.md` between repositories.
 2. Determine whether the workspace is on the user's local computer or in a cloud or ephemeral environment. Use filesystem layout, repository remotes, environment markers, and accessible sibling repositories as evidence. If the environment is cloud or remains ambiguous, do not search broadly or mutate other repositories; report the limitation or ask the user.

@@ -11,7 +11,7 @@
       "name": "async-python-patterns",
       "repo": "wshobson/agents",
       "skill": "async-python-patterns",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "no-ai-slop",
@@ -23,67 +23,67 @@
       "name": "python-anti-patterns",
       "repo": "wshobson/agents",
       "skill": "python-anti-patterns",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-background-jobs",
       "repo": "wshobson/agents",
       "skill": "python-background-jobs",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-configuration",
       "repo": "wshobson/agents",
       "skill": "python-configuration",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-design-patterns",
       "repo": "wshobson/agents",
       "skill": "python-design-patterns",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-error-handling",
       "repo": "wshobson/agents",
       "skill": "python-error-handling",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-performance-optimization",
       "repo": "wshobson/agents",
       "skill": "python-performance-optimization",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-project-structure",
       "repo": "wshobson/agents",
       "skill": "python-project-structure",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-resilience",
       "repo": "wshobson/agents",
       "skill": "python-resilience",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-resource-management",
       "repo": "wshobson/agents",
       "skill": "python-resource-management",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-testing-patterns",
       "repo": "wshobson/agents",
       "skill": "python-testing-patterns",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "python-type-safety",
       "repo": "wshobson/agents",
       "skill": "python-type-safety",
-      "update_on_sync": true
+      "update_on_sync": false
     },
     {
       "name": "security-audit",
