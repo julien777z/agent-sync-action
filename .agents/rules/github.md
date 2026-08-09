@@ -17,6 +17,8 @@ alwaysApply: true
 ## Branches and Pull Requests
 
 - Keep pull requests focused and give them descriptive titles and descriptions; request appropriate reviewers when the repository workflow requires them.
+- A pull request description covers the changes in that pull request and nothing else. Leave out alternatives considered and rejected, work deferred to a later change, and the reasoning behind not doing something.
+- Repositories are independent. A pull request in one repository does not describe, reference, or explain changes made in another.
 - When additional work arrives on a non-default branch, retain that branch and add the work to its pull request even when the task could be reviewed independently.
 - Query the current branch's pull request before creating one. Reuse it while it is open, or create one from the current branch when none exists.
 - Create a separate branch only when the user asks or the current branch's pull request is already merged; start post-merge work from the default branch.
