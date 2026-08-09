@@ -69,9 +69,9 @@ jobs:
 
 ### Scope A Rule To Matching Files
 
-Providers link the same canonical rule file but expect different metadata, so
-declare the scope once and the next sync keeps every provider's front matter
-consistent.
+A rule applies to every task by default. Give it file patterns and set
+`alwaysApply: false` to load it only while matching files are in play. Write the
+patterns once; the next sync keeps each provider's front matter consistent.
 
 ```markdown
 ---
