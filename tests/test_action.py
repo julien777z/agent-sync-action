@@ -38,7 +38,7 @@ class TestAction:
             "agents-dir": {
                 "description": (
                     "Source-of-truth directory name; the registry is read from "
-                    "<agents-dir>/skills.json."
+                    "<agents-dir>/external_skills.json."
                 ),
                 "default": ".agents",
             },

@@ -456,7 +456,7 @@ class TestExternalSkillService:
         """Test that changed external skills are reported by a dry run."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
+            workspace.agents_dir / "external_skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
         )
 
@@ -486,7 +486,7 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
+            workspace.agents_dir / "external_skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(update_on_sync=False)]),
         )
 

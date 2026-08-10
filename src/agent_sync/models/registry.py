@@ -49,7 +49,7 @@ class ExternalSkill(BaseModel):
 
 
 class SkillsRegistry(BaseModel):
-    """The .agents/skills.json external-skill registry."""
+    """The .agents/external_skills.json external-skill registry."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
