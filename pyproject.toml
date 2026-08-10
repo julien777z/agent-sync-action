@@ -32,7 +32,7 @@ asyncio_mode = "auto"
 
 [tool.black]
 line-length = 110
-target-version = ["py312"]
+target-version = ["py312", "py313", "py314"]
 
 [tool.pyright]
 include = ["src", "tests"]
