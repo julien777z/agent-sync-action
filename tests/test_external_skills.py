@@ -448,6 +448,16 @@ class TestExternalSkillService:
 
         assert sync.sync_external_skills(workspace, dry_run=True) is False
 
+    def test_prior_registry_filename_is_ignored(self, workspace: Workspace) -> None:
+        """Test that only the external-skill registry contract enables vendoring."""
+
+        materialize_registry(
+            workspace.agents_dir / "skills.json",
+            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
+        )
+
+        assert sync.sync_external_skills(workspace, dry_run=True) is False
+
     def test_dry_run_reports_changes(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -456,7 +466,7 @@ class TestExternalSkillService:
         """Test that changed external skills are reported by a dry run."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
+            workspace.agents_dir / "external_skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
         )
 
@@ -486,7 +496,7 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
+            workspace.agents_dir / "external_skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(update_on_sync=False)]),
         )
 

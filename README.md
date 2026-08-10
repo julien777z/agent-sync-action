@@ -77,7 +77,7 @@ jobs:
 ├── rules/
 ├── settings/
 ├── skills/
-└── skills.json
+└── external_skills.json
 ```
 
 | Path | Purpose |
@@ -88,7 +88,7 @@ jobs:
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories linked into provider layouts. |
-| `skills.json` | Registry of external skills that Agent Sync can update. |
+| `external_skills.json` | Registry of external skills that Agent Sync can update. |
 
 Only the directories and files your repository uses are required.
 
@@ -106,7 +106,7 @@ Only the directories and files your repository uses are required.
 ## External skills
 
 To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
-`.agents/skills.json`. Use its source repository and upstream slug, choose the local skill
+`.agents/external_skills.json`. Use its source repository and upstream slug, choose the local skill
 directory name you want, and set `update_on_sync` to keep it current.
 
 For example, this installs the
@@ -132,7 +132,7 @@ For example, this installs the
 - `skill`: upstream slug when it differs from `name`.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
-  after a push changes `.agents/skills.json`.
+  after a push changes `.agents/external_skills.json`.
 
 Vendored skills include a `metadata.source` URL in their `SKILL.md` frontmatter and retain
 repository-root license, copying, and notice files from the same immutable source revision.
