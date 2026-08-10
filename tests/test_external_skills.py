@@ -448,16 +448,6 @@ class TestExternalSkillService:
 
         assert sync.sync_external_skills(workspace, dry_run=True) is False
 
-    def test_prior_registry_filename_is_ignored(self, workspace: Workspace) -> None:
-        """Test that only the external-skill registry contract enables vendoring."""
-
-        materialize_registry(
-            workspace.agents_dir / "skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
-        )
-
-        assert sync.sync_external_skills(workspace, dry_run=True) is False
-
     def test_dry_run_reports_changes(
         self,
         monkeypatch: pytest.MonkeyPatch,

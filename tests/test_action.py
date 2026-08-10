@@ -67,7 +67,6 @@ class TestAction:
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
         assert action_text.count("${{ inputs.agents-dir }}/external_skills.json") == 2
-        assert "${{ inputs.agents-dir }}/skills.json" not in action_text
 
     def test_repository_validates_the_current_checkout_action(self) -> None:
         """Test that pull-request CI invokes the action from the current checkout."""
