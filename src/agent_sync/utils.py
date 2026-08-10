@@ -23,8 +23,7 @@ def serialized_field_names(model: type[BaseModel]) -> tuple[str, ...]:
     """Return a model's serialized keys, declared fields first then computed ones."""
 
     return tuple(
-        field.serialization_alias or field.alias or name
-        for name, field in model.model_fields.items()
+        field.serialization_alias or field.alias or name for name, field in model.model_fields.items()
     ) + tuple(model.model_computed_fields)
 
 

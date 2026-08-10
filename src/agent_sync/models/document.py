@@ -50,9 +50,7 @@ class RuleFrontMatter(BaseModel):
     model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
 
     description: str | None = None
-    globs: str | list[str] | None = Field(
-        default=None, validation_alias=AliasChoices("globs", "paths")
-    )
+    globs: str | list[str] | None = Field(default=None, validation_alias=AliasChoices("globs", "paths"))
     always_apply: bool = Field(default=True, alias="alwaysApply")
     starlark: str | None = None
 

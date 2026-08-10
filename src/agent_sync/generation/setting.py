@@ -63,9 +63,7 @@ def generate_codex_settings(
     return [
         GeneratedFile(
             target_path=source_path,
-            content=ensure_trailing_newline(
-                synchronized.model_dump_json(indent=2, exclude_none=True)
-            ),
+            content=ensure_trailing_newline(synchronized.model_dump_json(indent=2, exclude_none=True)),
             artifact=ArtifactKind.SETTING,
             source_path=source_path,
             provider=provider,

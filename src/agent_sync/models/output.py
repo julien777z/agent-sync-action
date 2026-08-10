@@ -70,9 +70,7 @@ class Manifest(BaseModel):
         """Reject manifests containing more than one owner for a target path."""
 
         target_counts = Counter(output.target_path for output in self.outputs)
-        duplicates = sorted(
-            (target for target, count in target_counts.items() if count > 1), key=str
-        )
+        duplicates = sorted((target for target, count in target_counts.items() if count > 1), key=str)
 
         if duplicates:
             raise ValueError(f"Duplicate generated targets: {duplicates}")

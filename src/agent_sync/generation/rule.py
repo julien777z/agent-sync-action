@@ -24,9 +24,7 @@ DISCARDED_RULE_KEYS: Final[frozenset[str]] = frozenset({"name"})
 def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
     """Render a rule with deterministic source front matter."""
 
-    values = FrontMatterValues.model_validate(
-        front_matter.model_dump(by_alias=True, exclude_none=True)
-    ).root
+    values = FrontMatterValues.model_validate(front_matter.model_dump(by_alias=True, exclude_none=True)).root
 
     declared_keys = serialized_field_names(RuleFrontMatter)
     normalized = {
@@ -134,15 +132,11 @@ def render_instruction_section(
     patterns = front_matter.scope_patterns
 
     if patterns:
-        scope = "> Applies only to files matching: " + ", ".join(
-            f"`{pattern}`" for pattern in patterns
-        )
+        scope = "> Applies only to files matching: " + ", ".join(f"`{pattern}`" for pattern in patterns)
     elif not front_matter.always_apply:
         scope = "> Apply this rule only when it is explicitly relevant to the current task."
 
-    return "\n\n".join(
-        part for part in (f"<!-- Source: .agents/rules/{path.name} -->", scope, body) if part
-    )
+    return "\n\n".join(part for part in (f"<!-- Source: .agents/rules/{path.name} -->", scope, body) if part)
 
 
 def render_instructions(sections: list[str]) -> str:

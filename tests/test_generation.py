@@ -39,8 +39,7 @@ class TestArtifactRegistry:
         """Test that the registry contains the stable provider support matrix."""
 
         assert {
-            artifact: set(registration["handlers"])
-            for artifact, registration in ARTIFACT_REGISTRY.items()
+            artifact: set(registration["handlers"]) for artifact, registration in ARTIFACT_REGISTRY.items()
         } == {
             ArtifactKind.SKILL: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
             ArtifactKind.AGENT: {Provider.CLAUDE, Provider.CURSOR},
@@ -65,9 +64,7 @@ class TestSkillGeneration:
         context = load_context(workspace)
         outputs = [output for provider in Provider for output in generate_skills(context, provider)]
         links = {
-            output.target_path: output.link_target
-            for output in outputs
-            if isinstance(output, GeneratedLink)
+            output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
         }
 
         assert links == {
@@ -130,20 +127,14 @@ class TestDocumentGeneration:
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "claude.json").write_text('{"model":"default"}')
         workspace.models_dir.mkdir()
-        (workspace.models_dir / "review.json").write_text(
-            '{"claude":"override","cursor":"cursor-model"}'
-        )
+        (workspace.models_dir / "review.json").write_text('{"claude":"override","cursor":"cursor-model"}')
 
         context = load_context(workspace)
         outputs = [
             *generate_agents(context, Provider.CLAUDE),
             *generate_agents(context, Provider.CURSOR),
         ]
-        files = {
-            output.provider: output.content
-            for output in outputs
-            if isinstance(output, GeneratedFile)
-        }
+        files = {output.provider: output.content for output in outputs if isinstance(output, GeneratedFile)}
 
         assert "model: override" in files[Provider.CLAUDE]
         assert "model: cursor-model" in files[Provider.CURSOR]
@@ -170,16 +161,12 @@ class TestDocumentGeneration:
             *generate_rule_links(context, Provider.CURSOR),
         ]
         source_output = next(
-            output
-            for output in outputs
-            if isinstance(output, GeneratedFile) and output.target_path == source
+            output for output in outputs if isinstance(output, GeneratedFile) and output.target_path == source
         )
 
         links = [output for output in outputs if isinstance(output, GeneratedLink)]
 
-        assert source_output.content.startswith(
-            "---\ndescription: A rule.\nalwaysApply: true\n---\n"
-        )
+        assert source_output.content.startswith("---\ndescription: A rule.\nalwaysApply: true\n---\n")
         assert "name:" not in source_output.content
         assert {link.link_target for link in links} == {source}
         assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
@@ -193,9 +180,7 @@ class TestDocumentGeneration:
         rules_dir = workspace.agents_dir / "rules"
         rules_dir.mkdir()
         source = rules_dir / "git.md"
-        source.write_text(
-            '---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n"
-        )
+        source.write_text('---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n")
 
         context = load_context(workspace)
         outputs = generate_codex_rules(context, Provider.CODEX)
@@ -233,9 +218,7 @@ class TestDocumentGeneration:
         context = load_context(workspace)
         outputs = generate_shared_rule_outputs(context)
         normalized = next(
-            output
-            for output in outputs
-            if isinstance(output, GeneratedFile) and output.target_path == source
+            output for output in outputs if isinstance(output, GeneratedFile) and output.target_path == source
         )
 
         assert "globs: '**/*.py'\n" in normalized.content
@@ -249,9 +232,7 @@ class TestDocumentGeneration:
 
         source = workspace.agents_dir / "rules/python.md"
         source.parent.mkdir(parents=True)
-        source.write_text(
-            '---\npaths: ["**/*.py", "**/*.pyi"]\nalwaysApply: false\n---\n\n# Rule\n'
-        )
+        source.write_text('---\npaths: ["**/*.py", "**/*.pyi"]\nalwaysApply: false\n---\n\n# Rule\n')
 
         context = load_context(workspace)
         instructions = next(
@@ -379,10 +360,6 @@ class TestMirrorIntegration:
 
         assert mirror_providers(workspace, dry_run=False) is False
 
-        assert os.readlink(workspace.root / ".claude/rules/python.md") == (
-            "../../.agents/rules/python.md"
-        )
-        assert os.readlink(workspace.root / ".codex/skills/review") == (
-            "../../.agents/skills/review"
-        )
+        assert os.readlink(workspace.root / ".claude/rules/python.md") == ("../../.agents/rules/python.md")
+        assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
         assert mirror_providers(workspace, dry_run=True) is False

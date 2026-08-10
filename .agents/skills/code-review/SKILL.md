@@ -177,6 +177,8 @@ Drop these outright:
 
 For rule findings, confirm the rule specifically applies to that file. An absolute rule is independently actionable and surrounding conventions cannot override it. For non-absolute guidance, confirm that repository conventions support treating it as required.
 
+**Breaking a contract is not a refutation.** A finding correct on the merits stays confirmed when the fix would change a wire message, a proto field, a persisted column, an API request or response model, a generated client, or any other published shape. Judge it on whether the change leaves the code better, never on how much moves with it: a schema change travels with a migration, and a contract change travels with its consumers, and both are ordinary work rather than a reason to keep a defect. This holds by default because most codebases are pre-production or have few enough consumers that one net-positive change beats a preserved contract. Refute such a finding only when it is wrong on its own terms, or when the contract demonstrably has independent consumers that cannot be updated alongside it — and then name those consumers rather than assuming they exist.
+
 Every retained finding must be actionable, anchored to a changed line, and state when it fails.
 
 ## Step 5 — Rate and rank
@@ -225,7 +227,9 @@ Only in fix mode. Every reported finding is CONFIRMED, because step 4 refutes ev
 
 **Every CONFIRMED finding gets fixed.** Surviving validation is what makes a finding legitimate, and a legitimate finding left unfixed in fix mode is the review failing at the only thing fix mode is for. "Out of scope", "pre-existing root cause", "larger than this diff", and "the obvious fix conflicts with another rule" are descriptions of the work, not permission to skip it. Report a finding as unfixed only after the escalation in step 4 below, and never as a first response to difficulty.
 
-When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Before fixing a finding whose correction would introduce, preserve, or migrate backward-compatible runtime or data behavior, stop and ask the user for approval. This applies only to compatibility fallbacks, legacy-shape support, migrations, or preservation paths for already-deployed behavior or persisted data; it does not apply to code organization, file moves, module paths, or internal package exports.
+When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Approval is needed to **keep** compatibility, not to break it: stop and ask before a fix that would introduce or preserve a backward-compatible path, a legacy shape, or a dual-write for already-deployed behavior.
+
+Changing the contract outright needs no such approval. Rewrite the proto, the response model, or the column, update every consumer in the same change, and write the migration when it touches the database — that is the fix, not a reason to escalate. None of this applies to code organization, file moves, module paths, or internal package exports, which were never gated.
 
 Work findings in severity order:
 

@@ -129,8 +129,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
             stale.update(
                 path
                 for filename in filenames
-                if ((path := root / filename).exists() or path.is_symlink())
-                and path not in expected
+                if ((path := root / filename).exists() or path.is_symlink()) and path not in expected
             )
 
     return sorted(stale, key=str)
