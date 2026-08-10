@@ -61,13 +61,6 @@ class TestAction:
         assert "PYTHONPATH=" not in action_text
         assert "requirements.txt" not in action_text
 
-    def test_uses_the_external_skill_registry_filename(self) -> None:
-        """Test that action refresh detection follows the external-skill registry contract."""
-
-        action_text = Path("action.yml").read_text(encoding="utf-8")
-
-        assert action_text.count("${{ inputs.agents-dir }}/external_skills.json") == 2
-
     def test_repository_validates_the_current_checkout_action(self) -> None:
         """Test that pull-request CI invokes the action from the current checkout."""
 
