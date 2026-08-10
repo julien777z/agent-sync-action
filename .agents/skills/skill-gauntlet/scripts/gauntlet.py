@@ -48,7 +48,9 @@ def tree_manifest(root: Path, ignored_paths: frozenset[str] = frozenset()) -> li
         if relative_path in ignored_paths:
             continue
         if path.is_symlink():
-            entries.append({"path": relative_path, "type": "symlink", "target": path.readlink().as_posix()})
+            entries.append(
+                {"path": relative_path, "type": "symlink", "target": path.readlink().as_posix()}
+            )
         elif path.is_file():
             entries.append(
                 {
@@ -205,7 +207,11 @@ def snapshot_skill(arguments: argparse.Namespace) -> None:
     entries = tree_manifest(resolved_path)
     content_hash = manifest_digest(entries)
     duplicate_record = next(
-        (item for item in inventory if isinstance(item, dict) and item.get("content_hash") == content_hash),
+        (
+            item
+            for item in inventory
+            if isinstance(item, dict) and item.get("content_hash") == content_hash
+        ),
         None,
     )
     if duplicate_record:
@@ -302,7 +308,9 @@ def verify_run(arguments: argparse.Namespace) -> None:
         if content_hash != item.get("content_hash"):
             raise ValueError(f"Snapshot digest mismatch: {snapshot_path}")
         for path in (snapshot_path, *snapshot_path.rglob("*")):
-            if not path.is_symlink() and path.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
+            if not path.is_symlink() and path.stat().st_mode & (
+                stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+            ):
                 raise ValueError(f"Writable snapshot path: {path}")
         verified_snapshots.add(snapshot_path)
 
@@ -383,7 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot_parser.add_argument("--origin", required=True)
     snapshot_parser.add_argument("--path", required=True)
     snapshot_parser.add_argument("--precedence", type=int)
-    snapshot_parser.add_argument("--activation", choices=("active", "inactive", "unknown"), default="unknown")
+    snapshot_parser.add_argument(
+        "--activation", choices=("active", "inactive", "unknown"), default="unknown"
+    )
     snapshot_parser.add_argument(
         "--editability", choices=("editable", "read-only", "unknown"), default="unknown"
     )
