@@ -87,6 +87,17 @@ def render_codex_settings(settings: CodexSettings) -> str:
         lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
 
     lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
+
+    if settings.features:
+        lines.extend(
+            (
+                "",
+                "[features]",
+                "default_mode_request_user_input = "
+                f"{json.dumps(settings.features.default_mode_request_user_input)}",
+            )
+        )
+
     rendered = ensure_trailing_newline("\n".join(lines))
 
     try:
