@@ -15,7 +15,7 @@ class ExternalSkill(BaseModel):
     name: str
     repo: str
     skill: str | None = None
-    automatic_updates: bool
+    update_on_sync: bool
 
     @field_validator("name")
     @classmethod
@@ -45,7 +45,7 @@ class ExternalSkill(BaseModel):
 
 
 class SkillsRegistry(BaseModel):
-    """The .agents/skills.json external-skill registry."""
+    """The .agents/external_skills.json external-skill registry."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 

@@ -13,13 +13,13 @@ from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
 
-REGISTRY_FILENAME: Final[str] = "skills.json"
+EXTERNAL_SKILLS_FILENAME: Final[str] = "external_skills.json"
 
 
 def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
     """Update external skills and report whether a dry run found changes."""
 
-    registry_path = workspace.agents_dir / REGISTRY_FILENAME
+    registry_path = workspace.agents_dir / EXTERNAL_SKILLS_FILENAME
     registry = load_json_model(registry_path, SkillsRegistry)
 
     if registry is None:
@@ -27,10 +27,10 @@ def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
 
         return False
 
-    updatable_skills = [skill for skill in registry.skills if skill.automatic_updates]
+    updatable_skills = [skill for skill in registry.skills if skill.update_on_sync]
 
     if not updatable_skills:
-        logger.info("No external skills have automatic updates enabled; nothing to update.")
+        logger.info("No external skills are enabled for sync; nothing to update.")
 
         return False
 

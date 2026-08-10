@@ -25,7 +25,7 @@ class TestExternalSkillModel:
         skill = ExternalSkill(
             name="sample-skill",
             repo="example/sample-skill",
-            automatic_updates=True,
+            update_on_sync=True,
         )
 
         assert skill.upstream_skill == "sample-skill"
@@ -35,7 +35,7 @@ class TestExternalSkillModel:
         """Test that unsafe external skill names are rejected."""
 
         with pytest.raises(ValidationError):
-            ExternalSkill(name=name, repo="example/sample", automatic_updates=True)
+            ExternalSkill(name=name, repo="example/sample", update_on_sync=True)
 
     @pytest.mark.parametrize("skill", ["Bad Name", "UPPER", "../escape"])
     def test_invalid_upstream_skill_names_fail(self, skill: str) -> None:
@@ -46,13 +46,13 @@ class TestExternalSkillModel:
                 name="sample",
                 repo="example/sample",
                 skill=skill,
-                automatic_updates=True,
+                update_on_sync=True,
             )
 
-    def test_automatic_updates_is_required(self) -> None:
+    def test_update_on_sync_is_required(self) -> None:
         """Test that every registry entry chooses its update behavior explicitly."""
 
-        with pytest.raises(ValidationError, match="automatic_updates"):
+        with pytest.raises(ValidationError, match="update_on_sync"):
             ExternalSkill.model_validate({"name": "sample", "repo": "example/sample"})
 
     def test_duplicate_local_skill_names_fail(self) -> None:
@@ -64,12 +64,12 @@ class TestExternalSkillModel:
                     ExternalSkill(
                         name="sample",
                         repo="example/first",
-                        automatic_updates=True,
+                        update_on_sync=True,
                     ),
                     ExternalSkill(
                         name="sample",
                         repo="example/second",
-                        automatic_updates=True,
+                        update_on_sync=True,
                     ),
                 ]
             )
@@ -163,7 +163,7 @@ class TestExternalSkillBoundaries:
         skill = ExternalSkill(
             name="sample",
             repo="example/repository",
-            automatic_updates=True,
+            update_on_sync=True,
         )
 
         installer.install_skill(skill, tmp_path, source_root)
@@ -214,7 +214,7 @@ class TestExternalSkillBoundaries:
         skill = ExternalSkill(
             name="sample",
             repo="example/repository",
-            automatic_updates=True,
+            update_on_sync=True,
         )
 
         def fake_resolve(repository: str) -> str:
@@ -295,7 +295,7 @@ class TestExternalSkillBoundaries:
             name="react-best-practices",
             repo="vercel-labs/agent-skills",
             skill="vercel-react-best-practices",
-            automatic_updates=True,
+            update_on_sync=True,
         )
 
         sync.normalize_skill_metadata(installed, skill)
@@ -322,7 +322,7 @@ class TestExternalSkillBoundaries:
             name="local-skill",
             repo="example/repository",
             skill="upstream-skill",
-            automatic_updates=True,
+            update_on_sync=True,
         )
 
         def fake_resolve(repository: str) -> str:
@@ -445,7 +445,7 @@ class TestExternalSkillService:
         """Test that changed external skills are reported by a dry run."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
+            workspace.agents_dir / "external_skills.json",
             SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
         )
 
@@ -467,7 +467,7 @@ class TestExternalSkillService:
 
         assert sync.sync_external_skills(workspace, dry_run=True) is True
 
-    def test_disabled_automatic_updates_skip_vendoring(
+    def test_disabled_update_on_sync_skips_vendoring(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
@@ -475,8 +475,8 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace.agents_dir / "skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(automatic_updates=False)]),
+            workspace.agents_dir / "external_skills.json",
+            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(update_on_sync=False)]),
         )
 
         local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
