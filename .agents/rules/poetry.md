@@ -19,7 +19,9 @@ paths:
 - Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
 - Under static `[project.dependencies]`, `[tool.poetry.dependencies]` only supplies alternate sources. A package listed there but absent from `[project.dependencies]` is not installed. Declare the package name in `[project.dependencies]` and use `[tool.poetry.dependencies]` only for its path, Git, or URL source.
 - Never repair a Poetry environment by installing packages directly with `pip`. Fix the manifest, regenerate the lock file, and run `poetry install` so the environment and lock remain consistent.
-- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python targets inferred from the full `[project.requires-python]` range.
+- Configure strict Pyright, pytest with automatic asyncio support, and Black with Python targets inferred from the full `[project.requires-python]` range.
+- Keep that range's upper bound at the version the project actually runs. Black formats for the newest release the range admits, then verifies the result by parsing it with the running interpreter, so a bound reaching past that interpreter makes every run emit a parse warning for a grammar it cannot read.
+- Set one line length and give every tool that wraps or measures lines the same value, so the formatter and the linters cannot disagree about what is too long.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
 ```toml
@@ -28,7 +30,7 @@ requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 ```
 
-- Use `poetry install`, `poetry run black .`, `poetry run pyright`, and `poetry run pytest` for the standard local workflow.
+- Use `poetry install`, `poetry run black .`, and `poetry run pyright` for the standard local workflow. Run the suite through the repository's own test-runner entry point when it defines one, since a bare `pytest` invocation reaches only the tiers its default collection happens to find.
 
 ## Application Structure
 
@@ -42,7 +44,7 @@ build-backend = "poetry.core.masonry.api"
 
 ## Testing
 
-- Use pytest and pytest-asyncio with small, readable tests, and mark async tests with `@pytest.mark.asyncio`.
+- Use pytest and pytest-asyncio with small, readable tests. Under the automatic asyncio mode this configuration requires, a bare `async def test_...` already runs; do not add `@pytest.mark.asyncio` on top of it.
 - Prefer dependency injection or fakes over deep patching.
 
 ## Guardrails

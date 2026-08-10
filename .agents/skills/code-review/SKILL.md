@@ -31,10 +31,10 @@ So a bare `/code-review` asks both, `/code-review high` asks only about modes, `
 When asking for effort, list every accepted value explicitly and describe its actual coverage and validation depth:
 
 - `low` — Run one Rules lens and one Bugs lens with inline validation for a quick review of small, low-risk changes.
-- `medium` — Run one Rules, Bugs, Contracts & comments, and History lens for a routine contextual review, with inline validation.
-- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, and one Prior PRs lens, then have one standard validator try to refute every finding.
-- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, and Prior PRs lens, then use two standard validators per finding with majority rule.
-- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, and two Prior PRs lenses in one pass, then use three deep refuters per finding with majority rule.
+- `medium` — Run one Rules, Bugs, Contracts & comments, History, and Simplification lens for a routine contextual review, with inline validation.
+- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, one Prior PRs, and one Simplification lens, then have one standard validator try to refute every finding.
+- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, Prior PRs, and Simplification lens, then use two standard validators per finding with majority rule.
+- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, two Prior PRs, and two Simplification lenses in one pass, then use three deep refuters per finding with majority rule.
 - `ultra` — Repeat the `max` cohort until two consecutive rounds find nothing new, using the same three deep refuters per finding.
 
 Keep each description to one or two sentences. Never summarize the effort values as a range such as `low`–`ultra` or replace the concrete descriptions with vague labels such as "quick," "thorough," or "broad."
@@ -122,21 +122,24 @@ A **Rules** lens runs at every effort level.
 | **Contracts & comments** | standard | Find changed behavior contradicting nearby docstrings, comments, type annotations, API or response models, or database constraints |
 | **History** | standard | Check `git log` and blame on the changed hunks for regressions against prior intent, only where the diff plausibly undoes earlier work |
 | **Prior PRs** | standard | Read earlier PRs touching these files and check whether past review comments apply again |
+| **Simplification** | deep | Run the `code-simplify` skill as its rubric over the scope — redundancy, a module named or placed wrong, a file past a healthy size, a value modelled one way here and another way in a sibling |
 
 Effort selects the cohort and the validation depth:
 
-| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Validation |
-|---|---|---|---|---|---|---|
-| `low` | 1 | 1 | – | – | – | Inline |
-| `medium` | 1 | 1 | 1 | 1 | – | Inline |
-| `high` | 1 | 2 | 1 | 1 | 1 | One **standard** validator per finding |
-| `xhigh` | 2 | 2 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
-| `max` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
-| `ultra` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Simplification | Validation |
+|---|---|---|---|---|---|---|---|
+| `low` | 1 | 1 | – | – | – | – | Inline |
+| `medium` | 1 | 1 | 1 | 1 | – | 1 | Inline |
+| `high` | 1 | 2 | 1 | 1 | 1 | 1 | One **standard** validator per finding |
+| `xhigh` | 2 | 2 | 1 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
+| `max` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| `ultra` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
 
 At `low` and `medium` the lenses may run inline in a single pass, and depth on the riskiest changed files beats exhaustive coverage of trivial ones. From `high` upward, launch one distinct subagent per lens in parallel; capacity limits force batching, never omission and never an undeclared local skim. When the host has no subagent capability, run the lenses sequentially and report that degraded mode.
 
 `ultra` runs the `max` cohort repeatedly, stopping only after two consecutive rounds surface no new confirmed finding. Every other level runs its cohort once.
+
+The **Simplification** lens does not carry its own rubric: dispatch it to the `code-simplify` agent, whose skill is the complete rubric, so the two stay one source of truth rather than two drifting copies. Give it the same target, and one instruction this skill adds — `code-simplify` resolves a scope to the diff *plus* whole files *plus* sibling modules, and it should keep reading all three, but every finding it returns must still anchor to a line this target added or removed. Reading a sibling is how it sees that a new module is misnamed, sits in a package that does not own it, or models a value the codebase already models another way; the sibling's own pre-existing debt is not this review's finding.
 
 Duplicated lenses run independently and must not see each other's output; redundancy is the point.
 

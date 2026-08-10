@@ -51,13 +51,12 @@ paths:
 - Give factories domain-qualified names. Do not use generic names such as `record_factory`, numbered names, or setup-mechanics prefixes such as `persisted_*`.
 - Factory inputs should be typed aggregates or boundary models rather than positional identity scalars, nested override dictionaries, relationship rows, or payload fragments.
 
-- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize with `model_dump(...)`.
-- Prefer `model_dump(mode="json", exclude_unset=True, exclude_none=True)` unless the endpoint contract needs different dump options.
+- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize them through the suite's shared serialization helper.
+- Keep the repository's standard dump options inside that one helper instead of repeating them at each call site. When an endpoint contract genuinely needs different options, call `model_dump(...)` directly there.
 - Do not pass ad-hoc inline dictionaries directly to `json=` when an application request model exists.
-- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them with `model_dump(...)` instead of hand-rolled response dictionaries.
+- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them instead of hand-rolled response dictionaries.
 - Use enum members in model payloads instead of hardcoded enum strings.
 - For invalid-request tests, derive from a valid model payload and then mutate/remove fields intentionally to assert validation behavior.
-- Serialize request and response models directly at the HTTP boundary with the repository-standard `model_dump(...)` options. Do not add a helper whose only behavior is calling `model_dump(...)`.
 - Do not add helpers that only format one URL or return one fixture/model field. Inline one-off values or reuse an existing shared boundary when the operation is repeated or nontrivial.
 - Construct typed models when a model exists for sample, request, response, or provider data. Do not maintain a parallel hand-written dictionary representation of that contract.
 
@@ -208,6 +207,10 @@ def create_order(order_fixture, customer_fixture, create_customer):
 - Do NOT hardcode configuration values in `conftest.py` files.
 - Access these values via `os.environ` in test code.
 - For every pull request an agent creates, ensure all test-related CI jobs pass before considering delivery complete; investigate and fix any failures within the pull request's scope.
+
+- Run tests through the repository's test-runner skill, at its full scope, rather than invoking the test framework directly against a hand-picked path. A single suite is for iterating on a failure you are actively fixing, never the run a change is verified against.
+- Choosing which tiers to run is not the author's call. Do not skip a tier because it looks unaffected, runs slowly, or needs services started — start them. If a tier genuinely cannot run, name it and say why alongside the result, because a result reported without that caveat claims coverage that was never achieved.
+- Every directory holding tests must be reachable from a runner target, and a test should assert that correspondence. A tier that no target selects is a tier nothing reports on.
 
 - If tests cannot be run locally (for example, missing dependencies, Docker not available, or environment issues), do NOT guess what the issue is. Ask the user for the error logs instead of speculating.
 - When CI tests fail and you cannot access the logs directly, ask the user to provide the failure output before attempting fixes.

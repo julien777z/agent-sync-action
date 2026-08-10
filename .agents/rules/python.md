@@ -81,12 +81,35 @@ class Report(BaseModel):
 - Give domain-specific module-level parsers, builders, formatters, and validators domain-qualified names. A generic name such as `parse_response` or `build_payload` falsely promises that a domain helper accepts any compatible input and creates collisions when multiple domains are imported together.
 - Reserve unqualified transformation names for genuinely domain-independent helpers in `utils/` whose signatures name no domain type.
 
+- **Import the symbols you use, never the module they live in.** `from pkg.domain import thing` followed by `thing.do_work(...)` reads differently from every neighbouring call, hides which of the module's names this file actually depends on, and is the shape an alias ban pushes people into when a name collides. A module import is correct only for a module you genuinely pass around as an object.
+- **A collision between a caller and the callee it invokes is a naming defect, not an import problem.** When `do_work` in one layer calls `do_work` in the layer below, the two names claim to describe the same thing while one of them adds behaviour the name never mentions. Rename the callee so each layer says what it alone does — the caller's name is usually fixed by an external contract, and the callee's is not.
+- Reaching through the module to dodge that collision preserves the defect and hides it. So does aliasing. Fix the name.
+
+```python
+# Bad: the collision is real, and reaching through the module only conceals it
+from billing.invoice import gateway
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await gateway.pay_invoice(invoice_id=invoice_id)
+
+
+# Good: the gateway says it crosses a service boundary, so both names can coexist
+from billing.invoice.gateway import pay_invoice_in_ledger
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await pay_invoice_in_ledger(invoice_id=invoice_id)
+```
+
 - Do not start Python files with module docstrings. Begin with imports, or leave package `__init__.py` files empty when they have no public surface.
 - Keep ALL imports at the top of the file.
 - Never import inside functions, methods, or test cases.
 - Group imports: stdlib, third-party, local (separated by blank lines).
 - Prefer **absolute imports** from the top-level package (for example `from application.routes.resources import router`) over **relative imports** with parent segments (for example `from ....routes.resources import router`). Absolute imports are stable when modules move, easier to grep, and avoid brittle `..` depth. Same rule applies to other installable packages: always anchor imports on the package name, not on the file’s directory depth.
-- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing.
+- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing. The one form that is not a rename is the explicit re-export marker `from pkg.module import Name as Name`, which PEP 484 defines as a package declaring `Name` part of its own public surface. Use it only in a package's `__init__.py` alongside `__all__`, never to give a symbol a second name.
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
@@ -264,7 +287,19 @@ register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=handler.__name__
 - Reuse the helper across read paths to avoid behavior drift.
 
 - Keep explicit wrapper/helper functions for external dependencies so tests can patch clear module boundaries.
-- Prefer patching module-level seams (for example `resource_gateway.fetch_resource`) over patching deep nested internals.
+- **Patch the consuming module's own binding, not the module that defines the symbol.** A symbol import binds the object at import time, so the consumer holds its own reference: patching the defining module rebinds a name the consumer never reads again. Nothing raises, the mock never fires, and the test passes while asserting nothing.
+- Patch the shallowest seam the consumer actually reads, rather than an internal several calls below it.
+
+```python
+# consumer.py binds the object at import time
+from billing.ledger.gateway import charge_card
+
+# Bad: resolves cleanly, rebinds a name consumer.py no longer reads, mock never fires
+monkeypatch.setattr("billing.ledger.gateway.charge_card", mock)
+
+# Good: rebinds the reference the consumer actually calls
+monkeypatch.setattr("billing.consumer.charge_card", mock)
+```
 
 ## Runtime Data and Caching
 
@@ -533,6 +568,22 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Keep docstrings to a single line. Do not include Args, Returns, or Raises sections.
 - Class docstrings go directly after the class definition.
 - Docstrings describe current behavior only — never reference what the code replaces, used to do, or PR/migration history. The docstring must read the same to a new reader who never saw the prior version.
+- Prose written for a person — a docstring, a comment, a log message — must not spell out an internal role, permission, or scope identifier (the literal string a provider or authorization system checks against, such as `tenant:member` or `scope:read_billing`). Name the concept in readable words instead. The identifier belongs in the code that evaluates it, where renaming it is a change the type checker and tests can see; repeated in prose it is a second copy nothing keeps honest.
+
+```python
+# Bad: the docstring and the log both spell out the internal identifier
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant:member, not a guest."""
+
+    logger.info("Checking tenant:member for %s", user.id)
+
+
+# Good: prose names the concept, and only the code carries the literal
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant member, not a guest."""
+
+    logger.info("Checking tenant membership for %s", user.id)
+```
 
 - **Comments are only for third-party quirks** — an SDK bug, a library's surprising contract, a spec oddity, a protocol requirement — that a reader could not infer from our own code. If the reason lives in code you control, it is not a comment.
 - **If your own code needs a comment to be understood, the code is too complex — refactor it instead.** Rename the identifier, extract a well-named helper, split the function, or restructure until the intent is obvious without prose. Reach for a comment only after the code cannot be made clearer and the remaining "why" is genuinely external.

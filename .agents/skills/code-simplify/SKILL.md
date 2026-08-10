@@ -13,7 +13,7 @@ Above all, this skill should push the reviewer to be **ambitious** about code st
 
 This skill does not stop at review: **apply the simplifications you identify directly to the working tree.** Make every behavior-preserving change you would otherwise only recommend — restructure, extract, delete indirection, collapse branches, reuse the canonical helper — and keep those edits in the commit you are working on. Treat the review questions and approval bar below as the checklist for what to fix, not merely what to flag.
 
-**Preserve observable behavior and the external contracts tests can't see — including on the default pre-push pass.** The pre-push pass runs automatically and cannot assume a full test run, so while simplifying do not change a contract that code or systems outside this diff depend on: public routes and their request/response shapes, durable identifiers (handler, event, queue, and state keys), persisted on-disk or on-the-wire formats (DB columns, migrations, serialized payloads), and cross-package shared DTOs or config keys. Do not introduce pass-through shims to fake an unchanged signature — adjust the real call sites instead. When a worthwhile simplification would alter one of these, leave a written note rather than applying it silently. The exception is a deliberate, test-verified caller (for example the **refactor** skill): when the suite proves behavior is preserved, internal structure and in-repo API shape may be restructured freely.
+**Preserve observable behavior and the external contracts tests can't see — including on the default pre-push pass.** The pre-push pass runs automatically and cannot assume a full test run, so while simplifying do not change a contract that code or systems outside this diff depend on: public routes and their request/response shapes, durable identifiers (handler, event, queue, and state keys), persisted on-disk or on-the-wire formats (DB columns, migrations, serialized payloads), and cross-package shared DTOs or config keys. Do not introduce pass-through shims to fake an unchanged signature — adjust the real call sites instead. When a worthwhile simplification would alter one of these, leave a written note rather than applying it silently. A deliberate, test-verified broader-scope request may restructure internal code and in-repository API shapes when the suite proves behavior is preserved.
 
 ## Scope
 
@@ -21,7 +21,7 @@ This skill does not stop at review: **apply the simplifications you identify dir
 
 When run as the pre-push pass (for example from the Stop hook), start from the **same diff as code-review's local / pre-push mode**: `git diff $(git merge-base <base> HEAD)` plus any untracked files the branch adds, where `<base>` is the repository's remote default branch (for example `origin/main` — use the actual default branch name; fall back to the local default branch if no remote is configured). This covers branch commits and uncommitted working-tree changes without unrelated upstream commits. Then resolve it into the three things above.
 
-When a caller provides a **broader scope** instead — for example the **refactor** skill (the whole repository) or a user who names specific directories or files — apply this rubric across **that** scope, not the pre-push diff. The merge-base diff above is only the default for the Stop-hook pre-push pass; always honor an explicit scope from the caller, while preserving external contracts (routes, response shapes, durable identifiers, persisted formats) and reporting anything that would spill outside the scope you were given.
+When a caller provides a **broader scope** instead — for example the whole repository or specific directories or files — apply this rubric across **that** scope, not the pre-push diff. The merge-base diff above is only the default for the Stop-hook pre-push pass; always honor an explicit scope from the caller, while preserving external contracts (routes, response shapes, durable identifiers, persisted formats) and reporting anything that would spill outside the scope you were given.
 
 ## Core Prompt
 
@@ -106,6 +106,8 @@ For every meaningful change, ask:
 - Is this abstraction actually earning its keep, or is it just a wrapper?
 - Did the diff introduce casts, optionality, or ad-hoc object shapes that obscure the real invariant?
 - Is this logic living in the canonical layer, or did the diff leak details across a boundary?
+- Does the module's name say what it holds, and does it sit in the package that owns that concept — or is it filed under the feature that happens to call it?
+- Does this represent a value differently from how a sibling already represents the same thing — a bare string where an enum exists, a fresh constant where a canonical type is the established shape?
 - Is this orchestration more sequential or less atomic than it needs to be?
 
 ## What to Flag Aggressively
@@ -127,6 +129,8 @@ Escalate findings when you see:
 - "Temporary" branching that is likely to become permanent debt.
 - Bespoke helpers where the codebase already has a canonical utility for the job.
 - Logic added in the wrong layer/package when it should live somewhere more central.
+- A module named for what it returns rather than the question it answers, or one sitting in a package that does not own its concept — a billing rule filed under the feature that consumes it.
+- The same kind of value modelled two ways across siblings: a bare string or one-off constant on one path where a shared enum already covers it on another, especially for anything persisted or sent across a service boundary.
 - Sequential async flow where obviously independent work could stay simpler and clearer with parallel execution.
 - Partial-update logic that leaves state less atomic than necessary.
 
