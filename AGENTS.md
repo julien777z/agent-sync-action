@@ -14,6 +14,7 @@ The canonical project rules live in `.agents/rules/`.
 - Do not hard-code runtime versions when a shared action, reusable workflow, or repository version file supplies them; omit `python-version` when shared Python automation provides it, and use `node-version-file: ".nvmrc"` for Node.js workflows.
 - Do not add glue steps that only read versions or forward setup data. Pass repository-owned version files and inputs directly to the action that uses them whenever supported.
 - Keep workflow files concise: merge related setup and dependency commands into one clearly named generic step when their execution order and conditions allow it. Do not split tool or package installation into separate steps merely by dependency.
+- Environment configuration that tunes a tool — retry counts, timeouts, cache locations, path entries — belongs in the step that installs or runs that tool, not in a step of its own. A step whose whole body writes to `$GITHUB_ENV` is named for a concern rather than an action, and the reader has to look elsewhere to find out which later step it affects. Write those exports at the end of the owning step so the setting and its consumer stay together.
 - Add an explanatory comment when an edge case requires an explicit version override.
 - Use version-tagged GitHub Actions such as `actions/checkout@v4` and `actions/setup-python@v5`, not full commit SHAs.
 
@@ -156,7 +157,9 @@ The canonical project rules live in `.agents/rules/`.
 - Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
 - Under static `[project.dependencies]`, `[tool.poetry.dependencies]` only supplies alternate sources. A package listed there but absent from `[project.dependencies]` is not installed. Declare the package name in `[project.dependencies]` and use `[tool.poetry.dependencies]` only for its path, Git, or URL source.
 - Never repair a Poetry environment by installing packages directly with `pip`. Fix the manifest, regenerate the lock file, and run `poetry install` so the environment and lock remain consistent.
-- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python targets inferred from the full `[project.requires-python]` range.
+- Configure strict Pyright, pytest with automatic asyncio support, and Black with Python targets inferred from the full `[project.requires-python]` range.
+- Keep that range's upper bound at the version the project actually runs. Black formats for the newest release the range admits, then verifies the result by parsing it with the running interpreter, so a bound reaching past that interpreter makes every run emit a parse warning for a grammar it cannot read.
+- Set one line length and give every tool that wraps or measures lines the same value, so the formatter and the linters cannot disagree about what is too long.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
 ```toml
@@ -165,7 +168,7 @@ requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 ```
 
-- Use `poetry install`, `poetry run black .`, `poetry run pyright`, and `poetry run pytest` for the standard local workflow.
+- Use `poetry install`, `poetry run black .`, and `poetry run pyright` for the standard local workflow. Run the suite through the repository's own test-runner entry point when it defines one, since a bare `pytest` invocation reaches only the tiers its default collection happens to find.
 
 ## Application Structure
 
@@ -179,7 +182,7 @@ build-backend = "poetry.core.masonry.api"
 
 ## Testing
 
-- Use pytest and pytest-asyncio with small, readable tests, and mark async tests with `@pytest.mark.asyncio`.
+- Use pytest and pytest-asyncio with small, readable tests. Under the automatic asyncio mode this configuration requires, a bare `async def test_...` already runs; do not add `@pytest.mark.asyncio` on top of it.
 - Prefer dependency injection or fakes over deep patching.
 
 ## Guardrails
@@ -392,12 +395,35 @@ class Report(BaseModel):
 - Give domain-specific module-level parsers, builders, formatters, and validators domain-qualified names. A generic name such as `parse_response` or `build_payload` falsely promises that a domain helper accepts any compatible input and creates collisions when multiple domains are imported together.
 - Reserve unqualified transformation names for genuinely domain-independent helpers in `utils/` whose signatures name no domain type.
 
+- **Import the symbols you use, never the module they live in.** `from pkg.domain import thing` followed by `thing.do_work(...)` reads differently from every neighbouring call, hides which of the module's names this file actually depends on, and is the shape an alias ban pushes people into when a name collides. A module import is correct only for a module you genuinely pass around as an object.
+- **A collision between a caller and the callee it invokes is a naming defect, not an import problem.** When `do_work` in one layer calls `do_work` in the layer below, the two names claim to describe the same thing while one of them adds behaviour the name never mentions. Rename the callee so each layer says what it alone does — the caller's name is usually fixed by an external contract, and the callee's is not.
+- Reaching through the module to dodge that collision preserves the defect and hides it. So does aliasing. Fix the name.
+
+```python
+# Bad: the collision is real, and reaching through the module only conceals it
+from billing.invoice import gateway
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await gateway.pay_invoice(invoice_id=invoice_id)
+
+
+# Good: the gateway says it crosses a service boundary, so both names can coexist
+from billing.invoice.gateway import pay_invoice_in_ledger
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await pay_invoice_in_ledger(invoice_id=invoice_id)
+```
+
 - Do not start Python files with module docstrings. Begin with imports, or leave package `__init__.py` files empty when they have no public surface.
 - Keep ALL imports at the top of the file.
 - Never import inside functions, methods, or test cases.
 - Group imports: stdlib, third-party, local (separated by blank lines).
 - Prefer **absolute imports** from the top-level package (for example `from application.routes.resources import router`) over **relative imports** with parent segments (for example `from ....routes.resources import router`). Absolute imports are stable when modules move, easier to grep, and avoid brittle `..` depth. Same rule applies to other installable packages: always anchor imports on the package name, not on the file’s directory depth.
-- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing.
+- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing. The one form that is not a rename is the explicit re-export marker `from pkg.module import Name as Name`, which PEP 484 defines as a package declaring `Name` part of its own public surface. Use it only in a package's `__init__.py` alongside `__all__`, never to give a symbol a second name.
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
@@ -575,7 +601,19 @@ register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=handler.__name__
 - Reuse the helper across read paths to avoid behavior drift.
 
 - Keep explicit wrapper/helper functions for external dependencies so tests can patch clear module boundaries.
-- Prefer patching module-level seams (for example `resource_gateway.fetch_resource`) over patching deep nested internals.
+- **Patch the consuming module's own binding, not the module that defines the symbol.** A symbol import binds the object at import time, so the consumer holds its own reference: patching the defining module rebinds a name the consumer never reads again. Nothing raises, the mock never fires, and the test passes while asserting nothing.
+- Patch the shallowest seam the consumer actually reads, rather than an internal several calls below it.
+
+```python
+# consumer.py binds the object at import time
+from billing.ledger.gateway import charge_card
+
+# Bad: resolves cleanly, rebinds a name consumer.py no longer reads, mock never fires
+monkeypatch.setattr("billing.ledger.gateway.charge_card", mock)
+
+# Good: rebinds the reference the consumer actually calls
+monkeypatch.setattr("billing.consumer.charge_card", mock)
+```
 
 ## Runtime Data and Caching
 
@@ -844,6 +882,22 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Keep docstrings to a single line. Do not include Args, Returns, or Raises sections.
 - Class docstrings go directly after the class definition.
 - Docstrings describe current behavior only — never reference what the code replaces, used to do, or PR/migration history. The docstring must read the same to a new reader who never saw the prior version.
+- Prose written for a person — a docstring, a comment, a log message — must not spell out an internal role, permission, or scope identifier (the literal string a provider or authorization system checks against, such as `tenant:member` or `scope:read_billing`). Name the concept in readable words instead. The identifier belongs in the code that evaluates it, where renaming it is a change the type checker and tests can see; repeated in prose it is a second copy nothing keeps honest.
+
+```python
+# Bad: the docstring and the log both spell out the internal identifier
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant:member, not a guest."""
+
+    logger.info("Checking tenant:member for %s", user.id)
+
+
+# Good: prose names the concept, and only the code carries the literal
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant member, not a guest."""
+
+    logger.info("Checking tenant membership for %s", user.id)
+```
 
 - **Comments are only for third-party quirks** — an SDK bug, a library's surprising contract, a spec oddity, a protocol requirement — that a reader could not infer from our own code. If the reason lives in code you control, it is not a comment.
 - **If your own code needs a comment to be understood, the code is too complex — refactor it instead.** Rename the identifier, extract a well-named helper, split the function, or restructure until the intent is obvious without prose. Reach for a comment only after the code cannot be made clearer and the remaining "why" is genuinely external.
@@ -908,13 +962,12 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Give factories domain-qualified names. Do not use generic names such as `record_factory`, numbered names, or setup-mechanics prefixes such as `persisted_*`.
 - Factory inputs should be typed aggregates or boundary models rather than positional identity scalars, nested override dictionaries, relationship rows, or payload fragments.
 
-- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize with `model_dump(...)`.
-- Prefer `model_dump(mode="json", exclude_unset=True, exclude_none=True)` unless the endpoint contract needs different dump options.
+- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize them through the suite's shared serialization helper.
+- Keep the repository's standard dump options inside that one helper instead of repeating them at each call site. When an endpoint contract genuinely needs different options, call `model_dump(...)` directly there.
 - Do not pass ad-hoc inline dictionaries directly to `json=` when an application request model exists.
-- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them with `model_dump(...)` instead of hand-rolled response dictionaries.
+- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them instead of hand-rolled response dictionaries.
 - Use enum members in model payloads instead of hardcoded enum strings.
 - For invalid-request tests, derive from a valid model payload and then mutate/remove fields intentionally to assert validation behavior.
-- Serialize request and response models directly at the HTTP boundary with the repository-standard `model_dump(...)` options. Do not add a helper whose only behavior is calling `model_dump(...)`.
 - Do not add helpers that only format one URL or return one fixture/model field. Inline one-off values or reuse an existing shared boundary when the operation is repeated or nontrivial.
 - Construct typed models when a model exists for sample, request, response, or provider data. Do not maintain a parallel hand-written dictionary representation of that contract.
 
@@ -1065,6 +1118,10 @@ def create_order(order_fixture, customer_fixture, create_customer):
 - Do NOT hardcode configuration values in `conftest.py` files.
 - Access these values via `os.environ` in test code.
 - For every pull request an agent creates, ensure all test-related CI jobs pass before considering delivery complete; investigate and fix any failures within the pull request's scope.
+
+- Run tests through the repository's test-runner skill, at its full scope, rather than invoking the test framework directly against a hand-picked path. A single suite is for iterating on a failure you are actively fixing, never the run a change is verified against.
+- Choosing which tiers to run is not the author's call. Do not skip a tier because it looks unaffected, runs slowly, or needs services started — start them. If a tier genuinely cannot run, name it and say why alongside the result, because a result reported without that caveat claims coverage that was never achieved.
+- Every directory holding tests must be reachable from a runner target, and a test should assert that correspondence. A tier that no target selects is a tier nothing reports on.
 
 - If tests cannot be run locally (for example, missing dependencies, Docker not available, or environment issues), do NOT guess what the issue is. Ask the user for the error logs instead of speculating.
 - When CI tests fail and you cannot access the logs directly, ask the user to provide the failure output before attempting fixes.
