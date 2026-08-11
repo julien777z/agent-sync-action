@@ -52,5 +52,6 @@ Produce, in order:
    - **Bad:** meaningful weaknesses or omissions.
    - **Ugly:** serious flaws likely to cause failure, wasted work, regressions, or an unusable implementation. State explicitly when nothing is genuinely ugly.
 4. A winner section that names the plan and model identifier, explains why it wins, gives `high`, `medium`, or `low` confidence, and lists specific ideas it should incorporate from the other plan.
+5. A `Prompt for the winning agent` in a fenced text block, ready to paste into the model that produced the winning plan. Make the prompt standalone: restate the original goal, explain why the plan should be revised, identify each useful idea to incorporate from the other plan and why it improves the result, specify the exact plan steps or concerns to change, preserve the winner's existing strengths, and request a complete revised plan. Ask for plan revision rather than implementation, and do not invent repository or system details absent from the submitted material.
 
-If the plans are effectively tied, say so explicitly, explain what additional information would break the tie, and do not force a winner.
+If the plans are effectively tied, say so explicitly, explain what additional information would break the tie, and do not force a winner. State that no winning-agent prompt is available until a winner can be selected.
