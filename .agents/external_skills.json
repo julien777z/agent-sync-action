@@ -14,6 +14,12 @@
       "update_on_sync": false
     },
     {
+      "name": "i-have-adhd",
+      "repo": "ayghri/i-have-adhd",
+      "skill": "i-have-adhd",
+      "update_on_sync": false
+    },
+    {
       "name": "no-ai-slop",
       "repo": "petergyang/no-ai-slop",
       "skill": "no-ai-slop",
