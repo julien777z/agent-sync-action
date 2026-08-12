@@ -1,6 +1,6 @@
 ---
 name: cr
-description: Run the multi-subagent code-review workflow at high effort with fix mode, then ready, squash-merge, and verify the current pull request.
+description: Run the multi-subagent code-review workflow at high effort with fix mode, repair and retry failed checks until they pass, then ready, squash-merge, and verify the current pull request.
 ---
 
 # CR
@@ -35,6 +35,8 @@ Treat fetching, pulling, or rebasing only to incorporate commits from the review
 
 Interrupt and restart the cohort only when the new task changes the reviewed codebase, target, or reviewed codebase diff. Pass this continuity rule into `/code-review high fix`; it overrides that skill's generic restart-on-any-new-task instruction.
 
+Once step 4 finishes with a complete high-effort review that has no confirmed findings, close the review loop. A later fix made specifically to repair a failed check does not reopen or rerun `/code-review high fix`, even when that check fix changes the reviewed codebase diff. Validate the fix locally and re-gate the new head instead. Restart review only for a separate user-requested code change, not for remediation required by the check gate.
+
 ## Session Continuity
 
 Keep the invoking session active until this CR workflow reaches a terminal result. Do not send a final response, end the session, or hand control back to the user while review, conflict reconciliation, validation, check gating, or the authorized merge remains in progress.
@@ -49,9 +51,10 @@ Only conclude the session after the PR is verified merged, or after reporting a 
 2. Invoke `/code-review high fix <PR>` for that PR, whether it is draft or ready for review.
 3. Apply and validate every confirmed finding. Stop and report any plausible or ambiguous finding that cannot be safely fixed.
 4. If fixes change the PR's reviewed codebase diff, immediately run `/code-review high fix <PR>` again against the complete PR at the new head. Repeat until a complete high-effort review finds no further confirmed findings. A head change containing only agent, rule, or skill content is not a re-review trigger.
-5. Before merging, make a draft PR ready for review, then ensure the ready-for-review PR's required checks are complete. When the head has no check
-   runs or legacy statuses, inspect the active workflow definitions for `pull_request` or
-   `pull_request_target`. If none can run for pull requests, treat the check gate as satisfied
-   even when GitHub reports an otherwise-empty aggregate status as `pending`; never synthesize a
-   commit status. If any workflow can run for pull requests, wait for its checks to resolve.
+5. Before merging, make a draft PR ready for review, then gate the current head on its required checks:
+   - Query both check runs and legacy statuses for the exact current head SHA. Treat queued or in-progress checks as unresolved and continue the active CR session when their result is delivered.
+   - If any check fails, inspect its annotations and complete logs, identify the root cause, fix the repository code, tests, configuration, workflow, or other owned input responsible, run the relevant local validation, commit, and push the fix. Do not stop merely because a check failed, and do not blindly rerun a deterministic failure without addressing its cause.
+   - Do not rerun completed high-effort review loops for a check fix. After the clean review loop has ended, preserve its receipts, gate the fixed head from the beginning, and repeat only the investigate-fix-validate-push-check cycle until every required check passes.
+   - For a diagnosed transient external failure with no repository fix, retry the failed job once the service can run it again, then gate the resulting head or run. Report a blocker only when the failure cannot be safely corrected from repository context and requires user input, unavailable credentials, an external service recovery, or another external-state change; include the failed check, evidence, and attempted remediation.
+   - When the head has no check runs or legacy statuses, inspect active workflow definitions for `pull_request` or `pull_request_target`. If none can run for pull requests, treat the check gate as satisfied even when GitHub reports an otherwise-empty aggregate status as `pending`; never synthesize a commit status. If a workflow can run, keep the session active until its checks resolve.
 6. Squash-merge the pull request and verify its remote state is `MERGED`.
