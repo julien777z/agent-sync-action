@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent_sync.models.output import Provider
@@ -41,6 +41,7 @@ class CodexSettings(BaseModel):
 
     model: str | None = None
     project_doc_max_bytes: int
+    features: dict[str, bool] = Field(default_factory=dict)
 
 
 class AgentModelOverride(BaseModel):

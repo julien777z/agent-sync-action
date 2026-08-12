@@ -287,7 +287,9 @@ class TestSettingsGeneration:
 
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "claude.json").write_text(
-            '{"$comment":"source comment","model":"sonnet","permissions":{"allow":["Read"]}}'
+            '{"$comment":"source comment","model":"sonnet",'
+            '"permissions":{"allow":["Read"]},'
+            '"features":{"default_mode_request_user_input":true,"experimental-feature":false}}'
         )
 
         outputs = generate_claude_settings(load_context(workspace), Provider.CLAUDE)
@@ -302,6 +304,10 @@ class TestSettingsGeneration:
             ),
             "model": "sonnet",
             "permissions": {"allow": ["Read"]},
+            "features": {
+                "default_mode_request_user_input": True,
+                "experimental-feature": False,
+            },
         }
 
     def test_codex_capacity_overwrites_existing_toml(
@@ -341,6 +347,28 @@ class TestSettingsGeneration:
         )
         assert native["project_doc_max_bytes"] == capacity
         assert "model_reasoning_effort" not in native
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_codex_features_accept_arbitrary_names(self, workspace: Workspace) -> None:
+        """Test that arbitrary Codex feature names are synchronized unchanged."""
+
+        workspace.settings_dir.mkdir()
+        settings_path = workspace.settings_dir / "codex.json"
+        settings_path.write_text(
+            '{"project_doc_max_bytes":1,"features":'
+            '{"default_mode_request_user_input":true,"experimental-feature":false}}'
+        )
+
+        assert mirror_providers(workspace, dry_run=False) is False
+
+        canonical = json.loads(settings_path.read_text())
+        native = tomllib.loads((workspace.root / ".codex/config.toml").read_text())
+
+        assert canonical["features"] == {
+            "default_mode_request_user_input": True,
+            "experimental-feature": False,
+        }
+        assert native["features"] == canonical["features"]
         assert mirror_providers(workspace, dry_run=True) is False
 
     def test_invalid_existing_toml_is_overwritten(self, workspace: Workspace) -> None:
