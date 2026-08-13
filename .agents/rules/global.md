@@ -22,7 +22,15 @@ alwaysApply: true
 ## User-Triggered Action Skills
 
 - Run an action skill only after the user directly invokes it in the current request. Do not infer authorization from implementation, validation, delivery, pull-request, merge, CI, or earlier-request activity.
+- **Recording a deferral is the exception, and it is never optional.** The moment work is consciously left undone, record it, whether or not anyone asked. Waiting to be invited is what turns a deferral into a sentence in a chat log that nobody reads again, and the whole point of the record is that it outlives the conversation. Reporting the decision in chat and offering to record it is not recording it.
 - Each direct invocation authorizes one execution by default. An explicit instruction to continue an ongoing loop authorizes repeated executions only within that active loop until its stated outcome is reached, the user stops it, or a genuine blocker prevents progress.
+- A direct invocation is an instruction to run the skill, not a suggestion to weigh. Start it, and run it at the effort and scope the invocation states.
+- Remaining context, token budget, elapsed time, and the size of the target are never grounds to decline, defer, downsize, or silently narrow it. Predicting that the work will not fit is not a blocker; it is a forecast, and acting on the forecast substitutes the agent's judgment for an instruction already given.
+- Run out mid-way and the position is honest: the work that completed is reported as complete, the rest is named precisely, and whatever the next session needs to resume is written down. Refusing to start leaves nothing behind at all.
+- Narrowing the scope of an invoked skill needs the user's agreement in the current request. Proposing a narrower scope is fine; adopting it unilaterally is not, and neither is running the narrower thing while reporting the wider one.
+- The same holds for every unit of work inside the run. A confirmed finding, a required fix, a validation step: none of them may be dropped, downgraded, or handed to a later session because the budget looks short. Work the list until it is done or the budget genuinely ends.
+- **Only the user declares the budget spent.** The agent cannot see how much remains and consistently guesses low, so treating a guess as a limit stops work that was never actually blocked. Keep going until the user says otherwise or the environment stops you.
+- Difficulty is not a budget problem wearing a disguise. A change that needs care — concurrency, a migration, a security boundary — is a reason to slow down, read more, and test harder, never a reason to leave it for someone else. Make the change and validate it.
 
 ## User Approvals
 
@@ -51,12 +59,6 @@ alwaysApply: true
 ## Replacement Contracts
 
 - When a request replaces a route, API contract, or behavior, remove the prior alias or fallback. Retain legacy compatibility only when the user explicitly authorizes it in the current request; if retention is unclear, ask before adding it.
-
-## Browser Use
-
-- Never use the user's browser to test or verify project changes unless the user explicitly requests browser-based testing.
-- Implementation, testing, or verification requests do not implicitly authorize browser control; use repository tests, type checks, builds, and source inspection by default.
-- Never test installed extensions with locally generated artifacts. Only artifacts generated and published by CI are valid for installed-extension testing.
 
 ## Approvals And Clarifying Questions
 

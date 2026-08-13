@@ -190,6 +190,21 @@ ACTION_CONFIG = ActionConfig()
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
 - Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
 - Compile regular expressions once at module scope and call methods on the compiled pattern instead of passing pattern strings repeatedly to `re.match`, `re.search`, `re.fullmatch`, or `re.sub`.
+- **When several constants form one family of the same shape** — parallel compiled patterns, per-kind values, same-shaped lookup entries — define one mapping keyed by an enum or other typed key instead of a pile of individually named constants, and iterate or index that mapping at the use site. A few unrelated constants are fine as standalone names; a family of related ones is a data structure.
+
+```python
+# Bad: a parallel pile of same-shaped constants
+CREATED_EVENT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^created:")
+UPDATED_EVENT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^updated:")
+REMOVED_EVENT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^removed:")
+
+# Good: one mapping keyed by the domain enum, iterated at the use site
+EVENT_PATTERNS: Final[dict[EventKind, re.Pattern[str]]] = {
+    EventKind.CREATED: re.compile(r"^created:"),
+    EventKind.UPDATED: re.compile(r"^updated:"),
+    EventKind.REMOVED: re.compile(r"^removed:"),
+}
+```
 - When a mutable object is annotated with `Final`, complete any setup-time mutation in the same expression as initialization instead of binding it first and mutating it on the next line.
 - Only extract literals when they are reused or carry domain meaning; keep trivial single-use literals inline (for example, delimiters like `"-"` or `"."`).
 - Never hard-code constants like HTTP status codes; use `HTTPStatus` from the `http` module instead.
@@ -203,6 +218,9 @@ ACTION_CONFIG = ActionConfig()
 
 Avoid trivial wrapper functions that add no value. A function that just returns its argument or applies a trivial fallback is noise:
 
+- **A function whose body is one call to the canonical function is banned**, whether it forwards the arguments unchanged or supplies a fixed value for one of them. Call the canonical function directly at the use site and name the argument there. Partial application does not earn a name: `send_welcome_email()` wrapping `send_email(template=WELCOME)` reads as a layer while adding none, and the wrapper has to be opened to learn what it does.
+- The pressure to write one usually comes from several call sites passing the same constant, which is not a defect on its own. Where the argument genuinely must not vary, encode that in the callee's signature or its type — do not station a wrapper in front of it to hold the value.
+- **That remedy assumes the callee is ours.** A third-party constructor or function has a signature we cannot change, so a named helper is the only place its fixed arguments can live once; one such helper is allowed and beats repeating those arguments at every call site. It may only name the intent and supply the fixed arguments — any of our own logic in its body makes it an ordinary function subject to the rule above.
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
 - Return an enum for an outcome with more than two states or states whose names carry meaning. Never return bare integers as application status codes.
 - A subprocess return code is an external value and may remain an `int` at that boundary. Convert it into the domain outcome enum before carrying it through the application.
@@ -214,6 +232,20 @@ Avoid trivial wrapper functions that add no value. A function that just returns 
 - Only use `object.__setattr__(...)` when normal assignment is genuinely unavailable (for example frozen models or descriptor bypass requirements), and keep that escape hatch explicit and justified.
 
 ```python
+# Bad: a wrapper that only fixes one argument
+def notify_owner(account: Account) -> None:
+    return send_notification(account, channel=Channel.EMAIL)
+
+
+# Good: the call site names the argument
+send_notification(account, channel=Channel.EMAIL)
+
+
+# Good: the fixed arguments belong to a third-party signature we cannot change
+def audited_timestamp(column_name: str) -> ExternalColumn:
+    return ExternalColumn(column_name, ExternalTimestamp(with_zone=True), track_history=True)
+
+
 # Bad: useless wrapper
 def resolve_config(config: Settings | None) -> Settings:
     return config or APPLICATION_CONFIG

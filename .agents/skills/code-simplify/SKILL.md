@@ -15,6 +15,14 @@ This skill does not stop at review: **apply the simplifications you identify dir
 
 **Preserve observable behavior and the external contracts tests can't see — including on the default pre-push pass.** The pre-push pass runs automatically and cannot assume a full test run, so while simplifying do not change a contract that code or systems outside this diff depend on: public routes and their request/response shapes, durable identifiers (handler, event, queue, and state keys), persisted on-disk or on-the-wire formats (DB columns, migrations, serialized payloads), and cross-package shared DTOs or config keys. Do not introduce pass-through shims to fake an unchanged signature — adjust the real call sites instead. When a worthwhile simplification would alter one of these, leave a written note rather than applying it silently. A deliberate, test-verified broader-scope request may restructure internal code and in-repository API shapes when the suite proves behavior is preserved.
 
+## Running the pass
+
+**Use subagents whenever the host exposes them, at every scope size.** One reader holding an entire scope in a single context reviews the early files with the rubric fresh and the later ones with it half-forgotten, and a code-judo move is exactly what that reader stops seeing. Fan the scope out instead, then let one reader decide what to apply. Where the host has no subagent capability, run the pass in process and say so in the report.
+
+Partition the scope into slices that a reader can hold at once — by app, service, or package, so each slice is a coherent area rather than an arbitrary file count — and give every subagent the same complete rubric over its slice. Add one cross-cutting reviewer that reads no slice in depth and looks only for structure that spans them: a concept modelled two ways in two areas, logic that belongs in a package neither slice owns, the same helper written twice. That reviewer finds what no single slice can.
+
+**Subagents review; the parent applies.** Every subagent returns findings — each anchored to a path and line, with the restructuring it proposes — and edits nothing. Concurrent writers on one tree produce conflicts and half-applied restructurings, and one applier is what keeps the result a single coherent change. The parent resolves the returned findings, drops any that another slice's finding subsumes, applies the survivors itself, and remains answerable for the approval bar.
+
 ## Scope
 
 **What a scope contains.** A scope is never the diff hunks alone. Resolving any scope — the pre-push merge-base diff or one a caller names — yields three things: the **diff** itself, the **full contents of every file it touches**, and the **sibling modules in those files' packages**. Hunks show what changed; the whole file shows what the change now sits inside; the siblings show where the logic should have lived. A code-judo move is usually only visible in the third, and the rubric below applies to everything the scope resolves to, not only to lines the diff added.
@@ -64,16 +72,7 @@ Apply the baseline prompt above, plus these explicit review rules:
 4. **Prefer direct, boring, maintainable code over hacky or magical code.**
    - Treat brittle, ad-hoc, or "magic" behavior as a code-quality problem.
    - Be skeptical of generic mechanisms that hide simple data-shape assumptions.
-   - Forbid slim pass-through shims: a function whose body is one call to the canonical function with the same name/args is banned. Call the canonical function directly at the use-site.
-
-     ```python
-     # Bad — pass-through shim
-     async def head_object_content_type(config, *, object_key):
-         return await object_storage.head_object_content_type(backend(config), object_key=object_key)
-
-     # Good — call the canonical helper at the use-site
-     await object_storage.head_object_content_type(backend(config), object_key=object_key)
-     ```
+   - Forbid slim pass-through shims: a function whose body is a single call to the canonical function is banned, whether it forwards its arguments unchanged or supplies a fixed value for one of them. Call the canonical function directly at the use site and name the argument there. Several call sites passing the same constant is not a defect on its own and does not earn a wrapper to hold it; where the argument genuinely must not vary, encode that in the callee's own signature or type.
 
 5. **Push hard on type and boundary cleanliness when they affect maintainability.**
    - Question unnecessary optionality, `unknown`, `any`, or cast-heavy code when a clearer type boundary could exist.
