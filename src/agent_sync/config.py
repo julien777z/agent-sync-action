@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent_sync.models.output import Provider
@@ -34,14 +34,6 @@ class PlatformSettings(BaseModel):
     model: str | None = None
 
 
-class CodexFeatures(BaseModel):
-    """Validate supported Codex feature flags."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    default_mode_request_user_input: bool
-
-
 class CodexSettings(BaseModel):
     """Validate source settings for generated Codex project configuration."""
 
@@ -49,7 +41,7 @@ class CodexSettings(BaseModel):
 
     model: str | None = None
     project_doc_max_bytes: int
-    features: CodexFeatures | None = None
+    features: dict[str, bool] = Field(default_factory=dict)
 
 
 class AgentModelOverride(BaseModel):
