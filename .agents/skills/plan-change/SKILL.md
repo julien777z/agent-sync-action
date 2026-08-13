@@ -35,6 +35,11 @@ proactive audit of the whole repository.
   overall net improvement, including fixing a defect, removing a code smell, simplifying the
   implementation, or intentionally replacing an inferior contract. A behavior change or
   compatibility break is not by itself a reason to preserve the existing implementation.
+- Delete every piece of confirmed dead code encountered during implementation, even when it sits
+  outside the files or packages already being changed. Confirm that no live application or
+  library consumer, public export, or external contract still depends on it; remove tests that
+  exist only to exercise the dead code; and validate the affected behavior. This requirement does
+  not turn implementation into a proactive dead-code audit of the whole repository.
 - Use the repository's relevant tests as the primary regression guardrail. Add or update tests for
   the intended contract and run them; do not preserve a defect solely because an existing test
   asserts the old behavior. When coverage is absent or insufficient, use the strongest available
@@ -52,7 +57,12 @@ proactive audit of the whole repository.
 Read and invoke `code-simplify` after each meaningful implementation batch and once across the
 complete diff before delivery.
 
-- Scope an intermediate pass to the current batch and the final pass to the complete change.
+- After each batch, scope the pass to the full contents of every file changed by the plan so far
+  and the sibling modules in each changed file's package, not only the diff hunks or current
+  batch. When simplification or dead-code deletion changes another file, add that file's full
+  contents and sibling modules to the scope recursively before continuing.
+- Resolve the final pass from the complete diff into the full contents of every changed file and
+  all sibling modules in those files' packages.
 - Apply simplifications that produce an overall net improvement and can be completed and verified
   in one focused pass. Do not require them to preserve an inferior implementation or compatibility
   contract.
