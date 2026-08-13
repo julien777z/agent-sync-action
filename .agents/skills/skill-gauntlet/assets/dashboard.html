@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill Gauntlet</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: #11130f;
+      color: #eef0e7;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(circle at top, #293121 0, #11130f 38rem); }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 80px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 28px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(2rem, 5vw, 4.5rem); letter-spacing: -.06em; margin-bottom: 8px; }
+    h2 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #b7c99b; }
+    h3 { margin-bottom: 8px; }
+    .muted { color: #a5aa9a; }
+    .status { border: 1px solid #53633f; background: #20271a; border-radius: 999px; padding: 9px 14px; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .panel { grid-column: span 12; border: 1px solid #343a2d; border-radius: 18px; background: rgba(24, 27, 21, .9); padding: 20px; box-shadow: 0 16px 50px rgba(0, 0, 0, .2); }
+    .half { grid-column: span 6; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric { background: #1d2119; border-radius: 12px; padding: 14px; }
+    .metric strong { display: block; font-size: 1.7rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid #30352a; vertical-align: top; }
+    th { color: #b7c99b; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; }
+    code { color: #dce8c9; overflow-wrap: anywhere; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .card { border: 1px solid #343a2d; border-radius: 14px; padding: 16px; background: #1b1e18; }
+    .tag { display: inline-block; border: 1px solid #53633f; border-radius: 999px; padding: 3px 8px; margin: 0 5px 5px 0; font-size: .78rem; }
+    pre { white-space: pre-wrap; margin: 0; color: #cfd5c3; font: inherit; }
+    .empty { padding: 24px 0; color: #8c9282; }
+    .error { color: #ffaaa0; }
+    @media (max-width: 760px) {
+      header { align-items: start; flex-direction: column; }
+      .half { grid-column: span 12; }
+      .metrics, .cards { grid-template-columns: 1fr; }
+      .table-wrap { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Skill Gauntlet</h1>
+        <p class="muted">A view-only record of evidence, iteration, and outcomes.</p>
+      </div>
+      <div class="status" id="status">Loading state…</div>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Run</h2>
+        <div class="metrics" id="metrics"></div>
+      </section>
+
+      <section class="panel half">
+        <h2>Models</h2>
+        <div id="models" class="empty">No model runs recorded.</div>
+      </section>
+
+      <section class="panel half">
+        <h2>Recent Activity</h2>
+        <div id="activity" class="empty">No activity recorded.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Installed Skill Inventory</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Skill</th><th>Purpose</th><th>Scope</th><th>Origin and Source</th><th>Status</th><th>Digest</th><th>Relationships</th></tr></thead>
+            <tbody id="inventory"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Selected Skill Experiments</h2>
+        <div id="skills" class="cards"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const list = (value) => Array.isArray(value) ? value : [];
+    const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const text = (value, fallback = "—") => value === undefined || value === null || value === "" ? fallback : String(value);
+    const detail = (value, fallback = "—") => {
+      if (value === undefined || value === null || value === "") return fallback;
+      return typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+    };
+
+    function metric(label, value) {
+      const node = document.createElement("div");
+      node.className = "metric";
+      const strong = document.createElement("strong");
+      strong.textContent = text(value, "0");
+      const caption = document.createElement("span");
+      caption.className = "muted";
+      caption.textContent = label;
+      node.append(strong, caption);
+      return node;
+    }
+
+    function tags(values) {
+      const fragment = document.createDocumentFragment();
+      list(values).forEach((value) => {
+        const node = document.createElement("span");
+        node.className = "tag";
+        node.textContent = text(value);
+        fragment.append(node);
+      });
+      return fragment;
+    }
+
+    function renderInventory(inventory) {
+      const body = byId("inventory");
+      body.replaceChildren();
+      list(inventory).forEach((item) => {
+        const row = document.createElement("tr");
+        const relationships = document.createElement("td");
+        relationships.append(tags([...list(item.dependencies), ...list(item.overlaps)]));
+        const origin = `${text(item.origin)}\n${text(item.installation_path)}`;
+        const status = `${text(item.activation, "unknown")} · ${text(item.editability, "unknown")} · precedence ${text(item.precedence, "unknown")}${item.duplicate_of ? " · duplicate" : ""}`;
+        [item.name, item.purpose, item.scope, origin, status, text(item.content_hash).slice(0, 12)].forEach((value, index) => {
+          const cell = document.createElement("td");
+          if (index === 5) {
+            const code = document.createElement("code");
+            code.textContent = text(value);
+            cell.append(code);
+          } else {
+            cell.textContent = text(value);
+          }
+          row.append(cell);
+        });
+        row.append(relationships);
+        body.append(row);
+      });
+      if (!list(inventory).length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 7;
+        cell.className = "empty";
+        cell.textContent = "Inventory is still being assembled.";
+        row.append(cell);
+        body.append(row);
+      }
+    }
+
+    function renderModels(models) {
+      const container = byId("models");
+      container.replaceChildren();
+      const entries = Object.entries(object(models));
+      if (!entries.length) {
+        container.className = "empty";
+        container.textContent = "No model runs recorded.";
+        return;
+      }
+      container.className = "";
+      entries.forEach(([role, model]) => {
+        const line = document.createElement("p");
+        const label = document.createElement("strong");
+        label.textContent = `${role}: `;
+        line.append(label, document.createTextNode(text(model)));
+        container.append(line);
+      });
+    }
+
+    function renderActivity(activity) {
+      const container = byId("activity");
+      container.replaceChildren();
+      const entries = list(activity).slice(-8).reverse();
+      if (!entries.length) {
+        container.className = "empty";
+        container.textContent = "No activity recorded.";
+        return;
+      }
+      container.className = "";
+      entries.forEach((entry) => {
+        const line = document.createElement("p");
+        line.textContent = typeof entry === "string" ? entry : `${text(entry.at, "")}${entry.at ? " — " : ""}${text(entry.message)}`;
+        container.append(line);
+      });
+    }
+
+    function renderSkills(skills) {
+      const container = byId("skills");
+      container.replaceChildren();
+      const entries = Object.entries(object(skills));
+      if (!entries.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No skills selected. Make selections in agent chat.";
+        container.append(empty);
+        return;
+      }
+      entries.forEach(([name, skill]) => {
+        const card = document.createElement("article");
+        card.className = "card";
+        const title = document.createElement("h3");
+        title.textContent = name;
+        const status = document.createElement("span");
+        status.className = "tag";
+        status.textContent = text(skill.status, "pending");
+        const detail = document.createElement("pre");
+        detail.textContent = [
+          `Contract: ${detail(skill.outcome_contract, "Not frozen")}`,
+          `Coverage: ${detail(skill.benchmark_coverage, "Not frozen")}`,
+          `Trials: ${text(skill.completed_trials, 0)}`,
+          `Blind results: ${detail(skill.blind_results, "None recorded")}`,
+          `Judge explanations: ${detail(skill.judge_explanations, "None recorded")}`,
+          `Iteration: ${text(skill.iteration, 0)}`,
+          `Iteration history: ${detail(skill.iteration_history, "None recorded")}`,
+          `Regressions: ${detail(skill.regressions, "None recorded")}`,
+          `Held-out: ${detail(skill.held_out_performance, "Not run")}`,
+          `Current change: ${detail(skill.current_change, "None")}`,
+          `Decision: ${text(skill.decision, "Pending")}`,
+          `Why: ${detail(skill.status_reason, "Not decided")}`
+        ].join("\n");
+        card.append(title, status, detail);
+        container.append(card);
+      });
+    }
+
+    function render(state) {
+      byId("status").textContent = `${text(state.phase, "unknown")} · ${text(state.status, "unknown")}`;
+      const metrics = byId("metrics");
+      metrics.replaceChildren(
+        metric("Installed skills", list(state.inventory).length),
+        metric("Selected", list(state.selection).length),
+        metric("Experiments", Object.keys(object(state.skills)).length),
+        metric("Last update", text(state.updated_at).replace("T", " ").slice(0, 19))
+      );
+      renderInventory(state.inventory);
+      renderModels(state.models);
+      renderActivity(state.activity);
+      renderSkills(state.skills);
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch(`/state.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`State request failed: ${response.status}`);
+        render(await response.json());
+      } catch (error) {
+        byId("status").classList.add("error");
+        byId("status").textContent = error.message;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

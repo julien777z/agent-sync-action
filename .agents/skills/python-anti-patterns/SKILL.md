@@ -1,13 +1,11 @@
 ---
 name: python-anti-patterns
-description: Common Python anti-patterns to avoid. Use as a checklist when reviewing code, before finalizing implementations, or when debugging issues that might stem from known bad practices.
+description: Use this skill when reviewing Python code for common anti-patterns to avoid. Use as a checklist when reviewing code, before finalizing implementations, or when debugging issues that might stem from known bad practices.
+metadata:
+  source: https://github.com/wshobson/agents
 ---
 
 # Python Anti-Patterns Checklist
-
-## Dependencies
-
-- `python-design-patterns` — provides the positive architecture guidance referenced by this anti-pattern guide.
 
 A reference checklist of common mistakes and anti-patterns in Python code. Review this before finalizing implementations to catch issues early.
 

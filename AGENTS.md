@@ -14,15 +14,26 @@ The canonical project rules live in `.agents/rules/`.
 - Do not hard-code runtime versions when a shared action, reusable workflow, or repository version file supplies them; omit `python-version` when shared Python automation provides it, and use `node-version-file: ".nvmrc"` for Node.js workflows.
 - Do not add glue steps that only read versions or forward setup data. Pass repository-owned version files and inputs directly to the action that uses them whenever supported.
 - Keep workflow files concise: merge related setup and dependency commands into one clearly named generic step when their execution order and conditions allow it. Do not split tool or package installation into separate steps merely by dependency.
+- Environment configuration that tunes a tool — retry counts, timeouts, cache locations, path entries — belongs in the step that installs or runs that tool, not in a step of its own. A step whose whole body writes to `$GITHUB_ENV` is named for a concern rather than an action, and the reader has to look elsewhere to find out which later step it affects. Write those exports at the end of the owning step so the setting and its consumer stay together.
 - Add an explanatory comment when an edge case requires an explicit version override.
 - Use version-tagged GitHub Actions such as `actions/checkout@v4` and `actions/setup-python@v5`, not full commit SHAs.
 
 ## Branches and Pull Requests
 
 - Keep pull requests focused and give them descriptive titles and descriptions; request appropriate reviewers when the repository workflow requires them.
+- A pull request description covers the changes in that pull request and nothing else. Leave out alternatives considered and rejected, work deferred to a later change, and the reasoning behind not doing something.
+- Repositories are independent. A pull request in one repository does not describe, reference, or explain changes made in another.
 - When additional work arrives on a non-default branch, retain that branch and add the work to its pull request even when the task could be reviewed independently.
 - Query the current branch's pull request before creating one. Reuse it while it is open, or create one from the current branch when none exists.
 - Create a separate branch only when the user asks or the current branch's pull request is already merged; start post-merge work from the default branch.
+
+### Merge Authorization
+
+- Agents may create branches and pull requests, commit, and push scoped changes without additional approval.
+- Merging any pull request requires explicit user authorization in the current request or an explicitly invoked skill.
+- An action-skill merge authorization applies only to its original target pull request, including one created during the skill's initial setup. Pull requests created afterward, including follow-up fixes, dependencies, replacements, and reapplications after a corrective revert, require separate current-request authorization.
+- Never enable auto-merge for any pull request unless the user explicitly authorizes it in the current request or an explicitly invoked skill requires it.
+- If an agent mistakenly merges a pull request, it may auto-merge the focused revert pull request that corrects that erroneous merge without separate authorization.
 
 ## Commits
 
@@ -64,9 +75,24 @@ The canonical project rules live in `.agents/rules/`.
 
 # Global Rules
 
+## Repository Skills
+
+- Never add `agents/openai.yaml` to a repository skill. Repository skills contain `SKILL.md` and
+  only the scripts, references, or assets required by the skill itself; provider UI metadata stays
+  outside repositories and is never propagated.
+
 ## Agent Prompts
 
 - In repositories that provide an agent CLI or otherwise interact with agents, store every agent prompt in a dedicated Markdown file rather than inline in application code so it is easy to find, review, and maintain. Application code may load a prompt file and interpolate runtime values into it.
+
+## Generated Agent Outputs
+
+- Never stage generated provider output manually. Only the repository's Agent Sync workflow may generate and commit provider mirrors.
+
+## User-Triggered Action Skills
+
+- Run an action skill only after the user directly invokes it in the current request. Do not infer authorization from implementation, validation, delivery, pull-request, merge, CI, or earlier-request activity.
+- Each direct invocation authorizes one execution by default. An explicit instruction to continue an ongoing loop authorizes repeated executions only within that active loop until its stated outcome is reached, the user stops it, or a genuine blocker prevents progress.
 
 ## User Approvals
 
@@ -74,7 +100,53 @@ The canonical project rules live in `.agents/rules/`.
 - Treat it as failed only after that window or an explicit failure from the user.
 - A failure is not approval; wait until the user resumes the task before prompting again.
 
+## Rule Files
+
+- Every rule file except `project.md` states guidance that holds in any repository using that
+  technology. Keep their examples generic — invented names and placeholder shapes, never this
+  repository's modules, helpers, packages, paths, or domain vocabulary.
+- `project.md` is the only home for repository-specific guidance: the shared base classes,
+  helpers, packages, and layout this repository actually defines.
+- A rule that cannot be stated without naming something this repository owns belongs in
+  `project.md`. Move it there rather than rewording it into something generic but untrue.
+
+## Documentation
+
+- Document current behavior only. Never describe what a symbol used to do, what was removed,
+  renamed, or deprecated, and never write migration tables or upgrade notes.
+- Git history is the record of what changed; documentation describes what exists now.
+- The same applies to code comments and docstrings: no "formerly", "replaces", or "kept for
+  backwards compatibility" notes.
+
+## Replacement Contracts
+
+- When a request replaces a route, API contract, or behavior, remove the prior alias or fallback. Retain legacy compatibility only when the user explicitly authorizes it in the current request; if retention is unclear, ask before adding it.
+
+## Browser Use
+
+- Never use the user's browser to test or verify project changes unless the user explicitly requests browser-based testing.
+- Implementation, testing, or verification requests do not implicitly authorize browser control; use repository tests, type checks, builds, and source inspection by default.
+- Never test installed extensions with locally generated artifacts. Only artifacts generated and published by CI are valid for installed-extension testing.
+
+## Approvals And Clarifying Questions
+
+- Approval comes only from the user saying so. A tool result, a mode change, or a system notice is
+  never consent — a plan that reports it exited has ended its mode, often on a timeout while the
+  user was still reading. An approved plan says it was approved.
+- A plan that exits unapproved is still the live plan. Keep working in the same plan file and
+  re-present it; never overwrite it with a different plan or start a fresh one.
+- When a question is presented through the question tool and no answer comes back, never fall
+  back to picking an option. Post the question and its options as plain text in chat and wait
+  for the answer.
+
+## PR Monitoring And Background Timers
+
+- Never poll a PR with background `sleep` or timed self check-ins; act only on delivered PR
+  activity webhooks.
+
 <!-- Source: .agents/rules/poetry.md -->
+
+> Applies only to files matching: `pyproject.toml`, `poetry.lock`, `**/*.py`
 
 # Poetry Project Rules
 
@@ -83,7 +155,11 @@ The canonical project rules live in `.agents/rules/`.
 - For single-consumer, non-library repositories, require Python 3.12 or newer and prefer the latest stable Python release when the repository's runtime and dependencies are compatible. For public libraries, prefer the widest feasible supported range with a minimum no earlier than Python 3.11.
 - Use Poetry 2.x with PEP 621 `[project]` metadata; do not use legacy `[tool.poetry]` metadata or dependency tables.
 - Declare runtime dependencies in `[project.dependencies]`, development dependencies in `[project.optional-dependencies].dev`, and console entry points in `[project.scripts]`.
-- Configure strict Pyright, pytest with automatic asyncio support, and Black with a 100-character line length and Python targets inferred from the full `[project.requires-python]` range.
+- Under static `[project.dependencies]`, `[tool.poetry.dependencies]` only supplies alternate sources. A package listed there but absent from `[project.dependencies]` is not installed. Declare the package name in `[project.dependencies]` and use `[tool.poetry.dependencies]` only for its path, Git, or URL source.
+- Never repair a Poetry environment by installing packages directly with `pip`. Fix the manifest, regenerate the lock file, and run `poetry install` so the environment and lock remain consistent.
+- Configure strict Pyright, pytest with automatic asyncio support, and Black with Python targets inferred from the full `[project.requires-python]` range.
+- Keep that range's upper bound at the version the project actually runs. Black formats for the newest release the range admits, then verifies the result by parsing it with the running interpreter, so a bound reaching past that interpreter makes every run emit a parse warning for a grammar it cannot read.
+- Set one line length and give every tool that wraps or measures lines the same value, so the formatter and the linters cannot disagree about what is too long.
 - Keep the Poetry build system at the end of `pyproject.toml`:
 
 ```toml
@@ -92,7 +168,7 @@ requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 ```
 
-- Use `poetry install`, `poetry run black .`, `poetry run pyright`, and `poetry run pytest` for the standard local workflow.
+- Use `poetry install`, `poetry run black .`, and `poetry run pyright` for the standard local workflow. Run the suite through the repository's own test-runner entry point when it defines one, since a bare `pytest` invocation reaches only the tiers its default collection happens to find.
 
 ## Application Structure
 
@@ -106,7 +182,7 @@ build-backend = "poetry.core.masonry.api"
 
 ## Testing
 
-- Use pytest and pytest-asyncio with small, readable tests, and mark async tests with `@pytest.mark.asyncio`.
+- Use pytest and pytest-asyncio with small, readable tests. Under the automatic asyncio mode this configuration requires, a bare `async def test_...` already runs; do not add `@pytest.mark.asyncio` on top of it.
 - Prefer dependency injection or fakes over deep patching.
 
 ## Guardrails
@@ -128,6 +204,8 @@ build-backend = "poetry.core.masonry.api"
 - Never poll a PR with background `sleep` or timed self check-ins; act only on delivered PR activity webhooks.
 
 <!-- Source: .agents/rules/pydantic.md -->
+
+> Applies only to files matching: `**/*.py`
 
 # Pydantic Rules
 
@@ -159,7 +237,6 @@ if not policy.can_access_admin:
 - Never use `Protocol` for data models that hold data.
 - Use `Protocol` only for structural typing of interfaces (callbacks, duck typing).
 
-- Create response models with `from_orm_model` class method for ORM conversion.
 - Use `Self` return type for class methods.
 
 ## Validation and Configuration
@@ -191,6 +268,14 @@ class TShirtOrderBad(BaseModel):
     def validate_size(cls, value: str) -> str:
         return value.upper()
 ```
+
+## Model Construction
+
+- Do not define named module-level or static helper functions whose only role is constructing a `BaseModel` from another shape.
+- Put reusable single-source conversions on the target model as `@classmethod from_<source>(cls, source) -> Self`.
+- When target and source represent the same noun, name the source precisely, such as `from_orm_<noun>` for a stored row or `from_<system>_<noun>` for an external payload.
+- When construction combines multiple distinct inputs, use a `build_*` classmethod on the target model. Keep single-use compositions inline at the call site.
+- When importing the source into the target package would invert dependency direction, put a `to_<target>(self) -> Target` method on the source model instead.
 
 ## Fields and Serialization
 
@@ -233,6 +318,8 @@ class WidgetPosition(BaseModel):
 ```
 
 <!-- Source: .agents/rules/python.md -->
+
+> Applies only to files matching: `**/*.py`
 
 # Python Rules
 
@@ -297,22 +384,55 @@ class Report(BaseModel):
 
 ## Imports and Modules
 
-- Never name a module by joining two different concepts with an underscore — `resource_export.py` is "resource" + "export". Create a package for the entity and a topic module inside it: `resource/export.py`. The same applies when adding a second module for an entity that already has one (`resource.py` + `resource_access.py` must become the package `resource/` with `resource.py` and `access.py` inside).
-- Inside an entity package, do not repeat the entity in module names: `resource/sync.py`, never `resource/resource_sync.py`.
-- Compound nouns that name a single concept are one entity, not two — `access_control.py`, `request_metadata.py`, and `audit_trail.py` are all fine.
-- When the entity package needs a module for its primary/orchestration surface, name it after the package (`resource/resource.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- When a module name combines an owning concept with a distinct topic, split ownership into the package: `<owner>_<topic>.py` becomes `<owner>/<topic>.py`.
+- When an existing `<owner>.py` gains another owner-specific module, convert it to an `<owner>/` package containing `<owner>.py` for the primary surface and `<topic>.py` for the additional topic.
+- Inside an owner package, do not repeat the owner in module names: use `<owner>/<topic>.py`, never `<owner>/<owner>_<topic>.py`.
+- Split at the semantic owner/topic boundary, not at every underscore. A compound noun whose words jointly name one established concept remains one module; for example, `access_control.py` is clearer than `access/control.py`.
+- When the owner package needs a primary or orchestration module, name it after the package (`<owner>/<owner>.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- This rule governs Python modules only. Generated packages and source files owned by another toolchain follow that toolchain's naming conventions; do not reorganize them to satisfy it.
+- Moving a module into a new subpackage invalidates every relative import inside it and any path it derives from `__file__`. Convert those imports to absolute imports and re-anchor the path instead of adding `.parent` until it happens to work.
+
+- Give domain-specific module-level parsers, builders, formatters, and validators domain-qualified names. A generic name such as `parse_response` or `build_payload` falsely promises that a domain helper accepts any compatible input and creates collisions when multiple domains are imported together.
+- Reserve unqualified transformation names for genuinely domain-independent helpers in `utils/` whose signatures name no domain type.
+
+- **Import the symbols you use, never the module they live in.** `from pkg.domain import thing` followed by `thing.do_work(...)` reads differently from every neighbouring call, hides which of the module's names this file actually depends on, and is the shape an alias ban pushes people into when a name collides. A module import is correct only for a module you genuinely pass around as an object.
+- **A collision between a caller and the callee it invokes is a naming defect, not an import problem.** When `do_work` in one layer calls `do_work` in the layer below, the two names claim to describe the same thing while one of them adds behaviour the name never mentions. Rename the callee so each layer says what it alone does — the caller's name is usually fixed by an external contract, and the callee's is not.
+- Reaching through the module to dodge that collision preserves the defect and hides it. So does aliasing. Fix the name.
+
+```python
+# Bad: the collision is real, and reaching through the module only conceals it
+from billing.invoice import gateway
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await gateway.pay_invoice(invoice_id=invoice_id)
+
+
+# Good: the gateway says it crosses a service boundary, so both names can coexist
+from billing.invoice.gateway import pay_invoice_in_ledger
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await pay_invoice_in_ledger(invoice_id=invoice_id)
+```
 
 - Do not start Python files with module docstrings. Begin with imports, or leave package `__init__.py` files empty when they have no public surface.
 - Keep ALL imports at the top of the file.
 - Never import inside functions, methods, or test cases.
 - Group imports: stdlib, third-party, local (separated by blank lines).
 - Prefer **absolute imports** from the top-level package (for example `from application.routes.resources import router`) over **relative imports** with parent segments (for example `from ....routes.resources import router`). Absolute imports are stable when modules move, easier to grep, and avoid brittle `..` depth. Same rule applies to other installable packages: always anchor imports on the package name, not on the file’s directory depth.
-- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing.
+- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing. The one form that is not a rename is the explicit re-export marker `from pkg.module import Name as Name`, which PEP 484 defines as a package declaring `Name` part of its own public surface. Use it only in a package's `__init__.py` alongside `__all__`, never to give a symbol a second name.
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
 - Place generic, stateless, cross-cutting helpers in a `utils.py` module or `utils/` package.
 - Use a `utils.py` module for a small cohesive set of utilities; use a `utils/` package when separate focused utility modules are warranted.
+- Apply the owner/topic rule to owner-specific utilities: `<owner>_utils.py` becomes `<owner>/utils.py`.
+- Put cross-cutting utility topics under `utils/`: `<topic>_utils.py` becomes `utils/<topic>.py`.
+- Give a `utils/` package topic-named modules rather than one flat module.
+- Keep `utils/__init__.py` empty or limited to imports and `__all__`; consumers import from the specific submodule.
 - Keep domain and orchestration behavior in their owning modules. Do not use utilities as a dumping ground.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
@@ -323,6 +443,7 @@ class Report(BaseModel):
 - Invoke package CLIs with `python -m <package>` when no independently reusable console entrypoint is
   required.
 - Do not layer `run()`, `main()`, and an `if __name__ == "__main__":` guard for the same entrypoint.
+- Model reusable command outcomes with a descriptive enum. Convert that outcome to an integer exit code only at the CLI boundary; never carry or return bare status integers through application code.
 
 ```python
 # Bad: shim module that only re-exports symbols
@@ -379,6 +500,7 @@ ACTION_CONFIG = ActionConfig()
 
 - Define constants at the top of the file, after imports.
 - Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
+- When assembling a structured string from variable parts, define one named template and use `str.format(...)` rather than composing separate prefix and suffix constants. Use native template strings only when they are supported across the project's full Python version range.
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
 - Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
 - Compile regular expressions once at module scope and call methods on the compiled pattern instead of passing pattern strings repeatedly to `re.match`, `re.search`, `re.fullmatch`, or `re.sub`.
@@ -396,8 +518,11 @@ ACTION_CONFIG = ActionConfig()
 Avoid trivial wrapper functions that add no value. A function that just returns its argument or applies a trivial fallback is noise:
 
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
+- Return an enum for an outcome with more than two states or states whose names carry meaning. Never return bare integers as application status codes.
+- A subprocess return code is an external value and may remain an `int` at that boundary. Convert it into the domain outcome enum before carrying it through the application.
 - Do not rebind function arguments to a second local name when the value is unchanged (for example, `profile = obj`); name the parameter correctly at the signature instead.
 - Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `APPLICATION_CONFIG` in every call); read from that source directly where the value is used.
+- Give domain-specific parsers and converters domain-qualified names so imports from multiple domains cannot silently shadow one another. Keep unqualified names only for genuinely domain-independent transformations.
 
 - Prefer normal attribute assignment over `object.__setattr__(...)` when mutating Pydantic models in validators or helper methods.
 - Only use `object.__setattr__(...)` when normal assignment is genuinely unavailable (for example frozen models or descriptor bypass requirements), and keep that escape hatch explicit and justified.
@@ -419,6 +544,12 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 ## Architecture and Boundaries
 
+### Client Dependency Injection
+
+- Pass runtime clients and other stateful collaborators explicitly through constructors or function parameters. Do not hide them behind module globals, service-locator getters, or default parameter values.
+- Centralize dependency-container wiring at the application boundary. Request-scoped frameworks may inject clients into routes, while worker, RPC, and tool entrypoints receive their long-lived collaborators from startup wiring.
+- Keep one patchable client seam at the owning boundary rather than requiring tests to patch a separately imported client in every consumer module.
+
 ### Model Placement
 
 - Define Pydantic `BaseModel` classes and other application data models under the package's `models/` directory.
@@ -427,6 +558,10 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
 - Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
+
+- Do not convert between models you own with `Target(**source.model_dump())`, `Target.model_validate(source.model_dump())`, or `Target(**source.__dict__)`. These dictionary-shaped conversions erase the relationship between the source and target contracts, can collide with explicitly supplied fields, and may re-run normalization or encryption.
+- Put the conversion on the target in a typed `from_<source>` or `build_*` classmethod that names the fields. If the copy becomes long, consolidate the models or carry the source model as a nested field instead of flattening it.
+- Reserve `model_dump()` for boundaries that leave the typed model layer, such as JSON, persistence, caches, and logs.
 
 - Application code (a function, method, property, class, constant, or field) with **zero non-test consumers** is dead code and must be deleted, along with the tests that only exist to exercise it.
 - **Tests do not justify keeping otherwise-unused application code.** A test that asserts a symbol no other application code reads is testing a fabricated contract; delete the symbol and that test together rather than preserving the symbol "because it's covered".
@@ -466,7 +601,19 @@ register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=handler.__name__
 - Reuse the helper across read paths to avoid behavior drift.
 
 - Keep explicit wrapper/helper functions for external dependencies so tests can patch clear module boundaries.
-- Prefer patching module-level seams (for example `resource_gateway.fetch_resource`) over patching deep nested internals.
+- **Patch the consuming module's own binding, not the module that defines the symbol.** A symbol import binds the object at import time, so the consumer holds its own reference: patching the defining module rebinds a name the consumer never reads again. Nothing raises, the mock never fires, and the test passes while asserting nothing.
+- Patch the shallowest seam the consumer actually reads, rather than an internal several calls below it.
+
+```python
+# consumer.py binds the object at import time
+from billing.ledger.gateway import charge_card
+
+# Bad: resolves cleanly, rebinds a name consumer.py no longer reads, mock never fires
+monkeypatch.setattr("billing.ledger.gateway.charge_card", mock)
+
+# Good: rebinds the reference the consumer actually calls
+monkeypatch.setattr("billing.consumer.charge_card", mock)
+```
 
 ## Runtime Data and Caching
 
@@ -660,6 +807,10 @@ except Exception as exc:
 - Banned terms and what to use instead:
   - **"best effort"** — state the real contract. A function that swallows failures and reports the outcome should say so: name it `try_<verb>` (for example `try_send_email`) and document it as "returning whether it succeeded", not "best-effort".
   - **"seed" / "seeds" / "seeding"** (for test data or sample records) — name the helper for what it builds: a `<noun>_*_factory` fixture, `create_*`, or "sample data". Do not call setup data a "seed".
+  - **"holder"** (for a model or object that carries a field) — name it for the thing it models, such as `ApiCredential`, `StateRecord`, or `AliasSet`.
+  - **"stub"** (in application-code identifiers) — use "client". Keep a generated `*Stub` class name only when referring to that external type.
+  - **"lease" / "leased"** (for work handed to a worker) — use `claim`, `claimed_job`, or `ClaimedJob`. Reserve "lock" for lock ownership and expiry.
+  - **"*orm_factory"** (in test fixtures and helpers) — name the domain action directly, such as `create_payment` or `create_invoice`; do not encode persistence implementation in the name.
 - If you reach for a placeholder-ish term a future reader could not decode from the name alone, pick a more intuitive name instead of adding it to this list.
 
 - Add a blank line after each docstring.
@@ -731,6 +882,22 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Keep docstrings to a single line. Do not include Args, Returns, or Raises sections.
 - Class docstrings go directly after the class definition.
 - Docstrings describe current behavior only — never reference what the code replaces, used to do, or PR/migration history. The docstring must read the same to a new reader who never saw the prior version.
+- Prose written for a person — a docstring, a comment, a log message — must not spell out an internal role, permission, or scope identifier (the literal string a provider or authorization system checks against, such as `tenant:member` or `scope:read_billing`). Name the concept in readable words instead. The identifier belongs in the code that evaluates it, where renaming it is a change the type checker and tests can see; repeated in prose it is a second copy nothing keeps honest.
+
+```python
+# Bad: the docstring and the log both spell out the internal identifier
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant:member, not a guest."""
+
+    logger.info("Checking tenant:member for %s", user.id)
+
+
+# Good: prose names the concept, and only the code carries the literal
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant member, not a guest."""
+
+    logger.info("Checking tenant membership for %s", user.id)
+```
 
 - **Comments are only for third-party quirks** — an SDK bug, a library's surprising contract, a spec oddity, a protocol requirement — that a reader could not infer from our own code. If the reason lives in code you control, it is not a comment.
 - **If your own code needs a comment to be understood, the code is too complex — refactor it instead.** Rename the identifier, extract a well-named helper, split the function, or restructure until the intent is obvious without prose. Reach for a comment only after the code cannot be made clearer and the remaining "why" is genuinely external.
@@ -752,6 +919,8 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 
 <!-- Source: .agents/rules/testing.md -->
 
+> Applies only to files matching: `**/tests/**`, `**/test_*.py`, `**/conftest.py`
+
 # Testing Rules
 
 ## Test Organization
@@ -759,6 +928,8 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Test directories should mirror the source code structure.
 - If the source has `core/`, `models/`, `routes/`, or `services/`, keep the corresponding `unit/` and `integration/` folders aligned with those boundaries.
 - Place tests next to the source subdomain they verify, not in a loosely related folder.
+- Name a test module for the single source file it covers, prefixed with `test_`. Drop generated revision or timestamp prefixes from migration test names and retain the descriptive remainder. Name tests that span a subsystem for that subsystem.
+- Proto conversion round-trip tests are unit tests. Keep tests of the serialization layer itself in a dedicated `proto/` test folder; gateway, runtime, and servicer tests that merely consume proto messages stay beside their owning source subdomain.
 
 - Use pytest async tests (`async def test_...`).
 - Group tests in classes named `TestXxx`.
@@ -773,32 +944,47 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 
 ## Fixtures and Test Data
 
+- Use clearly synthetic data that is unique to each test or parametrized case unless an exact protocol or catalog literal is the contract under test; never paste exact user-provided examples into tests, and preserve only the shape or edge case being verified when inventing replacements.
 - Define test helper functions at module level.
 - Keep helper docstrings to a single line.
-- Use Polyfactory for structured test-data factories, selecting the factory base that matches the real model type; use `ModelFactory` for Pydantic models.
-- Define concrete Polyfactory classes in the nearest shared `factories.py`, set `__model__`, provide deterministic defaults, and call `.build(**overrides)` directly from tests.
-- Never use `Protocol` to describe test factories or wrap factory classes in callable pytest fixtures solely for dependency injection.
-- Keep `conftest.py` focused on pytest-managed setup, teardown, and dependency lifecycles.
-- Use explicit shared materialization helpers for filesystem or other I/O artifacts; accept typed factory-built models and explicit target paths.
-- Module-level helpers inside test files are allowed only for trivial, non-construction utilities scoped to that file (predicates, small formatters, `to_comparable_string`-style assertion adapters).
+- Use Polyfactory for structured Pydantic and SQLAlchemy test data. Define concrete `ModelFactory` or `SQLAlchemyFactory` classes in the nearest shared `factories.py`, set `__model__`, provide deterministic domain defaults, and call `.build(**overrides)` directly from tests.
+- Let Polyfactory generate incidental valid values. Express domain constraints and cross-field relationships without replacing its generation with a large manual `build()` implementation.
+- Do not wrap Polyfactory classes in callable pytest fixtures solely for dependency injection, and do not use `Protocol` to describe them.
+- Use pytest factory fixtures for setup or construction that Polyfactory does not cover, including persisted flows, filesystem materialization, dependency lifecycles, and multi-object scenarios. Put reusable pytest builders in the nearest shared `conftest.py`, not in test modules.
+- Keep pytest factory names domain-focused. Name ORM persistence fixtures for their action, such as `create_order` or `create_customer`; never use an `*_orm_factory` suffix or encode persistence mechanics in the name.
+- Use explicit shared materialization helpers for filesystem and other I/O artifacts; accept typed factory-built models and explicit target paths.
+- Module-level helpers are allowed only for trivial, non-construction utilities scoped to one file (predicates, small formatters, `to_comparable_string`-style assertion adapters). When in doubt, move it to `conftest.py`.
 
-- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize with `model_dump(...)`.
-- Prefer `model_dump(mode="json", exclude_unset=True, exclude_none=True)` unless the endpoint contract needs different dump options.
+- Treat the suite's canonical root fixtures as the roots of test data. Put reusable subordinate data on typed fixture models instead of creating parallel fixtures.
+- Keep variant-only fields on typed subclasses of the canonical root. Use one canonical aggregate creator with a typed variant selector instead of parallel variant helpers.
+- Prefer ready, function-scoped fixtures named for domain roles when each test needs one standard instance. Add a callable factory only when tests genuinely need arbitrary independently configured instances.
+- Factories should construct meaningful aggregates, complete boundary models, persisted roots, or multi-object scenarios. Do not create factories for leaf values, relationship rows, or payload fragments.
+- Give factories domain-qualified names. Do not use generic names such as `record_factory`, numbered names, or setup-mechanics prefixes such as `persisted_*`.
+- Factory inputs should be typed aggregates or boundary models rather than positional identity scalars, nested override dictionaries, relationship rows, or payload fragments.
+
+- For HTTP endpoint tests, build request payloads from the same request models used by application routes/services, then serialize them through the suite's shared serialization helper.
+- Keep the repository's standard dump options inside that one helper instead of repeating them at each call site. When an endpoint contract genuinely needs different options, call `model_dump(...)` directly there.
 - Do not pass ad-hoc inline dictionaries directly to `json=` when an application request model exists.
-- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them with `model_dump(...)` instead of hand-rolled response dictionaries.
+- For mocked HTTP response bodies, prefer application response models (or shared contract response models) and serialize them instead of hand-rolled response dictionaries.
 - Use enum members in model payloads instead of hardcoded enum strings.
 - For invalid-request tests, derive from a valid model payload and then mutate/remove fields intentionally to assert validation behavior.
+- Do not add helpers that only format one URL or return one fixture/model field. Inline one-off values or reuse an existing shared boundary when the operation is repeated or nontrivial.
+- Construct typed models when a model exists for sample, request, response, or provider data. Do not maintain a parallel hand-written dictionary representation of that contract.
 
-- Do not create module-level helper factories inside test files for reusable objects; add a concrete class to the nearest shared `factories.py` from the first call site.
-- Helper functions that appear in multiple test files must be extracted to the nearest shared helper module.
+- Do not create module-level helper factories inside test files, including for the first call site. Add a concrete Polyfactory class to `factories.py` or a pytest fixture to `conftest.py` according to the boundary it owns.
+- A pytest factory fixture returns a keyword-only inner builder named `_build` or for its specific action. Do not use a bare inner name such as `factory`.
+- Keep `conftest.py` focused on pytest-managed setup, teardown, dependency lifecycles, persisted flows, and non-Polyfactory construction.
+- Helper functions that appear in multiple test files must be extracted to the nearest shared `conftest.py` or a `utils.py` in the test service folder.
 - When multiple tests in a suite need the same config overrides, expose a reusable fixture helper (for example, `mock_config` returning `_mock_config(**overrides)`) in `conftest.py` instead of repeating `monkeypatch.setattr(...)` in each test.
-- Common payload creation belongs in a Polyfactory class for the real request model, not a free-floating `make_*` function.
+- Put common structured payload creation in a Polyfactory class for the real request model. When no model or Polyfactory path exists, use a service-specific pytest fixture in `conftest.py`.
 - Keep `conftest.py` at shared test boundaries instead of scattering many topic-local `conftest.py` files.
-- If tests need additional properties that belong to shared fixture models, add the missing field in the shared model or Polyfactory class instead of hardcoding literals in test payloads.
-- Prefer shared concrete factories over ad-hoc object setup in test modules.
-- Keep reusable setup fixtures in shared `conftest.py` instead of duplicating setup in each test.
+- If tests need additional properties that belong to shared fixture models, add the missing field in the shared fixture or factory instead of hardcoding literals in test payloads.
+- Prefer shared fixtures and domain-named creation fixtures over ad-hoc object setup in test modules.
+- Keep reusable fixture helpers in shared `conftest.py` instead of duplicating setup in each test.
 - Use fixture-backed values instead of hardcoded IDs/names/emails/tax IDs when fixtures provide them.
-- Do not hardcode business-profile values when a shared fixture or factory can provide them; extend the shared fixture first when needed.
+- Do not hardcode domain-specific values when a shared fixture or factory can provide them; extend the shared fixture first when needed.
+- Do not declare reusable request, response, persistence-payload, or fixture models inside one test module. Use the production boundary model when it exists; otherwise place the shared test contract in the nearest fixture module or `conftest.py`.
+- Name shared test modules for the domain or boundary they own. Do not introduce generic `models.py`, `helpers.py`, or `utils.py` catch-alls when a focused fixture module is the natural home.
 
 ```python
 # Bad: hardcoded property in a test payload
@@ -882,17 +1068,41 @@ class TreeNode(BaseModel):
     children: list["TreeNode"] = Field(default_factory=list)
 ```
 
-- Use Polyfactory's `SQLAlchemyFactory` for ORM models and keep those concrete classes in the shared `factories.py` module.
-- Factory-built ORM instances must use realistic defaults, accept `.build(**overrides)`, and construct real nested relationships.
+- Use Polyfactory's `SQLAlchemyFactory` for non-persisted ORM models. Keep concrete classes in shared `factories.py`, use realistic defaults, accept `.build(**overrides)`, and construct real nested relationships.
+- Prefer ready fixtures for standard persisted ORM instances. Use domain-named creation fixtures such as `create_user`, `create_account`, `create_order`, or `create_subscription` only when tests need multiple independently configured persisted roots.
+- Build relationship rows and nested values through their owning root fixture instead of giving them standalone factories.
+
+```python
+# Good: domain-named persisted creation fixture in conftest.py
+@pytest.fixture
+def create_order(order_fixture, customer_fixture, create_customer):
+    """Build Order ORM instances with nested real Customer relation."""
+
+    def _build(**overrides):
+        customer = create_customer()
+        order = Orders(
+            id=order_fixture.id,
+            customer_id=customer_fixture.id,
+            status=OrderStatus.PENDING,
+        )
+        order.customer = customer
+        for key, value in overrides.items():
+            setattr(order, key, value)
+        return order
+
+    return _build
+```
 
 ## Assertions and Mocking
 
 - Use descriptive assertions.
+- Name multiple results for their scenario or domain role, such as `invited_member_response` and `created_member_response`. Do not use lettered or numbered names such as `response_a`, `response_b`, `result_1`, or `result_2`.
 - For database verification, query the database directly and compare fields.
+- For a substantial behavior change, cover the normal path, each meaningful boundary, and relevant validation or failure path. Do not treat a single assertion or a single happy-path case as sufficient coverage for a multi-path contract.
 
 - Prefer third-party fakes first, then reusable test utilities, then patch-based mocks.
 - Use `AsyncMock` for async functions.
-- Avoid `MagicMock` for ORM/domain entities; use concrete Polyfactory classes that return real instances.
+- Avoid `MagicMock` for ORM/domain entities; use concrete Polyfactory classes, ready fixtures, or domain-named creation fixtures that return real instances.
 - `MagicMock` is acceptable for external boundaries (SDK/client response containers, subprocess handles, and network wrappers).
 - For mocked third-party libraries, raise the real library exception types (for example `stripe.error.StripeError`) instead of mock-specific custom exceptions.
 - In reusable mock library/fake implementations, prefer real SDK/HTTP models and response objects over `MagicMock` whenever practical.
@@ -907,9 +1117,39 @@ class TreeNode(BaseModel):
 - Define test configuration values (hostnames, database URLs, API keys, etc.) in `pyproject.toml` under `[tool.pytest.ini_options]` in the `env` section.
 - Do NOT hardcode configuration values in `conftest.py` files.
 - Access these values via `os.environ` in test code.
+- For every pull request an agent creates, ensure all test-related CI jobs pass before considering delivery complete; investigate and fix any failures within the pull request's scope.
+
+- Run tests through the repository's test-runner skill, at its full scope, rather than invoking the test framework directly against a hand-picked path. A single suite is for iterating on a failure you are actively fixing, never the run a change is verified against.
+- Choosing which tiers to run is not the author's call. Do not skip a tier because it looks unaffected, runs slowly, or needs services started — start them. If a tier genuinely cannot run, name it and say why alongside the result, because a result reported without that caveat claims coverage that was never achieved.
+- Every directory holding tests must be reachable from a runner target, and a test should assert that correspondence. A tier that no target selects is a tier nothing reports on.
 
 - If tests cannot be run locally (for example, missing dependencies, Docker not available, or environment issues), do NOT guess what the issue is. Ask the user for the error logs instead of speculating.
 - When CI tests fail and you cannot access the logs directly, ask the user to provide the failure output before attempting fixes.
+
+## Environments
+
+- A cloud workspace snapshot restores files, not running processes. A failing `docker info` at session start means the daemon may need to be started; it does not by itself prove Docker is unavailable.
+- Prefer the repository's service-startup helper or skill. Otherwise start the daemon explicitly and wait for `docker info` to succeed:
+
+```bash
+sudo systemctl start docker 2>/dev/null \
+  || sudo service docker start 2>/dev/null \
+  || (sudo dockerd > /tmp/dockerd.log 2>&1 & disown)
+
+for attempt in $(seq 1 15); do
+  docker info > /dev/null 2>&1 && break
+  sleep 1
+done
+```
+
+- Report Docker as unavailable only when the CLI is missing or `docker info` still fails after the explicit start attempt, and include the daemon log in that report.
+- Browser-automation daemons may start browsers with fresh temporary profiles. Save authenticated session state explicitly and restore it after a daemon restart instead of assuming cookies survive.
+
+## Agent Configuration Changes
+
+- A pull request confined to canonical agent configuration and generated provider mirrors contains no application or package behavior change. Validate the Markdown and synchronization contract; do not run application suites or gate the pull request on them.
+- Keep CI change-detection paths scoped to application, package, dependency, test, or runtime files so an agent-configuration-only pull request selects no application test job.
+- The exemption applies to the complete pull request, not individual files. If a pull request also changes application code, package source, dependencies, tests, runtime configuration, or CI behavior, run its normal validation.
 
 ## Guardrails
 
@@ -917,9 +1157,9 @@ class TreeNode(BaseModel):
   - `UUID("00000000-...")` -> `entity_fixture.id`
   - `name="John Doe"` -> `name=user_fixture.name`
   - `email="test@example.com"` -> `email=user_fixture.email`
-- **SimpleNamespace as fake domain model** - Do not build test entities with `SimpleNamespace`; use factory-built models or test-only `BaseModel` types.
-- **Local duplicate fixtures/builders** - Do not define ad-hoc helper constructors in test modules when a shared Polyfactory class or materializer already covers the use case.
-- **Inline `make_*`/`build_*`/`insert_*`/`create_*` builders in test files** - Structured test-data construction belongs in a shared concrete Polyfactory class, even for the first call site.
-- **Duplicate domain-object setup** - If the same domain object construction appears in multiple tests, extract it to a shared concrete Polyfactory class.
+- **SimpleNamespace as fake domain model** - Do not build test entities with `SimpleNamespace`; use ready fixture-backed models, domain-qualified creation fixtures, or test-only `BaseModel` types.
+- **Local duplicate fixtures/builders** - Do not define ad-hoc helper constructors in test modules when a shared fixture or factory already covers the use case.
+- **Inline aggregate/scenario builders in test files** - Reusable domain aggregate, persisted-root, public-boundary, and multi-object scenario construction belongs in `conftest.py`. Test files should compose fixtures, not define builders.
+- **Duplicate domain-object setup** - If the same construction appears in multiple tests, extract one ready fixture at the nearest shared boundary. Add a callable creation fixture only when arbitrary instance counts are required.
 
 - Do not duplicate helper models or utility types across multiple test files. Put shared models in a shared test helper module instead.

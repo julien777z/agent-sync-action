@@ -1,5 +1,9 @@
 ---
-alwaysApply: true
+globs:
+- '**/*.py'
+alwaysApply: false
+paths:
+- '**/*.py'
 ---
 
 # Pydantic Rules
@@ -32,7 +36,6 @@ if not policy.can_access_admin:
 - Never use `Protocol` for data models that hold data.
 - Use `Protocol` only for structural typing of interfaces (callbacks, duck typing).
 
-- Create response models with `from_orm_model` class method for ORM conversion.
 - Use `Self` return type for class methods.
 
 ## Validation and Configuration
@@ -64,6 +67,14 @@ class TShirtOrderBad(BaseModel):
     def validate_size(cls, value: str) -> str:
         return value.upper()
 ```
+
+## Model Construction
+
+- Do not define named module-level or static helper functions whose only role is constructing a `BaseModel` from another shape.
+- Put reusable single-source conversions on the target model as `@classmethod from_<source>(cls, source) -> Self`.
+- When target and source represent the same noun, name the source precisely, such as `from_orm_<noun>` for a stored row or `from_<system>_<noun>` for an external payload.
+- When construction combines multiple distinct inputs, use a `build_*` classmethod on the target model. Keep single-use compositions inline at the call site.
+- When importing the source into the target package would invert dependency direction, put a `to_<target>(self) -> Target` method on the source model instead.
 
 ## Fields and Serialization
 

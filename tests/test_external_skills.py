@@ -187,10 +187,7 @@ class TestExternalSkillBoundaries:
             "---\nname: sample\ndescription: Installed skill.\n---\n\nInstalled.\n"
         )
 
-        assert (
-            installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root)
-            == installed
-        )
+        assert installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root) == installed
 
     def test_source_skill_discovery_uses_metadata_for_a_root_skill(
         self,
@@ -198,14 +195,10 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that root skills are found among sibling skill documents."""
 
-        (tmp_path / "SKILL.md").write_text(
-            "---\nname: root-skill\ndescription: Root skill.\n---\n\nRoot.\n"
-        )
+        (tmp_path / "SKILL.md").write_text("---\nname: root-skill\ndescription: Root skill.\n---\n\nRoot.\n")
         nested = tmp_path / "skills/nested"
         nested.mkdir(parents=True)
-        (nested / "SKILL.md").write_text(
-            "---\nname: nested\ndescription: Nested skill.\n---\n\nNested.\n"
-        )
+        (nested / "SKILL.md").write_text("---\nname: nested\ndescription: Nested skill.\n---\n\nNested.\n")
 
         assert installer.locate_skill_directory(tmp_path, "root-skill") == tmp_path
 
@@ -255,9 +248,7 @@ class TestExternalSkillBoundaries:
             observed.append(("install", str(source_root)))
             installed = working_directory / ".staging/skills" / installed_skill.name
             installed.mkdir(parents=True)
-            (installed / "SKILL.md").write_text(
-                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
-            )
+            (installed / "SKILL.md").write_text("---\nname: sample\ndescription: A skill.\n---\n\nContent.\n")
 
         monkeypatch.setattr(installer, "install_skill", fake_install)
 
@@ -425,9 +416,7 @@ class TestExternalSkillBoundaries:
 
             installed = working_directory / ".staging/skills" / installed_skill.name
             installed.mkdir(parents=True)
-            (installed / "SKILL.md").write_text(
-                "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
-            )
+            (installed / "SKILL.md").write_text("---\nname: sample\ndescription: A skill.\n---\n\nContent.\n")
 
         monkeypatch.setattr(installer, "install_skill", fake_install)
 

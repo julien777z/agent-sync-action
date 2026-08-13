@@ -23,9 +23,7 @@ class ExternalSkill(BaseModel):
         """Reject names that would not be a safe skill directory slug."""
 
         if not SAFE_SLUG_PATTERN.fullmatch(value):
-            raise ValueError(
-                f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})"
-            )
+            raise ValueError(f"Invalid skill name '{value}' (must match {SAFE_SLUG_PATTERN.pattern})")
 
         return value
 
@@ -35,9 +33,7 @@ class ExternalSkill(BaseModel):
         """Reject upstream skill selectors that are not safe slugs."""
 
         if value is not None and not SAFE_SLUG_PATTERN.fullmatch(value):
-            raise ValueError(
-                f"Invalid upstream skill '{value}' (must match {SAFE_SLUG_PATTERN.pattern})"
-            )
+            raise ValueError(f"Invalid upstream skill '{value}' (must match {SAFE_SLUG_PATTERN.pattern})")
 
         return value
 

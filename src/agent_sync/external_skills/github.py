@@ -40,8 +40,6 @@ def download_snapshot(repository: str, revision: str, destination: Path) -> Path
     roots = [path for path in destination.iterdir() if path.is_dir()]
 
     if len(roots) != 1:
-        raise RuntimeError(
-            f"Unexpected tarball layout for {repository}: {[path.name for path in roots]}"
-        )
+        raise RuntimeError(f"Unexpected tarball layout for {repository}: {[path.name for path in roots]}")
 
     return roots[0]

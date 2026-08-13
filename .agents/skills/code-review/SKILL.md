@@ -31,10 +31,10 @@ So a bare `/code-review` asks both, `/code-review high` asks only about modes, `
 When asking for effort, list every accepted value explicitly and describe its actual coverage and validation depth:
 
 - `low` — Run one Rules lens and one Bugs lens with inline validation for a quick review of small, low-risk changes.
-- `medium` — Run one Rules, Bugs, Contracts & comments, and History lens for a routine contextual review, with inline validation.
-- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, and one Prior PRs lens, then have one standard validator try to refute every finding.
-- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, and Prior PRs lens, then use two standard validators per finding with majority rule.
-- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, and two Prior PRs lenses in one pass, then use three deep refuters per finding with majority rule.
+- `medium` — Run one Rules, Bugs, Contracts & comments, History, and Simplification lens for a routine contextual review, with inline validation.
+- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, one Prior PRs, and one Simplification lens, then have one standard validator try to refute every finding.
+- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, Prior PRs, and Simplification lens, then use two standard validators per finding with majority rule.
+- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, two Prior PRs, and two Simplification lenses in one pass, then use three deep refuters per finding with majority rule.
 - `ultra` — Repeat the `max` cohort until two consecutive rounds find nothing new, using the same three deep refuters per finding.
 
 Keep each description to one or two sentences. Never summarize the effort values as a range such as `low`–`ultra` or replace the concrete descriptions with vague labels such as "quick," "thorough," or "broad."
@@ -122,21 +122,24 @@ A **Rules** lens runs at every effort level.
 | **Contracts & comments** | standard | Find changed behavior contradicting nearby docstrings, comments, type annotations, API or response models, or database constraints |
 | **History** | standard | Check `git log` and blame on the changed hunks for regressions against prior intent, only where the diff plausibly undoes earlier work |
 | **Prior PRs** | standard | Read earlier PRs touching these files and check whether past review comments apply again |
+| **Simplification** | deep | Run the `code-simplify` skill as its rubric over the scope — redundancy, a module named or placed wrong, a file past a healthy size, a value modelled one way here and another way in a sibling |
 
 Effort selects the cohort and the validation depth:
 
-| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Validation |
-|---|---|---|---|---|---|---|
-| `low` | 1 | 1 | – | – | – | Inline |
-| `medium` | 1 | 1 | 1 | 1 | – | Inline |
-| `high` | 1 | 2 | 1 | 1 | 1 | One **standard** validator per finding |
-| `xhigh` | 2 | 2 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
-| `max` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
-| `ultra` | 2 | 3 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Simplification | Validation |
+|---|---|---|---|---|---|---|---|
+| `low` | 1 | 1 | – | – | – | – | Inline |
+| `medium` | 1 | 1 | 1 | 1 | – | 1 | Inline |
+| `high` | 1 | 2 | 1 | 1 | 1 | 1 | One **standard** validator per finding |
+| `xhigh` | 2 | 2 | 1 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
+| `max` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| `ultra` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
 
 At `low` and `medium` the lenses may run inline in a single pass, and depth on the riskiest changed files beats exhaustive coverage of trivial ones. From `high` upward, launch one distinct subagent per lens in parallel; capacity limits force batching, never omission and never an undeclared local skim. When the host has no subagent capability, run the lenses sequentially and report that degraded mode.
 
 `ultra` runs the `max` cohort repeatedly, stopping only after two consecutive rounds surface no new confirmed finding. Every other level runs its cohort once.
+
+The **Simplification** lens does not carry its own rubric: dispatch it to the `code-simplify` agent, whose skill is the complete rubric, so the two stay one source of truth rather than two drifting copies. Give it the same target, and one instruction this skill adds — `code-simplify` resolves a scope to the diff *plus* whole files *plus* sibling modules, and it should keep reading all three, but every finding it returns must still anchor to a line this target added or removed. Reading a sibling is how it sees that a new module is misnamed, sits in a package that does not own it, or models a value the codebase already models another way; the sibling's own pre-existing debt is not this review's finding.
 
 Duplicated lenses run independently and must not see each other's output; redundancy is the point.
 
@@ -150,12 +153,15 @@ If the user gives a new task while reviewers are running, interrupt every review
 
 Deduplicate findings describing the same underlying issue, then validate each one against the diff. Validators are told to refute: the burden is on the finding to survive.
 
-Record a verdict per surviving finding:
+**Every finding resolves to CONFIRMED or refuted. There is no third verdict.** A defect either exists or it does not, and which one is a fact about the code that reading the code settles. "Could not verify" is a statement about how far the validation got, not about the code, and reporting it hands the reader an unfinished investigation to run themselves — the one thing the review was for.
 
-- **CONFIRMED** — validation verified the defect against the code.
-- **PLAUSIBLE** — validation could not verify or refute it. Report it, but never fix it.
+So when a validator cannot decide from the diff, it keeps going until it can: read the full file and every caller, read the library or SDK source the finding depends on, check the lock file for the resolved version, read the rule the finding cites in full, search the history for when the line was introduced, and run the code — construct the input, execute the branch, and observe the result. Uncertainty is a signal to look at something specific that has not been looked at yet. Name that thing and look at it.
 
-Drop anything refuted. At `low`, where no validator subagent runs, every retained finding is PLAUSIBLE unless the diff alone proves it.
+Only one situation ends validation undecided, and it is never uncertainty about the code: the answer turns on intent that exists nowhere in the repository — which of two contracts the author meant, whether a behavior change is wanted. Do not invent a verdict for that and do not report it as a finding with a hedge. Ask the user, in the shape step 8 uses for an ambiguous fix.
+
+Drop anything refuted, including anything a full investigation leaves unsupported. A finding that survives only because nobody finished checking it is not evidence of a defect.
+
+This bar does not move with effort. A cheaper level runs fewer validators over a smaller cohort, so it searches less; the inline validation at `low` and `medium` still resolves every finding it keeps.
 
 Drop these outright:
 
@@ -170,6 +176,10 @@ Drop these outright:
 - Behavior changes that are intentional and part of the change's purpose.
 
 For rule findings, confirm the rule specifically applies to that file. An absolute rule is independently actionable and surrounding conventions cannot override it. For non-absolute guidance, confirm that repository conventions support treating it as required.
+
+**Breaking a contract is not a refutation.** A finding correct on the merits stays confirmed when the fix would change a wire message, a proto field, a persisted column, an API request or response model, a generated client, or any other published shape. A schema change travels with a migration, a contract change travels with its consumers, and a gate enforcing contract stability — a breaking-change linter, a schema-drift check, a generated-client diff — travels with an updated baseline or a red build you call out. Every one of those is the change's cost rather than a veto over it, and that holds by default because most codebases are pre-production or have few enough consumers that one net-positive change beats a preserved contract. Refute such a finding only when it is wrong on its own terms, or when the contract demonstrably has independent consumers that cannot be updated alongside it — and then name those consumers rather than assuming they exist.
+
+**Refuting a finding can surface a different one.** Refutation often turns on a distinction the reviewer missed — one value meaning two different things, a fallback that exists only because a caller structurally cannot supply what the signature asks for, a special case held together by convention. The original finding is still refuted and still dropped; the design that made it refutable is a finding of its own. Raise it as one, anchored to the changed line that depends on it, and let it run through rating, reporting, and fix mode like anything else.
 
 Every retained finding must be actionable, anchored to a changed line, and state when it fails.
 
@@ -196,7 +206,9 @@ Before reporting a clean result at `high` or above, verify that every launched l
 
 ## Step 7 — Report
 
-When the host exposes a structured findings tool, report through it, passing the effort level, and do not also print the findings as prose. Otherwise report in chat:
+When the host exposes a structured findings tool, report through it, passing the effort level, and do not also print the findings as prose. Where its schema offers a verdict meaning unverified, leave that value unused — nothing surviving step 4 has one. Prose carries no qualifier either: no "possibly", no "may", no request that the reader go check.
+
+Otherwise report in chat:
 
 ```markdown
 ## Code review
@@ -213,13 +225,20 @@ If nothing remains, say `No findings.` and include the completed lens names, the
 
 ## Step 8 — Fix mode
 
-Only in fix mode, and only for CONFIRMED findings. Never fix a PLAUSIBLE finding; report it instead.
+Only in fix mode. Every reported finding is CONFIRMED, because step 4 refutes everything else.
+
+**Every CONFIRMED finding gets fixed.** Surviving validation is what makes a finding legitimate, and a legitimate finding left unfixed in fix mode is the review failing at the only thing fix mode is for. "Out of scope", "pre-existing root cause", "larger than this diff", and "the obvious fix conflicts with another rule" are descriptions of the work, not permission to skip it. Report a finding as unfixed only after the escalation in step 4 below, and never as a first response to difficulty.
+
+When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Approval is needed to **keep** compatibility, not to break it: stop and ask before a fix that would introduce or preserve a backward-compatible path, a legacy shape, or a dual-write for already-deployed behavior.
+
+Changing the contract outright needs no such approval. Rewrite the proto, the response model, or the column, update every consumer in the same change, and write the migration when it touches the database — that is the fix, not a reason to escalate. None of this applies to code organization, file moves, module paths, or internal package exports, which were never gated.
 
 Work findings in severity order:
 
 1. Apply the minimal correct fix. Do not refactor beyond the finding's blast radius.
 2. Follow the repository's own rules in the fix itself, the same ones the Rules lens checks.
-3. When a fix is ambiguous, would change intended product behavior, or turns on a decision the diff does not settle, do not guess. Leave it unfixed and flag it with the specific question.
+3. When the minimal fix does not resolve the finding, fix its cause. A defect whose root lies outside the diff is still this review's to fix, and a rule the code knowingly breaks is resolved by correcting one of them, not by recording the contradiction. Where two rules genuinely conflict, make the governing rule state the real contract rather than leaving code that violates it.
+4. Escalate only a decision that is genuinely the user's: a change to intended product behavior, or a choice between defensible designs that the diff does not settle. Ask the specific question through the host's question tool and act on the answer. An unanswered question is the only route to reporting a CONFIRMED finding unfixed, and the report must say what was asked.
 
 Preserve the requested behavior and any unrelated worktree changes. Re-review the fixed lines to confirm each correction holds, then re-report with an outcome per finding: `fixed`, `skipped`, or `no_change_needed`.
 

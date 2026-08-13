@@ -1,6 +1,10 @@
 ---
 description: Follow modern Python typing, import, formatting, error handling, and maintainability conventions.
-alwaysApply: true
+globs:
+- '**/*.py'
+alwaysApply: false
+paths:
+- '**/*.py'
 ---
 
 # Python Rules
@@ -66,22 +70,55 @@ class Report(BaseModel):
 
 ## Imports and Modules
 
-- Never name a module by joining two different concepts with an underscore — `resource_export.py` is "resource" + "export". Create a package for the entity and a topic module inside it: `resource/export.py`. The same applies when adding a second module for an entity that already has one (`resource.py` + `resource_access.py` must become the package `resource/` with `resource.py` and `access.py` inside).
-- Inside an entity package, do not repeat the entity in module names: `resource/sync.py`, never `resource/resource_sync.py`.
-- Compound nouns that name a single concept are one entity, not two — `access_control.py`, `request_metadata.py`, and `audit_trail.py` are all fine.
-- When the entity package needs a module for its primary/orchestration surface, name it after the package (`resource/resource.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- When a module name combines an owning concept with a distinct topic, split ownership into the package: `<owner>_<topic>.py` becomes `<owner>/<topic>.py`.
+- When an existing `<owner>.py` gains another owner-specific module, convert it to an `<owner>/` package containing `<owner>.py` for the primary surface and `<topic>.py` for the additional topic.
+- Inside an owner package, do not repeat the owner in module names: use `<owner>/<topic>.py`, never `<owner>/<owner>_<topic>.py`.
+- Split at the semantic owner/topic boundary, not at every underscore. A compound noun whose words jointly name one established concept remains one module; for example, `access_control.py` is clearer than `access/control.py`.
+- When the owner package needs a primary or orchestration module, name it after the package (`<owner>/<owner>.py`) with an empty `__init__.py`; consumers import the specific submodule.
+- This rule governs Python modules only. Generated packages and source files owned by another toolchain follow that toolchain's naming conventions; do not reorganize them to satisfy it.
+- Moving a module into a new subpackage invalidates every relative import inside it and any path it derives from `__file__`. Convert those imports to absolute imports and re-anchor the path instead of adding `.parent` until it happens to work.
+
+- Give domain-specific module-level parsers, builders, formatters, and validators domain-qualified names. A generic name such as `parse_response` or `build_payload` falsely promises that a domain helper accepts any compatible input and creates collisions when multiple domains are imported together.
+- Reserve unqualified transformation names for genuinely domain-independent helpers in `utils/` whose signatures name no domain type.
+
+- **Import the symbols you use, never the module they live in.** `from pkg.domain import thing` followed by `thing.do_work(...)` reads differently from every neighbouring call, hides which of the module's names this file actually depends on, and is the shape an alias ban pushes people into when a name collides. A module import is correct only for a module you genuinely pass around as an object.
+- **A collision between a caller and the callee it invokes is a naming defect, not an import problem.** When `do_work` in one layer calls `do_work` in the layer below, the two names claim to describe the same thing while one of them adds behaviour the name never mentions. Rename the callee so each layer says what it alone does — the caller's name is usually fixed by an external contract, and the callee's is not.
+- Reaching through the module to dodge that collision preserves the defect and hides it. So does aliasing. Fix the name.
+
+```python
+# Bad: the collision is real, and reaching through the module only conceals it
+from billing.invoice import gateway
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await gateway.pay_invoice(invoice_id=invoice_id)
+
+
+# Good: the gateway says it crosses a service boundary, so both names can coexist
+from billing.invoice.gateway import pay_invoice_in_ledger
+
+
+async def pay_invoice(invoice_id: UUID) -> Payment:
+    ...
+    return await pay_invoice_in_ledger(invoice_id=invoice_id)
+```
 
 - Do not start Python files with module docstrings. Begin with imports, or leave package `__init__.py` files empty when they have no public surface.
 - Keep ALL imports at the top of the file.
 - Never import inside functions, methods, or test cases.
 - Group imports: stdlib, third-party, local (separated by blank lines).
 - Prefer **absolute imports** from the top-level package (for example `from application.routes.resources import router`) over **relative imports** with parent segments (for example `from ....routes.resources import router`). Absolute imports are stable when modules move, easier to grep, and avoid brittle `..` depth. Same rule applies to other installable packages: always anchor imports on the package name, not on the file’s directory depth.
-- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing.
+- Never use import aliases for project modules; import the canonical symbol/module name and update call sites to that name instead of aliasing. The one form that is not a rename is the explicit re-export marker `from pkg.module import Name as Name`, which PEP 484 defines as a package declaring `Name` part of its own public surface. Use it only in a package's `__init__.py` alongside `__all__`, never to give a symbol a second name.
 - Use `__all__` exports in module `__init__.py` files.
 - Never define variables or call functions in between import statements; all imports must be contiguous at the top of the file.
 - Never create shim modules that only re-export symbols from another package for backwards compatibility; update all consumers to import from the canonical source instead.
 - Place generic, stateless, cross-cutting helpers in a `utils.py` module or `utils/` package.
 - Use a `utils.py` module for a small cohesive set of utilities; use a `utils/` package when separate focused utility modules are warranted.
+- Apply the owner/topic rule to owner-specific utilities: `<owner>_utils.py` becomes `<owner>/utils.py`.
+- Put cross-cutting utility topics under `utils/`: `<topic>_utils.py` becomes `utils/<topic>.py`.
+- Give a `utils/` package topic-named modules rather than one flat module.
+- Keep `utils/__init__.py` empty or limited to imports and `__all__`; consumers import from the specific submodule.
 - Keep domain and orchestration behavior in their owning modules. Do not use utilities as a dumping ground.
 - Narrow exception: `__main__.py` entrypoints may use same-package relative imports for bootstrap (for example `from .runtime import main`), and `__init__.py` may use explicit relative imports when assembling the package’s public surface.
 
@@ -92,6 +129,7 @@ class Report(BaseModel):
 - Invoke package CLIs with `python -m <package>` when no independently reusable console entrypoint is
   required.
 - Do not layer `run()`, `main()`, and an `if __name__ == "__main__":` guard for the same entrypoint.
+- Model reusable command outcomes with a descriptive enum. Convert that outcome to an integer exit code only at the CLI boundary; never carry or return bare status integers through application code.
 
 ```python
 # Bad: shim module that only re-exports symbols
@@ -148,6 +186,7 @@ ACTION_CONFIG = ActionConfig()
 
 - Define constants at the top of the file, after imports.
 - Place module-level constants and enums (including type aliases like `AllowedApiClient`) directly after imports.
+- When assembling a structured string from variable parts, define one named template and use `str.format(...)` rather than composing separate prefix and suffix constants. Use native template strings only when they are supported across the project's full Python version range.
 - Use `Final[T]` from `typing` and UPPER_SNAKE_CASE names for constants.
 - Reserve constants for values that are genuinely invariant, such as compiled regexes, stable paths, or implementation sentinels. Values likely to change between releases or deployments belong in the typed settings class even when they have a default.
 - Compile regular expressions once at module scope and call methods on the compiled pattern instead of passing pattern strings repeatedly to `re.match`, `re.search`, `re.fullmatch`, or `re.sub`.
@@ -165,8 +204,11 @@ ACTION_CONFIG = ActionConfig()
 Avoid trivial wrapper functions that add no value. A function that just returns its argument or applies a trivial fallback is noise:
 
 - Return `bool` for binary domain outcomes; never return integer `0` or `1` as a boolean substitute. Translate booleans into process exit codes only at the CLI boundary.
+- Return an enum for an outcome with more than two states or states whose names carry meaning. Never return bare integers as application status codes.
+- A subprocess return code is an external value and may remain an `int` at that boundary. Convert it into the domain outcome enum before carrying it through the application.
 - Do not rebind function arguments to a second local name when the value is unchanged (for example, `profile = obj`); name the parameter correctly at the signature instead.
 - Do not add passthrough function or method parameters when every call site provides the value from one shared source (for example, forwarding `timeout_seconds` from `APPLICATION_CONFIG` in every call); read from that source directly where the value is used.
+- Give domain-specific parsers and converters domain-qualified names so imports from multiple domains cannot silently shadow one another. Keep unqualified names only for genuinely domain-independent transformations.
 
 - Prefer normal attribute assignment over `object.__setattr__(...)` when mutating Pydantic models in validators or helper methods.
 - Only use `object.__setattr__(...)` when normal assignment is genuinely unavailable (for example frozen models or descriptor bypass requirements), and keep that escape hatch explicit and justified.
@@ -188,6 +230,12 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 ## Architecture and Boundaries
 
+### Client Dependency Injection
+
+- Pass runtime clients and other stateful collaborators explicitly through constructors or function parameters. Do not hide them behind module globals, service-locator getters, or default parameter values.
+- Centralize dependency-container wiring at the application boundary. Request-scoped frameworks may inject clients into routes, while worker, RPC, and tool entrypoints receive their long-lived collaborators from startup wiring.
+- Keep one patchable client seam at the owning boundary rather than requiring tests to patch a separately imported client in every consumer module.
+
 ### Model Placement
 
 - Define Pydantic `BaseModel` classes and other application data models under the package's `models/` directory.
@@ -196,6 +244,10 @@ def get_auth_secret(config: Settings | None = None) -> str:
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
 - Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
+
+- Do not convert between models you own with `Target(**source.model_dump())`, `Target.model_validate(source.model_dump())`, or `Target(**source.__dict__)`. These dictionary-shaped conversions erase the relationship between the source and target contracts, can collide with explicitly supplied fields, and may re-run normalization or encryption.
+- Put the conversion on the target in a typed `from_<source>` or `build_*` classmethod that names the fields. If the copy becomes long, consolidate the models or carry the source model as a nested field instead of flattening it.
+- Reserve `model_dump()` for boundaries that leave the typed model layer, such as JSON, persistence, caches, and logs.
 
 - Application code (a function, method, property, class, constant, or field) with **zero non-test consumers** is dead code and must be deleted, along with the tests that only exist to exercise it.
 - **Tests do not justify keeping otherwise-unused application code.** A test that asserts a symbol no other application code reads is testing a fabricated contract; delete the symbol and that test together rather than preserving the symbol "because it's covered".
@@ -235,7 +287,19 @@ register_task(task_type=TaskType.PROCESS_RESOURCE, handler_name=handler.__name__
 - Reuse the helper across read paths to avoid behavior drift.
 
 - Keep explicit wrapper/helper functions for external dependencies so tests can patch clear module boundaries.
-- Prefer patching module-level seams (for example `resource_gateway.fetch_resource`) over patching deep nested internals.
+- **Patch the consuming module's own binding, not the module that defines the symbol.** A symbol import binds the object at import time, so the consumer holds its own reference: patching the defining module rebinds a name the consumer never reads again. Nothing raises, the mock never fires, and the test passes while asserting nothing.
+- Patch the shallowest seam the consumer actually reads, rather than an internal several calls below it.
+
+```python
+# consumer.py binds the object at import time
+from billing.ledger.gateway import charge_card
+
+# Bad: resolves cleanly, rebinds a name consumer.py no longer reads, mock never fires
+monkeypatch.setattr("billing.ledger.gateway.charge_card", mock)
+
+# Good: rebinds the reference the consumer actually calls
+monkeypatch.setattr("billing.consumer.charge_card", mock)
+```
 
 ## Runtime Data and Caching
 
@@ -429,6 +493,10 @@ except Exception as exc:
 - Banned terms and what to use instead:
   - **"best effort"** — state the real contract. A function that swallows failures and reports the outcome should say so: name it `try_<verb>` (for example `try_send_email`) and document it as "returning whether it succeeded", not "best-effort".
   - **"seed" / "seeds" / "seeding"** (for test data or sample records) — name the helper for what it builds: a `<noun>_*_factory` fixture, `create_*`, or "sample data". Do not call setup data a "seed".
+  - **"holder"** (for a model or object that carries a field) — name it for the thing it models, such as `ApiCredential`, `StateRecord`, or `AliasSet`.
+  - **"stub"** (in application-code identifiers) — use "client". Keep a generated `*Stub` class name only when referring to that external type.
+  - **"lease" / "leased"** (for work handed to a worker) — use `claim`, `claimed_job`, or `ClaimedJob`. Reserve "lock" for lock ownership and expiry.
+  - **"*orm_factory"** (in test fixtures and helpers) — name the domain action directly, such as `create_payment` or `create_invoice`; do not encode persistence implementation in the name.
 - If you reach for a placeholder-ish term a future reader could not decode from the name alone, pick a more intuitive name instead of adding it to this list.
 
 - Add a blank line after each docstring.
@@ -500,6 +568,22 @@ ALLOWED_STATES: Final[frozenset[str]] = frozenset({"ready", "complete"})
 - Keep docstrings to a single line. Do not include Args, Returns, or Raises sections.
 - Class docstrings go directly after the class definition.
 - Docstrings describe current behavior only — never reference what the code replaces, used to do, or PR/migration history. The docstring must read the same to a new reader who never saw the prior version.
+- Prose written for a person — a docstring, a comment, a log message — must not spell out an internal role, permission, or scope identifier (the literal string a provider or authorization system checks against, such as `tenant:member` or `scope:read_billing`). Name the concept in readable words instead. The identifier belongs in the code that evaluates it, where renaming it is a change the type checker and tests can see; repeated in prose it is a second copy nothing keeps honest.
+
+```python
+# Bad: the docstring and the log both spell out the internal identifier
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant:member, not a guest."""
+
+    logger.info("Checking tenant:member for %s", user.id)
+
+
+# Good: prose names the concept, and only the code carries the literal
+def ensure_tenant_member(user: User) -> None:
+    """Ensure a user is a tenant member, not a guest."""
+
+    logger.info("Checking tenant membership for %s", user.id)
+```
 
 - **Comments are only for third-party quirks** — an SDK bug, a library's surprising contract, a spec oddity, a protocol requirement — that a reader could not infer from our own code. If the reason lives in code you control, it is not a comment.
 - **If your own code needs a comment to be understood, the code is too complex — refactor it instead.** Rename the identifier, extract a well-named helper, split the function, or restructure until the intent is obvious without prose. Reach for a comment only after the code cannot be made clearer and the remaining "why" is genuinely external.
