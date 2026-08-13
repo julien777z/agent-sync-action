@@ -2,4 +2,4 @@
 project_doc_max_bytes = 79880
 
 [features]
-default_mode_request_user_input = true
+"default_mode_request_user_input" = true
