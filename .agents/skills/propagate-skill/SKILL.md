@@ -20,7 +20,7 @@ When the invocation names no skill or rule other than `propagate-skill` as the w
 
 During an authorized change-propagation run whose selected scope includes repository consumers, also converge every matching skill that already exists in a writable user-level skill root exposed by the active host or its configured skill catalog. Do this whether repository consumers need edits or are already current; the mutation run and selected repository scope are the trigger, not whether a repository diff happens to be produced. Resolve real paths and ownership before classifying a target. Never infer user scope by broadly crawling a home directory, and exclude project, system, plugin, provider-managed, generated, and read-only installations.
 
-Do not install a missing user-level skill. For each existing editable match, treat the selected canonical skill directory as the source for canonical-managed files, compare the complete installation, and apply the same semantic-classification and deletion-ledger rules used for repository consumers. Preserve installation-only metadata and other compatible local additions, including `agents/openai.yaml`, unless the selected change explicitly updates them or the user authorizes their removal.
+Do not install a missing user-level skill. For each existing editable match, treat the selected canonical skill directory as the source for canonical-managed files, compare the complete installation, and apply the same semantic-classification and deletion-ledger rules used for repository consumers. Preserve compatible local additions other than provider metadata. Never compare, copy, create, or refresh `agents/openai.yaml`; remove an existing local copy only with explicit deletion authorization.
 
 Delegate snapshots, filesystem mutation, typed manifest state, independent verification, and recovery to `coordinate-repositories`. Listing and other read-only runs never mutate user-level installations.
 
@@ -58,6 +58,6 @@ Delegate snapshots, filesystem mutation, typed manifest state, independent verif
 - Never resolve incompatible generic, consumer, or target-specific guidance without an explicit user choice.
 - Make convergence additive by default. Never interpret silence, omission, or a broad synchronization request as authority to delete compatible consumer guidance.
 - Never propagate secrets, absolute machine paths, generated mirrors, or repository-specific operational details to unrelated repositories.
-- Never create, retain, or propagate `agents/openai.yaml` in a repository skill directory.
+- Never create, copy, refresh, or propagate `agents/openai.yaml` in any skill installation. Remove an existing local copy only with explicit deletion authorization.
 - Never create a missing user-level installation or mutate a managed installation while synchronizing existing local copies.
 - Never propagate an artifact beyond a product or repository boundary proven by its complete contents.
