@@ -7,6 +7,11 @@ description: Code review a pull request or the current working changes with inde
 
 Provide a code review for the selected target.
 
+## Dependencies
+
+- `code-simplify` — supply the complete simplification rubric for that review lens.
+- `security-audit` — supply the complete security rubric and attack-class catalogue for that review lens.
+
 ```
 /code-review [low|medium|high|xhigh|max|ultra] [fix] [comment] [<target>]
 ```
@@ -31,10 +36,10 @@ So a bare `/code-review` asks both, `/code-review high` asks only about modes, `
 When asking for effort, list every accepted value explicitly and describe its actual coverage and validation depth:
 
 - `low` — Run one Rules lens and one Bugs lens with inline validation for a quick review of small, low-risk changes.
-- `medium` — Run one Rules, Bugs, Contracts & comments, History, and Simplification lens for a routine contextual review, with inline validation.
-- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, one Prior PRs, and one Simplification lens, then have one standard validator try to refute every finding.
-- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, Prior PRs, and Simplification lens, then use two standard validators per finding with majority rule.
-- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, two Prior PRs, and two Simplification lenses in one pass, then use three deep refuters per finding with majority rule.
+- `medium` — Run one Rules, Bugs, Contracts & comments, History, Simplification, and Security lens for a routine contextual review, with inline validation.
+- `high` — Run one Rules, two independent Bugs, one Contracts & comments, one History, one Prior PRs, one Simplification, and one Security lens, then have one standard validator try to refute every finding.
+- `xhigh` — Run two independent Rules and Bugs lenses plus one Contracts & comments, History, Prior PRs, Simplification, and Security lens, then use two standard validators per finding with majority rule.
+- `max` — Run two Rules, three Bugs, two Contracts & comments, two History, two Prior PRs, two Simplification, and two Security lenses in one pass, then use three deep refuters per finding with majority rule.
 - `ultra` — Repeat the `max` cohort until two consecutive rounds find nothing new, using the same three deep refuters per finding.
 
 Keep each description to one or two sentences. Never summarize the effort values as a range such as `low`–`ultra` or replace the concrete descriptions with vague labels such as "quick," "thorough," or "broad."
@@ -43,7 +48,7 @@ Ask using the host's structured question tool when it has one and a plain chat q
 
 When the host cannot ask, as in a non-interactive or automated run, fall back to `medium` effort with both modes off and say that the fallback was used. Without fix mode this skill never edits code; without comment mode it never writes to GitHub beyond reads.
 
-**Scope.** Every finding must anchor to a line added or removed by the selected target. Never report pre-existing issues on untouched lines, even in modified files.
+**Scope.** Anchor a finding to a changed line when that line introduces, inherits, exposes, or depends on the defect. A real defect with no faithful changed-line anchor is still in scope: anchor it to its exact current line, mark it `OUTSIDE_DIFF`, and report it without pretending an unrelated changed line caused it. "Pre-existing" describes when a defect arrived, not whether it is worth fixing, and a review that steps over one because the blame is older leaves the reader with a known defect and no record of it.
 
 ## Agent assumptions
 
@@ -59,7 +64,11 @@ Select subagents by capability, never by model name, so the skill behaves the sa
 
 - **fast** — cheapest capable model. Eligibility checks, file enumeration, mechanical lookups.
 - **standard** — default balanced model. Summarization, rule compliance, validation.
-- **deep** — strongest reasoning model available. Bug hunting and adversarial refutation.
+- **deep** — strongest reasoning model available below the orchestrator. Bug hunting and adversarial refutation.
+
+**Prefer every tier below the model running the review.** A review fans out across many subagents, each reading the same diff, so the cohort rather than any one lens is what a round costs — and a lens reads code and reports what it finds, which a mid-tier model does well. Where the host exposes an ordered model catalogue, resolve `deep` to the strongest model below the orchestrator and resolve `standard` and `fast` to capable lower-cost models. When selection is available but the catalogue has no lower model or exposes no reliable ordering, use the strongest available capable model for `deep` and the cheapest capable model for the other tiers, then record that fallback in the degraded-mode note. Judgement that has to be right the first time stays with the orchestrator: rating, deduplication, deciding what to fix, and writing the fix.
+
+Where the host exposes no per-subagent model selection, run the tiers as they stand and say so in the degraded-mode note. Never name a specific model in this skill or in a subagent prompt — a host that renames or replaces its lineup must not need this file edited.
 
 ## Step 1 — Resolve the target
 
@@ -123,31 +132,42 @@ A **Rules** lens runs at every effort level.
 | **History** | standard | Check `git log` and blame on the changed hunks for regressions against prior intent, only where the diff plausibly undoes earlier work |
 | **Prior PRs** | standard | Read earlier PRs touching these files and check whether past review comments apply again |
 | **Simplification** | deep | Run the `code-simplify` skill as its rubric over the scope — redundancy, a module named or placed wrong, a file past a healthy size, a value modelled one way here and another way in a sibling |
+| **Security** | deep | Run the `security-audit` skill as its rubric over the changed lines — injection, authentication and authorization defeats, sensitive data reaching a log or response, unsafe deserialization, secrets in source |
 
 Effort selects the cohort and the validation depth:
 
-| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Simplification | Validation |
-|---|---|---|---|---|---|---|---|
-| `low` | 1 | 1 | – | – | – | – | Inline |
-| `medium` | 1 | 1 | 1 | 1 | – | 1 | Inline |
-| `high` | 1 | 2 | 1 | 1 | 1 | 1 | One **standard** validator per finding |
-| `xhigh` | 2 | 2 | 1 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
-| `max` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
-| `ultra` | 2 | 3 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| Effort | Rules | Bugs | Contracts & comments | History | Prior PRs | Simplification | Security | Validation |
+|---|---|---|---|---|---|---|---|---|
+| `low` | 1 | 1 | – | – | – | – | – | Inline |
+| `medium` | 1 | 1 | 1 | 1 | – | 1 | 1 | Inline |
+| `high` | 1 | 2 | 1 | 1 | 1 | 1 | 1 | One **standard** validator per finding |
+| `xhigh` | 2 | 2 | 1 | 1 | 1 | 1 | 1 | Two **standard** validators per finding, majority rules |
+| `max` | 2 | 3 | 2 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
+| `ultra` | 2 | 3 | 2 | 2 | 2 | 2 | 2 | Three **deep** refuters per finding, majority rules |
 
 At `low` and `medium` the lenses may run inline in a single pass, and depth on the riskiest changed files beats exhaustive coverage of trivial ones. From `high` upward, launch one distinct subagent per lens in parallel; capacity limits force batching, never omission and never an undeclared local skim. When the host has no subagent capability, run the lenses sequentially and report that degraded mode.
 
 `ultra` runs the `max` cohort repeatedly, stopping only after two consecutive rounds surface no new confirmed finding. Every other level runs its cohort once.
 
+**A lens that keeps coming back clean retires.** Whenever the cohort runs more than once in the same logical review — `ultra`'s own loop, and every fix-triggered re-review of the same pull request or ref range — track each lens's consecutive clean rounds across the follow-up invocations. A lens that has returned no confirmed finding for **two consecutive rounds** is excluded from every later round of that logical review, and its last coverage receipt stands as its result. Count a round as clean for a lens only when it completed: a lens that errored, timed out, or reported partial coverage has not earned a clean round, and its counter holds rather than advancing.
+
+A confirmed finding from a lens resets its counter to zero, so a lens that goes quiet and then catches something on a later round starts earning its way out again from scratch. Refuted findings do not reset it — only findings that survive Step 4. Invalidating a retired lens's receipt reactivates that lens and resets its counter to zero before the next cohort; retirement never outlives the material or inputs its receipt covered.
+
+Name the retired lenses and their round counts in the report, so a reader can tell a lens that found nothing twice from one that never ran. Persist the counters with the logical review's receipts. A new target or an invocation unrelated to the active fix loop starts every lens at zero; a follow-up invocation required by fixes to the same target does not.
+
+The **Security** lens does not carry its own rubric: give it the `security-audit` skill and have it read that skill's complete core principles and attack-class catalogue for the current target, so the two stay one source of truth. Borrow the *rubric*, not the *workflow* — do not run the audit skill's engagement phases, write its findings files or report artifacts, or apply its remediation-approval gate. This lens applies the canonical rubric to the review scope and returns ordinary review findings.
+
 The **Simplification** lens does not carry its own rubric: dispatch it to the `code-simplify` agent, whose skill is the complete rubric, so the two stay one source of truth rather than two drifting copies. Give it the same target, and one instruction this skill adds — `code-simplify` resolves a scope to the diff *plus* whole files *plus* sibling modules, and it should keep reading all three, but every finding it returns must still anchor to a line this target added or removed. Reading a sibling is how it sees that a new module is misnamed, sits in a package that does not own it, or models a value the codebase already models another way; the sibling's own pre-existing debt is not this review's finding.
 
 Duplicated lenses run independently and must not see each other's output; redundancy is the point.
 
-From `high` upward, each reviewer returns a coverage receipt with its lens, the reviewed head SHA, the reviewed changed-file list, its completion status, and a flat list of findings. Each finding carries path, line, diff side (`RIGHT` for added or current, `LEFT` for removed or base), a concrete trigger, and its reasoning.
+From `high` upward, each reviewer returns a coverage receipt with its lens, the reviewed head SHA, the reviewed changed-file list, the exact rule and rubric inputs it used, its completion status, and a flat list of findings. Each finding carries path, line, anchor (`RIGHT` for added or current changed lines, `LEFT` for removed or base changed lines, or `OUTSIDE_DIFF` for an exact current line with no faithful diff anchor), a concrete trigger, and its reasoning.
 
 For `ultra`, deduplicate each round against every finding seen so far, not only against confirmed ones, or rejected findings resurface every round and the loop never converges.
 
-If the user gives a new task while reviewers are running, interrupt every reviewer immediately and discard their results. Restart the review only after that task completes, on its new baseline.
+If the user gives a new task while reviewers are running, compare the complete reviewed inputs: the target diff and every rule, rubric, dependency, generated contract, configuration, workflow, and document whose semantics a lens used. A changed target diff invalidates every receipt that covered the changed material. A changed supporting input invalidates each lens whose analysis depends on it, even when no source file changed. Interrupt and rerun only the invalidated lenses after the new task completes; retain receipts whose target material and inputs are byte-identical.
+
+Do not classify validity by file extension or category. A lock file can change executed code, a workflow can change the gate, a rule can create a new violation, and a skill can change a lens rubric. Conversely, an unrelated edit outside the target and its reviewed inputs does not invalidate anything. Record the compared inputs and the receipt decision so a resumed review can prove why coverage still stands.
 
 ## Step 4 — Validate findings
 
@@ -165,7 +185,6 @@ This bar does not move with effort. A cheaper level runs fewer validators over a
 
 Drop these outright:
 
-- Pre-existing issues, and real issues on lines the change did not modify.
 - Something that looks like a bug but is not.
 - Pedantic nitpicks a senior engineer would not raise.
 - Failures a linter, typechecker, compiler, or formatter would catch. Assume CI runs them; do not run them here.
@@ -181,7 +200,7 @@ For rule findings, confirm the rule specifically applies to that file. An absolu
 
 **Refuting a finding can surface a different one.** Refutation often turns on a distinction the reviewer missed — one value meaning two different things, a fallback that exists only because a caller structurally cannot supply what the signature asks for, a special case held together by convention. The original finding is still refuted and still dropped; the design that made it refutable is a finding of its own. Raise it as one, anchored to the changed line that depends on it, and let it run through rating, reporting, and fix mode like anything else.
 
-Every retained finding must be actionable, anchored to a changed line, and state when it fails.
+Every retained finding must be actionable, anchored to either the faithful changed line or the exact current defect line, and state when it fails. Never attach an `OUTSIDE_DIFF` finding to an unrelated changed line merely to satisfy a reporting tool.
 
 ## Step 5 — Rate and rank
 
@@ -200,7 +219,7 @@ Rank most severe first and report at most 32 findings.
 
 ## Step 6 — Re-gate before reporting
 
-Re-fetch the target head. If it differs from the baseline head SHA, discard the findings and restart against the new complete diff. Never report findings gathered against one commit set as though they apply to another. For a PR target, repeat the Step 1 eligibility check.
+Re-fetch the target head and rebuild the complete reviewed-input inventory. If either differs from the baseline, apply the invalidation rule from Step 3: discard and rerun every receipt whose target material or supporting inputs changed, and retain only receipts proven byte-identical in both respects. Report the head and inputs actually reviewed. Never report findings gathered against one target or rubric as though they apply to another. For a PR target, repeat the Step 1 eligibility check.
 
 Before reporting a clean result at `high` or above, verify that every launched lens returned a complete, distinct receipt for the baseline head. Reject missing, failed, duplicate, incomplete, or stale receipts and rerun those lenses. A review without complete coverage must never report `No findings.`
 
@@ -229,6 +248,12 @@ Only in fix mode. Every reported finding is CONFIRMED, because step 4 refutes ev
 
 **Every CONFIRMED finding gets fixed.** Surviving validation is what makes a finding legitimate, and a legitimate finding left unfixed in fix mode is the review failing at the only thing fix mode is for. "Out of scope", "pre-existing root cause", "larger than this diff", and "the obvious fix conflicts with another rule" are descriptions of the work, not permission to skip it. Report a finding as unfixed only after the escalation in step 4 below, and never as a first response to difficulty.
 
+**Severity ranks the work; it never selects which work happens.** A confirmed finding is fixed whether it is critical or cosmetic, and whether or not it touches the theme the change was opened for. "Not critical", "not what this PR is about", "lower value than the rest", and "the important ones are closed" are the same skip wearing different words — every one of them ends with a defect the review found, named, and then left in the code. Rank by severity to decide what to fix *first*, then keep going until the list is empty.
+
+**A round is not finished while confirmed findings remain.** Do not close a round by reporting the fixes made alongside a list of confirmed findings left open; that list is the round's unfinished work, not its summary. The only finding that may outlive the round is one that step 4's escalation genuinely could not settle, and it is reported as a blocker with what it needs, not as a leftover.
+
+"A test patches or imports that symbol" is likewise never grounds to skip or soften a fix. Tests follow application code, not the reverse: when the fix moves, renames, or absorbs a symbol that tests patch, mock, or import, updating those patch targets and fixtures is part of the fix, and the affected suite is rerun to prove the reworked tests still pass.
+
 When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Approval is needed to **keep** compatibility, not to break it: stop and ask before a fix that would introduce or preserve a backward-compatible path, a legacy shape, or a dual-write for already-deployed behavior.
 
 Changing the contract outright needs no such approval. Rewrite the proto, the response model, or the column, update every consumer in the same change, and write the migration when it touches the database — that is the fix, not a reason to escalate. None of this applies to code organization, file moves, module paths, or internal package exports, which were never gated.
@@ -242,13 +267,19 @@ Work findings in severity order:
 
 Preserve the requested behavior and any unrelated worktree changes. Re-review the fixed lines to confirm each correction holds, then re-report with an outcome per finding: `fixed`, `skipped`, or `no_change_needed`.
 
-After fixing, run the relevant tests and report their actual output. If the tests cannot run in this environment, say so and ask for the logs rather than speculating about the failure.
+**Then run the Rules lens once more, over the fix diff alone, before staging anything.** A fix is code this review wrote, and nothing has checked it against the rule inventory — the lenses ran on the target as it was, so every line fix mode adds is unreviewed by construction. Confirming a fix resolves its finding is a different question from whether the fix itself breaks a rule, and a fix that trades a confirmed finding for a fresh violation has not improved the diff.
 
-Stage only the fix edits — never sweep in unrelated uncommitted work that Step 1 deliberately left alone — and commit on the current feature branch with a conventional commit message, never on the default branch. When the target is a PR, push so its diff stays authoritative. A full re-review is a separate invocation, not part of this one.
+Resolve that pass exactly like Step 3's Rules lens, with `git diff` over the fix edits as its scope and the same inventory from Step 2. Fix what it reports, at the same bar: a violation it finds is a finding, not a note. Repeat until it comes back clean, and say in the report that the pass ran and what it changed. Where a fix cannot satisfy both the finding and a rule, Step 8's rule-conflict clause governs — correct the governing rule rather than shipping code that violates it.
+
+**A remedy a validator proposed carries no authority of its own.** A validator's mandate is to confirm or refute a finding; when it also volunteers a fix, that fix is a suggestion from something that was never asked to check it against the rules. Put it through this pass like any other edit.
+
+After fixing, run the relevant tests and report their actual output. Before any local validation, record which local services were already running. Never stop, restart, reconfigure, or claim ownership of a pre-existing service: another agent or user may be using it. When relevant validation requires local services and any were already running, do not run a competing service-managed test locally; push the fix, use the pull request's CI checks as the authoritative validation, and wait through the host's event mechanism until those checks reach a terminal result. If no required service was already running and the repository's normal test command can run without disturbing external state, run it; otherwise use CI and state the local-validation limit.
+
+Stage only the fix edits — never sweep in unrelated uncommitted work that Step 1 deliberately left alone — and commit on the current feature branch with a conventional commit message, never on the default branch. When the target is a PR, push so its diff stays authoritative. A full re-review is a later phase of the same authorized logical fix review, not a new action-skill invocation: carry forward its receipts and lens-retirement counters, invalidate them against the new reviewed inputs, and rerun the required cohort.
 
 ## Step 9 — Comment mode
 
-Only in comment mode. Post one inline comment per unique issue, never duplicates.
+Only in comment mode. Post one inline comment per unique issue with a faithful changed-line anchor, never duplicates. Collect `OUTSIDE_DIFF` findings in one top-level review comment with permanent blob links to their exact current lines; never attach them to unrelated diff lines.
 
 Each comment states the issue briefly and cites its source; a rule finding must link the rule file. Include a committable suggestion block only when committing it fixes the issue entirely — never for fixes spanning 6 or more lines, multiple locations, or needing follow-up.
 
