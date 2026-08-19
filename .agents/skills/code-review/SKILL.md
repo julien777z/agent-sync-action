@@ -256,9 +256,9 @@ Only in fix mode. Every reported finding is CONFIRMED, because step 4 refutes ev
 
 "A test patches or imports that symbol" is likewise never grounds to skip or soften a fix. Tests follow application code, not the reverse: when the fix moves, renames, or absorbs a symbol that tests patch, mock, or import, updating those patch targets and fixtures is part of the fix, and the affected suite is rerun to prove the reworked tests still pass.
 
-When a requested change replaces a runtime or data contract, treat a retained legacy alias or fallback as a defect unless the user explicitly authorizes compatibility in the current request. Approval is needed to **keep** compatibility, not to break it: stop and ask before a fix that would introduce or preserve a backward-compatible path, a legacy shape, or a dual-write for already-deployed behavior.
+Never introduce or preserve backward-compatible code. A legacy alias, fallback, old request or response shape, deprecated parameter, transition adapter, or dual read/write path is a defect when the requested change replaces that behavior. Remove the replaced behavior outright, update every consumer in the same change, and write the migration when it touches the database.
 
-Changing the contract outright needs no such approval. Rewrite the proto, the response model, or the column, update every consumer in the same change, and write the migration when it touches the database — that is the fix, not a reason to escalate. None of this applies to code organization, file moves, module paths, or internal package exports, which were never gated.
+Do not add a compatibility path even when a user asks for one; escalate that conflict rather than implementing it under this skill. None of this applies to code organization, file moves, module paths, or internal package exports, which were never gated.
 
 Work findings in severity order:
 
