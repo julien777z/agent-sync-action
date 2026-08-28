@@ -7,18 +7,18 @@ license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "pydantic>=2,<3",
-    "pydantic-settings>=2,<3",
-    "pyyaml>=6",
+    "pydantic>=2.13.5,<3",
+    "pydantic-settings>=2.15.0,<3",
+    "pyyaml>=6.0.3",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black>=25",
-    "polyfactory>=3.1.0",
-    "pyright>=1.1",
-    "pytest>=8",
-    "pytest-asyncio>=0.24",
+    "black>=26.5.1",
+    "polyfactory>=3.3.0",
+    "pyright>=1.1.411",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [tool.poetry]
