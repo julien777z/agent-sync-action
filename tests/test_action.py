@@ -23,13 +23,9 @@ class TestAction:
                 "description": "Token used to commit and push changes (or open a pull request).",
                 "default": "${{ github.token }}",
             },
-            "refresh-external-skills": {
-                "description": "Force vendoring external skills from the registry before mirroring.",
+            "refresh-vendors": {
+                "description": "Force installing registered vendors before mirroring.",
                 "default": "false",
-            },
-            "skills-cli-version": {
-                "description": "Version of the skills CLI used to update external skills.",
-                "default": "1.5.13",
             },
             "mode": {
                 "description": "How to persist changes — commit (push to the branch) or pull-request.",
@@ -37,8 +33,7 @@ class TestAction:
             },
             "agents-dir": {
                 "description": (
-                    "Source-of-truth directory name; the registry is read from "
-                    "<agents-dir>/external_skills.json."
+                    "Source-of-truth directory name; the registry is read from " "<agents-dir>/vendors.json."
                 ),
                 "default": ".agents",
             },
@@ -56,8 +51,7 @@ class TestAction:
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
         assert "python -m agent_sync mirror-providers" in action_text
-        assert "python -m agent_sync vendor-skills" in action_text
-        assert "AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}" in action_text
+        assert "python -m agent_sync install-vendors" in action_text
         assert "PYTHONPATH=" not in action_text
         assert "requirements.txt" not in action_text
 
@@ -68,10 +62,10 @@ class TestAction:
 
         assert "poetry run python -m agent_sync mirror-providers --root ." in workflow_text
         assert "uses: ./" in workflow_text
-        assert 'refresh-external-skills: "true"' in workflow_text
+        assert 'refresh-vendors: "true"' in workflow_text
 
-    def test_sets_up_node_when_vendoring_may_run(self) -> None:
-        """Test that Node setup covers initial and post-rebase vendoring."""
+    def test_sets_up_node_when_vendors_may_run(self) -> None:
+        """Test that Node setup covers initial and post-rebase vendor installation."""
 
         action_text = Path("action.yml").read_text(encoding="utf-8")
 

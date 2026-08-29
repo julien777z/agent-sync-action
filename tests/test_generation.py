@@ -146,6 +146,37 @@ class TestDocumentGeneration:
             for content in files.values()
         )
 
+    def test_agent_tool_lists_survive_generation(self, workspace: Workspace) -> None:
+        """Test that an agent declaring its tools as a list keeps that declaration."""
+
+        agents_dir = workspace.agents_dir / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "review.md").write_text(
+            "---\nname: review\ntools:\n  - read_file\n  - write_file\n---\n\nReview.\n"
+        )
+
+        outputs = generate_agents(load_context(workspace), Provider.CLAUDE)
+        content = next(output.content for output in outputs if isinstance(output, GeneratedFile))
+
+        assert "tools:\n- read_file\n- write_file\n" in content
+
+    @pytest.mark.parametrize("directory_name", ["agents", "rules"])
+    def test_directory_readmes_are_not_canonical_documents(
+        self,
+        workspace: Workspace,
+        directory_name: str,
+    ) -> None:
+        """Test that a documentation index beside canonical documents is not mirrored."""
+
+        directory = workspace.agents_dir / directory_name
+        directory.mkdir()
+        (directory / "README.md").write_text("# Index\n\nWhat lives here.\n")
+
+        context = load_context(workspace)
+
+        assert context.agents == ()
+        assert context.rules == ()
+
     def test_rules_normalize_sources_and_generate_links(
         self,
         workspace: Workspace,

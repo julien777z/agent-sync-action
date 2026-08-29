@@ -40,7 +40,7 @@ class AgentFrontMatter(BaseModel):
 
     name: str | None = None
     description: str | None = None
-    tools: str | None = None
+    tools: str | list[str] | None = None
     model: str | None = None
 
 

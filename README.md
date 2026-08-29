@@ -9,7 +9,7 @@ directory.
 - Links Claude, Cursor, and Codex skills directly to their canonical directories.
 - Links Claude and Cursor rules to their canonical files.
 - Scopes a rule to matching files from one declaration, kept consistent across every provider's front matter.
-- Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
+- Installs registered vendors, including [skills.sh](https://www.skills.sh/) skills and the [ECC](https://github.com/affaan-m/ecc) catalog, and keeps them current.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
 - Overwrites generated provider files so they always match `.agents/`.
@@ -42,13 +42,13 @@ jobs:
       - uses: julien777z/agent-sync-action@v0
 ```
 
-### Sync External Skills
+### Sync Vendors
 
-Use this scheduled workflow to install the latest registered external skills and
-mirror any resulting changes.
+Use this scheduled workflow to install the latest registered vendors and mirror
+any resulting changes.
 
 ```yaml
-name: Sync External Skills
+name: Sync Vendors
 
 on:
   schedule:
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julien777z/agent-sync-action@v0
         with:
-          refresh-external-skills: true
+          refresh-vendors: true
 ```
 
 ## Layout
@@ -77,7 +77,7 @@ jobs:
 ├── rules/
 ├── settings/
 ├── skills/
-└── external_skills.json
+└── vendors.json
 ```
 
 | Path | Purpose |
@@ -88,7 +88,7 @@ jobs:
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories linked into provider layouts. |
-| `external_skills.json` | Registry of external skills that Agent Sync can update. |
+| `vendors.json` | Registry of third-party vendors that Agent Sync can install from. |
 
 Only the directories and files your repository uses are required.
 
@@ -97,45 +97,112 @@ Only the directories and files your repository uses are required.
 | Input | Default | Purpose |
 |---|---|---|
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
-| `refresh-external-skills` | `false` | Install registered external skills before mirroring. |
-| `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
+| `refresh-vendors` | `false` | Install registered vendors before mirroring. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `dry-run` | `false` | Report differences without writing or committing. |
 
-## External skills
+## Vendors
 
-To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
-`.agents/external_skills.json`. Use its source repository and upstream slug, choose the local skill
-directory name you want, and set `update_on_sync` to keep it current.
+A vendor is a third-party system Agent Sync installs into `.agents/` before mirroring. Each supported
+vendor is a key in `.agents/vendors.json` carrying its own options, and `update_on_sync` decides
+whether it runs when vendors refresh: when `refresh-vendors` is `true`, on a scheduled workflow run,
+or after a push changes `.agents/vendors.json`.
 
-For example, this installs the
+```json
+{
+  "version": 1,
+  "vendors": {
+    "skills-cli": {
+      "update_on_sync": true,
+      "skills": []
+    },
+    "ecc": {
+      "update_on_sync": true,
+      "profile": "developer"
+    }
+  }
+}
+```
+
+### Skills CLI
+
+Installs individual [skills.sh](https://www.skills.sh/) skills from their source repositories. Find a
+skill on skills.sh, then add it with its source repository and upstream slug, choosing the local
+directory name you want.
+
+This installs the
 [React best-practices](https://www.skills.sh/vercel-labs/agent-skills/vercel-react-best-practices) skill as
 `.agents/skills/react-best-practices`:
 
 ```json
 {
   "version": 1,
-  "skills": [
-    {
-      "name": "react-best-practices",
-      "repo": "vercel-labs/agent-skills",
-      "skill": "vercel-react-best-practices",
-      "update_on_sync": true
+  "vendors": {
+    "skills-cli": {
+      "update_on_sync": true,
+      "cli_version": "1.5.13",
+      "skills": [
+        {
+          "name": "react-best-practices",
+          "repo": "vercel-labs/agent-skills",
+          "skill": "vercel-react-best-practices",
+          "update_on_sync": true
+        }
+      ]
     }
-  ]
+  }
 }
 ```
 
+| Option | Default | Purpose |
+|---|---|---|
+| `cli_version` | `1.5.13` | Version of the skills CLI used to install skills. |
+| `skills` | `[]` | Skills to install, each with its own `update_on_sync`. |
+
+Each skill entry takes:
+
 - `name`: local directory under `.agents/skills/`.
 - `repo`: source GitHub repository in `owner/repo` form.
-- `skill`: upstream slug when it differs from `name`.
-- `update_on_sync`: required. Set this to `true` to install the skill whenever external
-  skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
-  after a push changes `.agents/external_skills.json`.
+- `skill`: upstream slug when it differs from `name`. This is the skill's front-matter `name`, which
+  is not always its directory name.
+- `skills_path`: directory inside the source repository holding its skills. Set this when a
+  repository mirrors the same slug into several trees, so the vendored copy is chosen explicitly.
 
-Vendored skills include a `metadata.source` URL in their `SKILL.md` frontmatter and retain
-repository-root license, copying, and notice files from the same immutable source revision.
+Skills from one repository share a single immutable source revision. Vendored skills include a
+`metadata.source` URL in their `SKILL.md` frontmatter and retain repository-root license, copying,
+and notice files from that same revision.
+
+### ECC
+
+Installs the [ECC](https://github.com/affaan-m/ecc) catalog through its own selective-install CLI.
+Name a profile, explicit modules, explicit skills, or any combination, and ECC resolves the module
+dependencies itself.
+
+```json
+{
+  "version": 1,
+  "vendors": {
+    "ecc": {
+      "update_on_sync": true,
+      "version": "latest",
+      "profile": "developer",
+      "modules": ["security"]
+    }
+  }
+}
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `version` | `latest` | Version of the `ecc-universal` package to run. |
+| `target` | `antigravity` | ECC install target, which must write to `agents-dir`. |
+| `profile` | none | ECC profile to resolve. |
+| `modules` | `[]` | Explicit ECC module IDs. |
+| `skills` | `[]` | Explicit ECC skill IDs. |
+
+An `ecc-install.json` at the repository root supplies anything else ECC accepts, including
+`--with`, `--without`, and `--locale`.
 
 ## Rule Scope
 
