@@ -1,10 +1,10 @@
 import logging
 from typing import Final
 
-from agent_sync.models.vendors import VendorRegistry
+from agent_sync.models.vendors.registry import VendorRegistry
 from agent_sync.utils import load_json_model
-from agent_sync.vendors.ecc import install_ecc_vendor
-from agent_sync.vendors.skills_cli import install_skills_cli_vendor
+from agent_sync.vendors.ecc.install import install_ecc_vendor
+from agent_sync.vendors.skills_cli.sync import install_skills_cli_vendor
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)

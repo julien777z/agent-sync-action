@@ -4,13 +4,11 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
-from agent_sync.models.vendors import (
-    EccVendor,
-    SkillsCliVendor,
-    VendoredSkill,
-    VendorRegistry,
-    Vendors,
-)
+from agent_sync.models.vendors.ecc import EccVendor
+from agent_sync.models.vendors.registry import VendorRegistry, Vendors
+from agent_sync.models.vendors.skills_cli import SkillsCliVendor, VendoredSkill
+
+SOURCE_SKILL = "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n"
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
