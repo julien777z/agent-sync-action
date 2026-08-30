@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
@@ -15,6 +16,9 @@ from agent_sync.utils import validate_slug
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
+
+
+DOCUMENTATION_FILENAMES: Final[frozenset[str]] = frozenset({"README.md"})
 
 
 class SkillSource(BaseModel):
@@ -186,6 +190,9 @@ def load_markdown_sources[T: BaseModel](
     sources: list[tuple[Path, str, T, str]] = []
 
     for path in sorted(directory.glob("*.md")):
+        if path.name in DOCUMENTATION_FILENAMES:
+            continue
+
         slug = validate_slug(path.stem, path)
         content = workspace.read_text(path)
 

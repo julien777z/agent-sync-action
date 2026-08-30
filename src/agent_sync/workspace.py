@@ -49,6 +49,11 @@ class Workspace(BaseModel):
             agents_dirname=resolved_agents_dirname,
         )
 
+    def relative_path(self, path: Path) -> str:
+        """Return a path inside the workspace as a repository-relative POSIX string."""
+
+        return path.relative_to(self.root).as_posix()
+
     def read_text(self, path: Path) -> str | None:
         """Read UTF-8 text when a path exists."""
 

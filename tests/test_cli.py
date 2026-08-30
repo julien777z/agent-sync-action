@@ -29,7 +29,7 @@ class TestCli:
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 
-        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--dry-run"])
+        result = run_cli(["install-vendors", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 0
 

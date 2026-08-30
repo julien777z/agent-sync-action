@@ -11,6 +11,9 @@ from agent_sync.errors import AgentSyncError
 logger = logging.getLogger(__name__)
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+SAFE_RELATIVE_PATH_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^[A-Za-z0-9_][A-Za-z0-9._-]*(?:/[A-Za-z0-9_][A-Za-z0-9._-]*)*$"
+)
 
 
 def ensure_trailing_newline(text: str) -> str:

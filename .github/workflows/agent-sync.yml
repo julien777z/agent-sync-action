@@ -26,4 +26,4 @@ jobs:
           fetch-depth: 0
       - uses: ./
         with:
-          refresh-external-skills: ${{ github.event_name == 'schedule' }}
+          refresh-vendors: ${{ github.event_name == 'schedule' }}

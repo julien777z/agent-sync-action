@@ -1,13 +1,14 @@
 import logging
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agent_sync.utils import SAFE_SLUG_PATTERN
+from agent_sync.config import ACTION_CONFIG
+from agent_sync.utils import SAFE_RELATIVE_PATH_PATTERN, SAFE_SLUG_PATTERN
 
 logger = logging.getLogger(__name__)
 
 
-class ExternalSkill(BaseModel):
+class VendoredSkill(BaseModel):
     """A single skills.sh skill to vendor into .agents/skills/<name>/."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -15,6 +16,7 @@ class ExternalSkill(BaseModel):
     name: str
     repo: str
     skill: str | None = None
+    skills_path: str | None = None
     update_on_sync: bool
 
     @field_validator("name")
@@ -37,6 +39,18 @@ class ExternalSkill(BaseModel):
 
         return value
 
+    @field_validator("skills_path")
+    @classmethod
+    def validate_skills_path(cls, value: str | None) -> str | None:
+        """Reject upstream skill directories that are not safe relative paths."""
+
+        if value is not None and not SAFE_RELATIVE_PATH_PATTERN.fullmatch(value):
+            raise ValueError(
+                f"Invalid skills path '{value}' (must match {SAFE_RELATIVE_PATH_PATTERN.pattern})"
+            )
+
+        return value
+
     @property
     def upstream_skill(self) -> str:
         """Return the skill slug to request from the source repo (defaults to the local name)."""
@@ -44,31 +58,33 @@ class ExternalSkill(BaseModel):
         return self.skill or self.name
 
 
-class SkillsRegistry(BaseModel):
-    """The .agents/external_skills.json external-skill registry."""
+class SkillsCliVendor(BaseModel):
+    """Skills installed from their source repositories through the skills.sh CLI."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    version: int = 1
-    skills: list[ExternalSkill] = Field(default_factory=list[ExternalSkill])
+    update_on_sync: bool = True
+    cli_version: str = Field(default_factory=lambda: ACTION_CONFIG.skills_cli_version)
+    skills: list[VendoredSkill] = Field(default_factory=list[VendoredSkill])
 
-    @model_validator(mode="after")
-    def validate_unique_names(self) -> "SkillsRegistry":
+    @field_validator("skills")
+    @classmethod
+    def validate_unique_names(cls, value: list[VendoredSkill]) -> list[VendoredSkill]:
         """Reject entries that would write to the same local skill directory."""
 
-        names = [skill.name for skill in self.skills]
+        names = [skill.name for skill in value]
         duplicates = sorted({name for name in names if names.count(name) > 1})
 
         if duplicates:
-            raise ValueError(f"External skill names must be unique: {', '.join(duplicates)}")
+            raise ValueError(f"Vendored skill names must be unique: {', '.join(duplicates)}")
 
-        return self
+        return value
 
 
-class ExternalSkillResult(BaseModel):
-    """The outcome of updating one external skill in .agents/skills/."""
+class VendoredSkillResult(BaseModel):
+    """The outcome of updating one vendored skill in .agents/skills/."""
 
     model_config = ConfigDict(frozen=True)
 
-    skill: ExternalSkill
+    skill: VendoredSkill
     changed: bool

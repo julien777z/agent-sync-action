@@ -5,8 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.external_skills.sync import sync_external_skills
 from agent_sync.reconciliation import mirror_providers
+from agent_sync.vendors.runner import install_vendors
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class CliArguments(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    command: Literal["mirror-providers", "vendor-skills"]
+    command: Literal["mirror-providers", "install-vendors"]
     root: str | None
     agents_dir: str | None
     dry_run: bool
@@ -50,7 +50,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="agent-sync",
-        description="Mirror canonical agent sources and vendor registered skills.",
+        description="Mirror canonical agent sources and install registered vendors.",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
@@ -62,8 +62,8 @@ def create_parser() -> argparse.ArgumentParser:
     add_workspace_arguments(mirror_parser)
 
     vendor_parser = commands.add_parser(
-        "vendor-skills",
-        help="Vendor registered external skills into canonical sources.",
+        "install-vendors",
+        help="Install registered vendors into canonical sources.",
     )
     add_workspace_arguments(vendor_parser)
 
@@ -80,8 +80,8 @@ if __name__ == "__main__":
         match parsed.command:
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
-            case "vendor-skills":
-                differences_found = sync_external_skills(workspace, parsed.dry_run)
+            case "install-vendors":
+                differences_found = install_vendors(workspace, parsed.dry_run)
 
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError) as exc:
