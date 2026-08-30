@@ -161,7 +161,7 @@ class TestDocumentGeneration:
         assert "tools:\n- read_file\n- write_file\n" in content
 
     @pytest.mark.parametrize("directory_name", ["agents", "rules"])
-    def test_directory_readmes_are_not_canonical_documents(
+    def test_directory_readmes_are_not_canonical(
         self,
         workspace: Workspace,
         directory_name: str,

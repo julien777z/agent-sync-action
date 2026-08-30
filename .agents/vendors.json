@@ -3,7 +3,6 @@
   "vendors": {
     "skills-cli": {
       "update_on_sync": true,
-      "cli_version": "1.5.13",
       "skills": [
         {
           "name": "agent-browser",
@@ -99,7 +98,6 @@
     },
     "ecc": {
       "update_on_sync": false,
-      "version": "latest",
       "target": "antigravity",
       "profile": "core"
     }

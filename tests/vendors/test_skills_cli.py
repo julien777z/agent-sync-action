@@ -1,10 +1,11 @@
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from agent_sync.config import ActionConfig
-from agent_sync.models.vendors.skills_cli import VendoredSkill
+from agent_sync.models.vendors.skills_cli import SkillsCliVendor, VendoredSkill
 from agent_sync.vendors.skills_cli import assets, discovery, github, installer, sync
 from agent_sync.workspace import Workspace
 from tests.factories import (
@@ -18,7 +19,7 @@ from tests.factories import (
 class TestSkillsCliBoundaries:
     """Test that immutable GitHub snapshots and installer behavior work."""
 
-    def test_runtime_config_accepts_namespaced_overrides(
+    def test_config_accepts_namespaced_overrides(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -79,7 +80,7 @@ class TestSkillsCliBoundaries:
         [(None, "source"), ("skills", "source/skills")],
         ids=["repository-root", "registered-subdirectory"],
     )
-    def test_installer_searches_the_registered_skills_path(
+    def test_installer_searches_registered_path(
         self,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
@@ -118,7 +119,43 @@ class TestSkillsCliBoundaries:
         assert "skills@9.9.9" in captured
         assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
 
-    def test_a_missing_skills_path_fails(self, tmp_path: Path) -> None:
+    def test_configured_version_reaches_installer(
+        self,
+        configure_action: Callable[..., None],
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Test that a vendor without its own pin runs the configured version."""
+
+        configure_action(skills_cli_version="9.9.9")
+        captured: list[str] = []
+
+        def fake_run(
+            command: list[str],
+            *,
+            cwd: Path,
+            capture_output: bool,
+            text: bool,
+            check: bool,
+        ) -> subprocess.CompletedProcess[str]:
+            """Capture one installer invocation."""
+
+            captured.extend(command)
+
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        monkeypatch.setattr(installer.subprocess, "run", fake_run)
+
+        installer.install_skill(
+            SkillsCliVendor(),
+            VendoredSkillFactory.build(),
+            tmp_path / "install",
+            tmp_path,
+        )
+
+        assert "skills@9.9.9" in captured
+
+    def test_missing_skills_path_fails(self, tmp_path: Path) -> None:
         """Test that a registered directory absent upstream is reported by name."""
 
         skill = VendoredSkillFactory.build(skills_path="packages/skills")
@@ -126,7 +163,7 @@ class TestSkillsCliBoundaries:
         with pytest.raises(RuntimeError, match="packages/skills"):
             installer.resolve_search_root(tmp_path, skill)
 
-    def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
+    def test_installed_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
         """Test that staging discovery does not depend on one provider directory."""
 
         materialize_tree(
@@ -151,7 +188,7 @@ class TestSkillsCliBoundaries:
         ],
         ids=["no-document", "selected-skill", "different-skill"],
     )
-    def test_root_skill_detection_matches_the_upstream_selector(
+    def test_root_detection_matches_selector(
         self,
         tmp_path: Path,
         document: str | None,
@@ -164,7 +201,7 @@ class TestSkillsCliBoundaries:
 
         assert discovery.is_search_root_skill(tmp_path, VendoredSkillFactory.build()) is expected
 
-    def test_vendor_renames_upstream_metadata_for_the_local_directory(
+    def test_vendor_renames_metadata_locally(
         self,
         tmp_path: Path,
     ) -> None:
@@ -209,7 +246,7 @@ class TestSkillsCliBoundaries:
 class TestSkillsCliVendoring:
     """Test that snapshots resolve the registered upstream tree and its assets."""
 
-    def test_mirrored_skill_slugs_vendor_the_registered_tree(
+    def test_mirrored_slugs_vendor_registered_tree(
         self,
         snapshot: Path,
         workspace: Workspace,
@@ -238,7 +275,7 @@ class TestSkillsCliVendoring:
         assert "Canonical." in (vendored / "SKILL.md").read_text()
         assert (vendored / "LICENSE").read_text() == "License text.\n"
 
-    def test_a_nested_skill_does_not_absorb_repository_root_files(
+    def test_nested_skill_excludes_root_files(
         self,
         snapshot: Path,
         workspace: Workspace,
@@ -261,7 +298,7 @@ class TestSkillsCliVendoring:
 
         assert sorted(path.name for path in vendored.iterdir()) == ["LICENSE", "SKILL.md"]
 
-    def test_a_root_skill_supplements_its_own_assets(
+    def test_root_skill_supplements_own_assets(
         self,
         snapshot: Path,
         workspace: Workspace,
@@ -275,7 +312,7 @@ class TestSkillsCliVendoring:
 
         assert (workspace.agents_dir / "skills/sample/reference.md").read_text() == "Reference.\n"
 
-    def test_one_snapshot_serves_every_skill_from_one_repository(
+    def test_one_snapshot_serves_whole_repository(
         self,
         monkeypatch: pytest.MonkeyPatch,
         snapshot: Path,
@@ -324,7 +361,7 @@ class TestSkillsCliVendoring:
         assert (workspace.agents_dir / "skills/sample/SKILL.md").is_file()
         assert (workspace.agents_dir / "skills/other/SKILL.md").is_file()
 
-    def test_dry_run_reports_changes_without_writing(
+    def test_dry_run_reports_without_writing(
         self,
         snapshot: Path,
         workspace: Workspace,

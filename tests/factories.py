@@ -2,6 +2,7 @@ from pathlib import Path
 
 from polyfactory.factories.pydantic_factory import ModelFactory
 
+from agent_sync.config import ACTION_CONFIG
 from agent_sync.document import render_front_matter
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.vendors.ecc import EccVendor
@@ -49,7 +50,7 @@ class SkillsCliVendorFactory(ModelFactory[SkillsCliVendor]):
     __model__ = SkillsCliVendor
 
     update_on_sync = True
-    cli_version = "1.5.13"
+    cli_version = ACTION_CONFIG.skills_cli_version
 
     @classmethod
     def skills(cls) -> list[VendoredSkill]:
@@ -64,7 +65,7 @@ class EccVendorFactory(ModelFactory[EccVendor]):
     __model__ = EccVendor
 
     update_on_sync = True
-    version = "latest"
+    version = ACTION_CONFIG.ecc_version
     target = "antigravity"
     profile = "core"
 

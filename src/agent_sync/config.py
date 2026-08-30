@@ -20,6 +20,8 @@ class ActionConfig(BaseSettings):
 
     root: Path | None = None
     agents_dir: str = ".agents"
+    skills_cli_version: str = "1.5.23"
+    ecc_version: str = "latest"
 
 
 ACTION_CONFIG = ActionConfig()

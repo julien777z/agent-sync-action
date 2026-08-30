@@ -2,6 +2,7 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from agent_sync.config import ACTION_CONFIG
 from agent_sync.utils import SAFE_RELATIVE_PATH_PATTERN, SAFE_SLUG_PATTERN
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class SkillsCliVendor(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     update_on_sync: bool = True
-    cli_version: str = "1.5.13"
+    cli_version: str = Field(default_factory=lambda: ACTION_CONFIG.skills_cli_version)
     skills: list[VendoredSkill] = Field(default_factory=list[VendoredSkill])
 
     @field_validator("skills")

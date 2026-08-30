@@ -125,7 +125,7 @@ class TestVendorRegistryModel:
 
         assert registry.vendors.skills_cli is None
 
-    def test_registry_round_trips_through_its_serialized_keys(self) -> None:
+    def test_registry_round_trips_serialized_keys(self) -> None:
         """Test that a serialized registry validates back into the same configuration."""
 
         registry = VendorRegistryFactory.build(

@@ -95,7 +95,7 @@ class TestVendorRunner:
 
         assert runner.install_vendors(workspace, dry_run=False) is False
 
-    def test_disabled_skills_leave_local_sources_untouched(
+    def test_disabled_skills_leave_sources_untouched(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,

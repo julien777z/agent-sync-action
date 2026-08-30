@@ -141,7 +141,6 @@ This installs the
   "vendors": {
     "skills-cli": {
       "update_on_sync": true,
-      "cli_version": "1.5.13",
       "skills": [
         {
           "name": "react-best-practices",
@@ -157,7 +156,7 @@ This installs the
 
 | Option | Default | Purpose |
 |---|---|---|
-| `cli_version` | `1.5.13` | Version of the skills CLI used to install skills. |
+| `cli_version` | the action's pinned version | Version of the skills CLI used to install skills. |
 | `skills` | `[]` | Skills to install, each with its own `update_on_sync`. |
 
 Each skill entry takes:
@@ -185,7 +184,6 @@ dependencies itself.
   "vendors": {
     "ecc": {
       "update_on_sync": true,
-      "version": "latest",
       "profile": "developer",
       "modules": ["security"]
     }
@@ -195,7 +193,7 @@ dependencies itself.
 
 | Option | Default | Purpose |
 |---|---|---|
-| `version` | `latest` | Version of the `ecc-universal` package to run. |
+| `version` | the action's pinned version | Version of the `ecc-universal` package to run. |
 | `target` | `antigravity` | ECC install target, which must write to `agents-dir`. |
 | `profile` | none | ECC profile to resolve. |
 | `modules` | `[]` | Explicit ECC module IDs. |

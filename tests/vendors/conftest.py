@@ -1,7 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from agent_sync.config import ACTION_CONFIG
+from agent_sync.models.vendors import ecc as ecc_models
+from agent_sync.models.vendors import skills_cli as skills_cli_models
 from agent_sync.models.vendors.skills_cli import SkillsCliVendor, VendoredSkill
 from agent_sync.vendors.skills_cli import discovery, github, installer
 from tests.factories import materialize_tree
@@ -43,3 +47,18 @@ def snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setattr(installer, "install_skill", fake_install)
 
     return source_root
+
+
+@pytest.fixture
+def configure_action(monkeypatch: pytest.MonkeyPatch) -> Callable[..., None]:
+    """Install action settings carrying the given overrides for every vendor model."""
+
+    def _configure(**overrides: str) -> None:
+        """Replace the settings object each vendor model reads its defaults from."""
+
+        settings = ACTION_CONFIG.model_copy(update=overrides)
+
+        for module in (skills_cli_models, ecc_models):
+            monkeypatch.setattr(module, "ACTION_CONFIG", settings)
+
+    return _configure

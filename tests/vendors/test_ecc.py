@@ -1,4 +1,5 @@
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -13,19 +14,32 @@ from tests.factories import EccVendorFactory
 class TestEccCommand:
     """Test that ECC selective-install invocations are built from vendor options."""
 
-    def test_profile_only_selection_builds_a_minimal_command(self) -> None:
+    def test_profile_only_selection_builds_command(self) -> None:
         """Test that a profile-only configuration passes just its profile."""
 
         invocation = command.build_command(EccVendorFactory.build(), dry_run=False)
 
-        assert invocation[:4] == ["npx", "--yes", f"{command.ECC_PACKAGE}@latest", "install"]
+        assert invocation[:2] == ["npx", "--yes"]
+        assert invocation[3] == "install"
         assert invocation[invocation.index("--target") + 1] == "antigravity"
         assert invocation[invocation.index("--profile") + 1] == "core"
         assert "--modules" not in invocation
         assert "--skills" not in invocation
         assert invocation[-1] == "--json"
 
-    def test_modules_and_skills_are_passed_as_comma_lists(self) -> None:
+    def test_configured_version_reaches_command(
+        self,
+        configure_action: Callable[..., None],
+    ) -> None:
+        """Test that a vendor without its own pin runs the configured version."""
+
+        configure_action(ecc_version="2.2.0")
+
+        invocation = command.build_command(EccVendor(), dry_run=False)
+
+        assert invocation[2] == f"{command.ECC_PACKAGE}@2.2.0"
+
+    def test_modules_and_skills_pass_comma_lists(self) -> None:
         """Test that explicit module and skill selections reach the installer."""
 
         vendor = EccVendorFactory.build(modules=["security", "database"], skills=["deep-research"])
@@ -35,7 +49,7 @@ class TestEccCommand:
         assert invocation[invocation.index("--modules") + 1] == "security,database"
         assert invocation[invocation.index("--skills") + 1] == "deep-research"
 
-    def test_dry_run_forwards_the_installer_dry_run(self) -> None:
+    def test_dry_run_forwards_installer_flag(self) -> None:
         """Test that a dry run never asks the installer to write files."""
 
         assert "--dry-run" in command.build_command(EccVendorFactory.build(), dry_run=True)
@@ -66,7 +80,7 @@ class TestEccInstall:
         with pytest.raises(RuntimeError, match="agent-sources"):
             install.assert_target_writes_to_workspace(workspace, EccVendorFactory.build())
 
-    def test_a_failing_installer_surfaces_its_output(
+    def test_failing_installer_surfaces_output(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,

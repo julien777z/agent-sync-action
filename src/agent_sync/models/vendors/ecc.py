@@ -3,6 +3,7 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
+from agent_sync.config import ACTION_CONFIG
 from agent_sync.utils import SAFE_SLUG_PATTERN
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class EccVendor(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     update_on_sync: bool = True
-    version: str = "latest"
+    version: str = Field(default_factory=lambda: ACTION_CONFIG.ecc_version)
     target: str = ANTIGRAVITY_TARGET
     profile: str | None = None
     modules: list[str] = Field(default_factory=list[str])
