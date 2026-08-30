@@ -1,7 +1,7 @@
 import logging
 from typing import Final
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agent_sync.config import ACTION_CONFIG
 from agent_sync.utils import SAFE_SLUG_PATTERN
@@ -59,12 +59,20 @@ class EccVendor(BaseModel):
         return ANTIGRAVITY_AGENTS_DIRNAME if self.target == ANTIGRAVITY_TARGET else None
 
 
+class EccInstallOperation(BaseModel):
+    """One file operation an ECC selective-install run reported."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    destination_path: str | None = Field(default=None, alias="destinationPath")
+
+
 class EccInstallPlan(BaseModel):
     """The file operations one ECC selective-install run reported."""
 
     model_config = ConfigDict(extra="ignore")
 
-    operations: list[JsonValue] = Field(default_factory=list[JsonValue])
+    operations: list[EccInstallOperation] = Field(default_factory=list[EccInstallOperation])
 
 
 class EccInstallOutput(BaseModel):
@@ -76,9 +84,19 @@ class EccInstallOutput(BaseModel):
     result: EccInstallPlan | None = None
 
     @property
-    def operation_count(self) -> int:
-        """Return the number of file operations the run reported."""
+    def operations(self) -> list[EccInstallOperation]:
+        """Return the file operations the run reported."""
 
         reported = self.plan or self.result
 
-        return len(reported.operations) if reported is not None else 0
+        return reported.operations if reported is not None else []
+
+    @property
+    def destination_paths(self) -> list[str]:
+        """Return every absolute destination the run wrote to."""
+
+        return [
+            operation.destination_path
+            for operation in self.operations
+            if operation.destination_path is not None
+        ]

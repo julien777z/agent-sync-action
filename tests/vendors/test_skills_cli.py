@@ -268,7 +268,9 @@ class TestSkillsCliVendoring:
 
         vendor = SkillsCliVendorFactory.build(skills=[VendoredSkillFactory.build(skills_path="skills")])
 
-        assert sync.install_skills_cli_vendor(workspace, vendor, dry_run=False) is False
+        assert sync.install_skills_cli_vendor(workspace, vendor, dry_run=False).paths == [
+            ".agents/skills/sample"
+        ]
 
         vendored = workspace.agents_dir / "skills/sample"
 
@@ -371,5 +373,5 @@ class TestSkillsCliVendoring:
         materialize_tree(snapshot, {"skills/sample/SKILL.md": SOURCE_SKILL})
         vendor = SkillsCliVendorFactory.build(skills=[VendoredSkillFactory.build(skills_path="skills")])
 
-        assert sync.install_skills_cli_vendor(workspace, vendor, dry_run=True) is True
+        assert sync.install_skills_cli_vendor(workspace, vendor, dry_run=True).differences_found is True
         assert not (workspace.agents_dir / "skills").exists()

@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from agent_sync.models.vendors.lock import VendorInstallResult
 from agent_sync.models.vendors.skills_cli import (
     SkillsCliVendor,
     VendoredSkill,
@@ -15,15 +16,19 @@ from agent_sync.workspace import Workspace
 logger = logging.getLogger(__name__)
 
 
-def install_skills_cli_vendor(workspace: Workspace, vendor: SkillsCliVendor, dry_run: bool) -> bool:
-    """Update every enabled skill and report whether a dry run found changes."""
+def install_skills_cli_vendor(
+    workspace: Workspace,
+    vendor: SkillsCliVendor,
+    dry_run: bool,
+) -> VendorInstallResult:
+    """Update every enabled skill and report what it wrote."""
 
     updatable_skills = [skill for skill in vendor.skills if skill.update_on_sync]
 
     if not updatable_skills:
         logger.info("No skills are enabled for sync; nothing to update.")
 
-        return False
+        return VendorInstallResult()
 
     skills_dir = workspace.agents_dir / "skills"
     results = [
@@ -34,7 +39,10 @@ def install_skills_cli_vendor(workspace: Workspace, vendor: SkillsCliVendor, dry
 
     report_results(results, dry_run)
 
-    return dry_run and any(result.changed for result in results)
+    return VendorInstallResult(
+        differences_found=dry_run and any(result.changed for result in results),
+        paths=sorted(workspace.relative_path(skills_dir / skill.name) for skill in updatable_skills),
+    )
 
 
 def group_skills_by_repository(skills: list[VendoredSkill]) -> dict[str, list[VendoredSkill]]:

@@ -61,12 +61,15 @@ class TestEccCommand:
         with pytest.raises(ValidationError):
             EccVendor.model_validate({field: ["../escape"]})
 
-    def test_operation_counts_come_from_installer_output(self) -> None:
-        """Test that reported operation counts are read from the installer's own plan."""
+    def test_destinations_come_from_installer_output(self) -> None:
+        """Test that installed destinations are read from the installer's own plan."""
 
-        assert command.count_operations('{"dryRun": true, "plan": {"operations": [1, 2, 3]}}') == 3
-        assert command.count_operations('{"dryRun": false, "result": {"operations": [1]}}') == 1
-        assert command.count_operations("not json") == 0
+        planned = '{"dryRun": true, "plan": {"operations": [{"destinationPath": "/repo/.agents/a.md"}]}}'
+        applied = '{"dryRun": false, "result": {"operations": [{"destinationPath": "/repo/.agents/b.md"}]}}'
+
+        assert command.installed_destinations(planned) == ["/repo/.agents/a.md"]
+        assert command.installed_destinations(applied) == ["/repo/.agents/b.md"]
+        assert command.installed_destinations("not json") == []
 
 
 class TestEccInstall:

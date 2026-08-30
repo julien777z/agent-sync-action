@@ -37,10 +37,10 @@ def build_command(vendor: EccVendor, dry_run: bool) -> list[str]:
     return command + ["--json"]
 
 
-def count_operations(output: str) -> int:
-    """Return the number of file operations an install run reported."""
+def installed_destinations(output: str) -> list[str]:
+    """Return every destination an install run reported writing to."""
 
     try:
-        return EccInstallOutput.model_validate_json(output).operation_count
+        return EccInstallOutput.model_validate_json(output).destination_paths
     except ValidationError:
-        return 0
+        return []

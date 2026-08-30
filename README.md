@@ -125,6 +125,31 @@ or after a push changes `.agents/vendors.json`.
 }
 ```
 
+### Installed Paths
+
+Each vendor run records what it installed in `.agents/vendors.lock.json`. The file is generated and
+belongs in version control: it is what lets a narrowed selection remove the paths a vendor no longer
+claims.
+
+```json
+{
+  "version": 1,
+  "vendors": {
+    "ecc": { "paths": ["skills/agent-sort", "rules/angular-coding-style.md"] },
+    "skills-cli": { "paths": ["skills/react-best-practices"] }
+  }
+}
+```
+
+Three rules decide what reconciliation removes:
+
+- A path absent from the lockfile is never deleted, so repository-authored content under `.agents/`
+  is untouched by construction.
+- A vendor that did not run keeps every recorded path, so `update_on_sync: false` stops syncing a
+  vendor rather than removing it.
+- A vendor removed from `.agents/vendors.json` has its recorded paths deleted, which is the
+  deliberate way to withdraw one.
+
 ### Skills CLI
 
 Installs individual [skills.sh](https://www.skills.sh/) skills from their source repositories. Find a
@@ -220,7 +245,7 @@ alwaysApply: false
 
 ```bash
 poetry install --extras dev
-poetry run python -m agent_sync vendor-skills --root .
+poetry run python -m agent_sync install-vendors --root .
 poetry run python -m agent_sync mirror-providers --root .
 ```
 

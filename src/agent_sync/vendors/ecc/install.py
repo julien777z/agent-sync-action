@@ -3,7 +3,9 @@ import subprocess
 from typing import Final
 
 from agent_sync.models.vendors.ecc import EccVendor
+from agent_sync.models.vendors.lock import VendorInstallResult
 from agent_sync.vendors.ecc import command
+from agent_sync.vendors.reconcile import relative_installed_paths
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -11,8 +13,8 @@ logger = logging.getLogger(__name__)
 INSTALL_STATE_FILENAME: Final[str] = "ecc-install-state.json"
 
 
-def install_ecc_vendor(workspace: Workspace, vendor: EccVendor, dry_run: bool) -> bool:
-    """Install the ECC catalog into canonical sources and report planned operations."""
+def install_ecc_vendor(workspace: Workspace, vendor: EccVendor, dry_run: bool) -> VendorInstallResult:
+    """Install the ECC catalog into canonical sources and report what it wrote."""
 
     assert_target_writes_to_workspace(workspace, vendor)
 
@@ -33,17 +35,18 @@ def install_ecc_vendor(workspace: Workspace, vendor: EccVendor, dry_run: bool) -
             f"\n{result.stdout}\n{result.stderr}"
         )
 
+    destinations = command.installed_destinations(result.stdout)
     logger.info(
         "  ECC %s: %d operation(s) %s.",
         vendor.profile or "custom modules",
-        command.count_operations(result.stdout),
+        len(destinations),
         "planned" if dry_run else "applied",
     )
 
     if not dry_run:
         discard_install_state(workspace)
 
-    return False
+    return VendorInstallResult(paths=relative_installed_paths(workspace, destinations))
 
 
 def assert_target_writes_to_workspace(workspace: Workspace, vendor: EccVendor) -> None:

@@ -1,6 +1,7 @@
 import pytest
 
 from agent_sync.models.vendors.ecc import EccVendor
+from agent_sync.models.vendors.lock import VendorInstallResult
 from agent_sync.models.vendors.registry import Vendors
 from agent_sync.models.vendors.skills_cli import SkillsCliVendor
 from agent_sync.vendors import runner
@@ -43,19 +44,23 @@ class TestVendorRunner:
             resolved_workspace: Workspace,
             vendor: SkillsCliVendor,
             dry_run: bool,
-        ) -> bool:
+        ) -> VendorInstallResult:
             """Report one synthetic skills.sh change."""
 
             installed.append("skills-cli")
 
-            return True
+            return VendorInstallResult(differences_found=True)
 
-        def fake_ecc(resolved_workspace: Workspace, vendor: EccVendor, dry_run: bool) -> bool:
+        def fake_ecc(
+            resolved_workspace: Workspace,
+            vendor: EccVendor,
+            dry_run: bool,
+        ) -> VendorInstallResult:
             """Report one synthetic ECC installation."""
 
             installed.append("ecc")
 
-            return False
+            return VendorInstallResult()
 
         monkeypatch.setattr(runner, "install_skills_cli_vendor", fake_skills_cli)
         monkeypatch.setattr(runner, "install_ecc_vendor", fake_ecc)
@@ -76,7 +81,7 @@ class TestVendorRunner:
     ) -> None:
         """Test that a vendor opting out of sync is never installed."""
 
-        def fail_install(*args: object, **kwargs: object) -> bool:
+        def fail_install(*args: object, **kwargs: object) -> VendorInstallResult:
             """Fail if a disabled vendor reaches installation."""
 
             raise AssertionError("disabled vendor must not be installed")
