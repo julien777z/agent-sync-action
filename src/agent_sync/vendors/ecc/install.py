@@ -6,6 +6,7 @@ from agent_sync.models.vendors.ecc import EccVendor
 from agent_sync.models.vendors.lock import VendorInstallResult
 from agent_sync.vendors.ecc import command
 from agent_sync.vendors.reconcile import relative_installed_paths
+from agent_sync.vendors.skills import normalize_installed_skills
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ def install_ecc_vendor(workspace: Workspace, vendor: EccVendor, dry_run: bool) -
     )
 
     if not dry_run:
+        normalize_installed_skills(workspace.agents_dir / "skills", destinations)
         discard_install_state(workspace)
 
     return VendorInstallResult(paths=relative_installed_paths(workspace, destinations))

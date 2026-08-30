@@ -10,6 +10,7 @@ from agent_sync.models.vendors.skills_cli import (
     VendoredSkillResult,
 )
 from agent_sync.utils import trees_differ
+from agent_sync.vendors import skills
 from agent_sync.vendors.skills_cli import assets, discovery, github, installer
 from agent_sync.workspace import Workspace
 
@@ -112,7 +113,7 @@ def vendor_skill(
         assets.supplement_root_assets(installed, search_root)
 
     assets.copy_legal_files(installed, source_root)
-    assets.normalize_skill_metadata(installed, skill)
+    skills.normalize_installed_skill(installed, skill.name, f"https://github.com/{skill.repo}")
 
     destination = skills_dir / skill.name
     changed = trees_differ(installed, destination)

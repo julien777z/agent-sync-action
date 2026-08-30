@@ -1,3 +1,4 @@
+import json
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -8,7 +9,7 @@ from pydantic import ValidationError
 from agent_sync.models.vendors.ecc import EccVendor
 from agent_sync.vendors.ecc import command, install
 from agent_sync.workspace import Workspace
-from tests.factories import EccVendorFactory
+from tests.factories import EccVendorFactory, materialize_tree
 
 
 class TestEccCommand:
@@ -136,3 +137,53 @@ class TestEccInstall:
         install.install_ecc_vendor(workspace, EccVendorFactory.build(), dry_run=dry_run)
 
         assert install_state.exists() is dry_run
+
+    def test_installed_skill_names_match_their_directories(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a catalog skill announcing another name is renamed to its directory."""
+
+        directory = workspace.agents_dir / "skills" / "scientific-db-pubmed-database"
+        materialize_tree(
+            directory,
+            {
+                "SKILL.md": (
+                    "---\n"
+                    "name: pubmed-database\n"
+                    "description: Search biomedical literature.\n"
+                    "---\n\n"
+                    "# PubMed\n"
+                )
+            },
+        )
+        destination = str(directory / "SKILL.md")
+
+        def fake_run(
+            invocation: list[str],
+            *,
+            cwd: Path,
+            capture_output: bool,
+            text: bool,
+            check: bool,
+        ) -> subprocess.CompletedProcess[str]:
+            """Return an installer invocation that wrote one skill document."""
+
+            plan = json.dumps(
+                {"plan": {"operations": [{"destinationPath": destination}]}},
+            )
+
+            return subprocess.CompletedProcess(invocation, 0, plan, "")
+
+        monkeypatch.setattr(install.subprocess, "run", fake_run)
+
+        install.install_ecc_vendor(workspace, EccVendorFactory.build(), dry_run=False)
+
+        assert (directory / "SKILL.md").read_text() == (
+            "---\n"
+            "name: scientific-db-pubmed-database\n"
+            "description: Search biomedical literature.\n"
+            "---\n\n"
+            "# PubMed\n"
+        )

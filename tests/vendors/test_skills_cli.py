@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from agent_sync.config import ActionConfig
-from agent_sync.models.vendors.skills_cli import SkillsCliVendor, VendoredSkill
-from agent_sync.vendors.skills_cli import assets, discovery, github, installer, sync
+from agent_sync.models.vendors.skills_cli import SkillsCliVendor
+from agent_sync.vendors import skills
+from agent_sync.vendors.skills_cli import discovery, github, installer, sync
 from agent_sync.workspace import Workspace
 from tests.factories import (
     SOURCE_SKILL,
@@ -222,14 +223,11 @@ class TestSkillsCliBoundaries:
                 )
             },
         )
-        skill = VendoredSkill(
-            name="react-best-practices",
-            repo="vercel-labs/agent-skills",
-            skill="vercel-react-best-practices",
-            update_on_sync=True,
+        skills.normalize_installed_skill(
+            installed,
+            "react-best-practices",
+            "https://github.com/vercel-labs/agent-skills",
         )
-
-        assets.normalize_skill_metadata(installed, skill)
 
         assert (installed / "SKILL.md").read_text() == (
             "---\n"
