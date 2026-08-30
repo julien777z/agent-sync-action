@@ -1,6 +1,7 @@
 import json
 import os
 import tomllib
+from collections.abc import Callable
 
 import pytest
 
@@ -176,6 +177,34 @@ class TestDocumentGeneration:
 
         assert context.agents == ()
         assert context.rules == ()
+
+    def test_generated_sources_name_configured_directory(
+        self,
+        create_workspace: Callable[..., Workspace],
+    ) -> None:
+        """Test that generated source references follow a renamed canonical directory."""
+
+        workspace = create_workspace(agents_dirname="agent-sources")
+        materialize_rule(
+            workspace.agents_dir / "rules/python.md",
+            RuleFrontMatterFactory.build(starlark='allow_rule(prefix_rule = ["ls"])'),
+        )
+        context = load_context(workspace)
+
+        codex_rules = generate_codex_rules(context, Provider.CODEX)
+        instructions = next(
+            output
+            for output in generate_shared_rule_outputs(context)
+            if output.artifact is ArtifactKind.INSTRUCTIONS
+        )
+
+        assert isinstance(codex_rules[0], GeneratedFile)
+        assert isinstance(instructions, GeneratedFile)
+        assert "# Source: agent-sources/rules/python.md\n" in codex_rules[0].content
+        assert "<!-- Source: agent-sources/rules/python.md -->" in instructions.content
+        assert "live in `agent-sources/rules/`" in instructions.content
+        assert ".agents" not in codex_rules[0].content
+        assert ".agents" not in instructions.content
 
     def test_rules_normalize_sources_and_generate_links(
         self,

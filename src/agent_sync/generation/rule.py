@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from typing import Final
 
 from agent_sync.document import FrontMatterValues, render_front_matter
@@ -57,13 +56,14 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
             content=render_instructions(
                 [
                     render_instruction_section(
-                        source.path,
+                        context.workspace.relative_path(source.path),
                         source.front_matter,
                         source.body,
                     )
                     for source in context.rules
                     if source.body
-                ]
+                ],
+                context.workspace.relative_path(context.workspace.agents_dir / "rules"),
             ),
             artifact=ArtifactKind.INSTRUCTIONS,
             source_path=context.workspace.agents_dir / "rules",
@@ -109,7 +109,7 @@ def generate_codex_rules(
             target_path=root / "rules" / f"{source.slug}.rules",
             content=ensure_trailing_newline(
                 f"# {GENERATED_FILE_NOTICE}\n"
-                f"# Source: .agents/rules/{source.path.name}\n"
+                f"# Source: {context.workspace.relative_path(source.path)}\n"
                 f"{source.front_matter.starlark.strip()}"
             ),
             artifact=ArtifactKind.RULE,
@@ -122,7 +122,7 @@ def generate_codex_rules(
 
 
 def render_instruction_section(
-    path: Path,
+    source_path: str,
     front_matter: RuleFrontMatter,
     body: str,
 ) -> str:
@@ -136,16 +136,16 @@ def render_instruction_section(
     elif not front_matter.always_apply:
         scope = "> Apply this rule only when it is explicitly relevant to the current task."
 
-    return "\n\n".join(part for part in (f"<!-- Source: .agents/rules/{path.name} -->", scope, body) if part)
+    return "\n\n".join(part for part in (f"<!-- Source: {source_path} -->", scope, body) if part)
 
 
-def render_instructions(sections: list[str]) -> str:
+def render_instructions(sections: list[str], rules_path: str) -> str:
     """Render the root instruction document from canonical rule sections."""
 
     header = (
         "# AGENTS.md\n\n"
         f"{GENERATED_FILE_NOTICE}\n\n"
-        "The canonical project rules live in `.agents/rules/`.\n"
+        f"The canonical project rules live in `{rules_path}/`.\n"
     )
 
     content = header if not sections else header + "\n" + "\n\n".join(sections)
