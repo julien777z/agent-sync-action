@@ -16,10 +16,15 @@ logger = logging.getLogger(__name__)
 class SkillFrontMatter(BaseModel):
     """Validate required canonical skill metadata."""
 
-    model_config = ConfigDict(extra="allow", strict=True)
+    model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
 
     name: str
     description: str
+    disable_model_invocation: bool = Field(
+        default=False,
+        alias="disable-model-invocation",
+        exclude_if=lambda value: not value,
+    )
     metadata: dict[str, JsonValue] | None = None
 
     @field_validator("name", "description")

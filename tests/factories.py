@@ -14,6 +14,7 @@ class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
 
     name = "sample-skill"
     description = "Does a thing."
+    disable_model_invocation = False
 
 
 class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
@@ -59,7 +60,7 @@ def materialize_skill(
 ) -> None:
     """Write one generated canonical skill document."""
 
-    path.parent.mkdir(parents=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         render_front_matter(front_matter, f"# {front_matter.name}\n\n{body}"),
         encoding="utf-8",

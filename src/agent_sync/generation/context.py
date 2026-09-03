@@ -25,6 +25,7 @@ class SkillSource(BaseModel):
     slug: str
     path: Path
     directory: Path
+    front_matter: SkillFrontMatter
 
 
 class AgentSource(BaseModel):
@@ -115,7 +116,20 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
                 f"as its front matter name, not {front_matter.name!r}"
             )
 
-        sources.append(SkillSource(slug=slug, path=path, directory=directory))
+        if (directory / "agents/openai.yaml").exists():
+            raise AgentSyncError(
+                f"Codex skill metadata is generated from canonical front matter: "
+                f"remove {directory / 'agents/openai.yaml'}"
+            )
+
+        sources.append(
+            SkillSource(
+                slug=slug,
+                path=path,
+                directory=directory,
+                front_matter=front_matter,
+            )
+        )
 
     return sources
 

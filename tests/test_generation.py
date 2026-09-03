@@ -73,6 +73,48 @@ class TestSkillGeneration:
             workspace.root / ".codex/skills/sample-skill": source.parent,
         }
 
+    def test_codex_generates_explicit_invocation_policy(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that explicit-only skills receive Codex's native policy."""
+
+        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
+        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
+        references = source.parent / "references"
+        references.mkdir()
+        reference = references / "provider.md"
+        reference.write_text("Provider guidance.\n")
+
+        context = load_context(workspace)
+        outputs = generate_skills(context, Provider.CODEX)
+        links = {
+            output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
+        }
+        policy = next(output for output in outputs if isinstance(output, GeneratedFile))
+        skill_root = workspace.root / ".codex/skills/sample-skill"
+
+        assert links == {
+            skill_root / "SKILL.md": source,
+            skill_root / "references": references,
+        }
+        assert policy.target_path == skill_root / "agents/openai.yaml"
+        assert policy.content == "policy:\n  allow_implicit_invocation: false\n"
+
+    def test_rejects_canonical_codex_metadata(self, workspace: Workspace) -> None:
+        """Test that provider metadata cannot be stored in canonical skills."""
+
+        front_matter = SkillFrontMatterFactory.build()
+        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
+        metadata = source.parent / "agents/openai.yaml"
+        metadata.parent.mkdir()
+        metadata.write_text("policy: {}\n")
+
+        with pytest.raises(AgentSyncError, match="Codex skill metadata is generated"):
+            load_context(workspace)
+
     @pytest.mark.parametrize(
         "front_matter",
         [
@@ -397,4 +439,37 @@ class TestMirrorIntegration:
 
         assert os.readlink(workspace.root / ".claude/rules/python.md") == ("../../.agents/rules/python.md")
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_codex_skill_policy_transitions_are_idempotent(self, workspace: Workspace) -> None:
+        """Test that invocation-policy changes replace either Codex skill shape."""
+
+        source = workspace.agents_dir / "skills/review/SKILL.md"
+        front_matter = SkillFrontMatterFactory.build(name="review")
+        materialize_skill(source, front_matter)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert (workspace.root / ".codex/skills/review").is_symlink()
+
+        materialize_skill(
+            source,
+            front_matter.model_copy(update={"disable_model_invocation": True}),
+        )
+
+        assert mirror_providers(workspace, dry_run=False) is False
+
+        codex_skill = workspace.root / ".codex/skills/review"
+
+        assert codex_skill.is_dir()
+        assert not codex_skill.is_symlink()
+        assert (codex_skill / "SKILL.md").is_symlink()
+        assert (codex_skill / "agents/openai.yaml").read_text() == (
+            "policy:\n  allow_implicit_invocation: false\n"
+        )
+        assert mirror_providers(workspace, dry_run=True) is False
+
+        materialize_skill(source, front_matter)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert codex_skill.is_symlink()
         assert mirror_providers(workspace, dry_run=True) is False

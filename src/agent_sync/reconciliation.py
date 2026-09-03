@@ -120,7 +120,23 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             stale.add(directory)
         elif directory.is_dir():
-            stale.update(path for path in directory.iterdir() if path not in expected)
+            expected_descendants = {
+                path
+                for target in expected
+                if directory in target.parents
+                for path in (target, *target.parents)
+                if directory in path.parents
+            }
+            directories = [directory]
+
+            while directories:
+                current = directories.pop()
+
+                for path in current.iterdir():
+                    if path not in expected_descendants:
+                        stale.add(path)
+                    elif path.is_dir() and not path.is_symlink() and path not in expected:
+                        directories.append(path)
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
