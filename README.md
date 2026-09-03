@@ -95,6 +95,16 @@ Set `disable-model-invocation: true` in a skill's `SKILL.md` front matter when t
 only after a user invokes it. Claude and Cursor read the canonical field directly. Agent Sync generates
 Codex's native `agents/openai.yaml` policy while keeping provider metadata out of the canonical skill.
 
+```md
+---
+name: deploy
+description: Deploy the application after explicit user approval.
+disable-model-invocation: true
+---
+
+# Deploy
+```
+
 Only the directories and files your repository uses are required.
 
 ## Inputs
