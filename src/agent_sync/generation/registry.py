@@ -3,12 +3,7 @@ import logging
 from typing import Final, TypedDict
 
 from agent_sync.config import SourceConfig
-from agent_sync.generation.artifact import (
-    generate_agents,
-    generate_codex_skills,
-    generate_hooks,
-    generate_linked_skills,
-)
+from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.rule import (
     generate_codex_rules,
@@ -43,9 +38,9 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="skills",
         owned_files={},
         handlers={
-            Provider.CLAUDE: generate_linked_skills,
-            Provider.CURSOR: generate_linked_skills,
-            Provider.CODEX: generate_codex_skills,
+            Provider.CLAUDE: generate_skills,
+            Provider.CURSOR: generate_skills,
+            Provider.CODEX: generate_skills,
         },
     ),
     ArtifactKind.AGENT: ArtifactRegistration(
