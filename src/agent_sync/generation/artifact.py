@@ -93,10 +93,10 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
         for part in invocation_policy.relative_path.parent.parts:
             metadata_directory /= part
 
-            if (metadata_directory.exists() or metadata_directory.is_symlink()) and not metadata_directory.is_dir():
-                raise AgentSyncError(
-                    f"Generated skill metadata requires a directory at {metadata_directory}"
-                )
+            if (
+                metadata_directory.exists() or metadata_directory.is_symlink()
+            ) and not metadata_directory.is_dir():
+                raise AgentSyncError(f"Generated skill metadata requires a directory at {metadata_directory}")
 
         metadata_path = source.directory / invocation_policy.relative_path
 
