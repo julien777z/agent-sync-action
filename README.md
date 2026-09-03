@@ -92,8 +92,8 @@ jobs:
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
 
 Set `disable-model-invocation: true` in a skill's `SKILL.md` front matter when the skill should run
-only after a user invokes it. Claude reads the canonical field directly. Agent Sync generates Codex's
-native `agents/openai.yaml` policy while keeping provider metadata out of the canonical skill.
+only after a user invokes it. Claude and Cursor read the canonical field directly. Agent Sync generates
+Codex's native `agents/openai.yaml` policy while keeping provider metadata out of the canonical skill.
 
 Only the directories and files your repository uses are required.
 

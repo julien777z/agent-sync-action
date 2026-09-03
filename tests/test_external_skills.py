@@ -1,4 +1,5 @@
 import subprocess
+import logging
 from pathlib import Path
 
 import pytest
@@ -435,14 +436,17 @@ class TestExternalSkillService:
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
 
-        assert sync.sync_external_skills(workspace, dry_run=True) is False
+        assert sync.sync_external_skills(workspace, dry_run=True) is None
 
     def test_dry_run_reports_changes(
         self,
+        caplog: pytest.LogCaptureFixture,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
         """Test that changed external skills are reported by a dry run."""
+
+        caplog.set_level(logging.INFO)
 
         materialize_registry(
             workspace.agents_dir / "external_skills.json",
@@ -465,7 +469,8 @@ class TestExternalSkillService:
             fake_update_external_skill,
         )
 
-        assert sync.sync_external_skills(workspace, dry_run=True) is True
+        assert sync.sync_external_skills(workspace, dry_run=True) is None
+        assert "sample (example/repository): would update" in caplog.text
 
     def test_disabled_update_on_sync_skips_vendoring(
         self,
@@ -495,5 +500,5 @@ class TestExternalSkillService:
 
         monkeypatch.setattr(sync, "update_external_skill", fail_update)
 
-        assert sync.sync_external_skills(workspace, dry_run=False) is False
+        assert sync.sync_external_skills(workspace, dry_run=False) is None
         assert local_skill.read_text() == "local\n"

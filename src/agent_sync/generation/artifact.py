@@ -2,6 +2,7 @@ import logging
 from typing import Final
 
 from agent_sync.document import render_front_matter
+from agent_sync.errors import AgentSyncError
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
 from agent_sync.models.output import Provider
@@ -64,8 +65,25 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
     ]
 
 
-def generate_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Generate one provider's skill links."""
+def generate_linked_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Link one provider to every canonical skill directory."""
+
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+
+    return [
+        GeneratedLink(
+            target_path=root / "skills" / source.slug,
+            link_target=source.directory,
+            artifact=ArtifactKind.SKILL,
+            source_path=source.path,
+            provider=provider,
+        )
+        for source in context.skills
+    ]
+
+
+def generate_codex_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
+    """Generate Codex skills with native invocation policies."""
 
     root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
     outputs: list[GeneratedOutput] = []
@@ -73,7 +91,7 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
     for source in context.skills:
         skill_root = root / "skills" / source.slug
 
-        if provider is not Provider.CODEX or not source.front_matter.disable_model_invocation:
+        if not source.front_matter.disable_model_invocation:
             outputs.append(
                 GeneratedLink(
                     target_path=skill_root,
@@ -85,6 +103,13 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
             )
 
             continue
+
+        metadata_path = source.directory / "agents/openai.yaml"
+
+        if metadata_path.exists():
+            raise AgentSyncError(
+                f"Codex skill metadata is generated from canonical front matter: remove {metadata_path}"
+            )
 
         outputs.extend(
             GeneratedLink(

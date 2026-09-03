@@ -44,7 +44,8 @@ class TestAction:
             },
             "dry-run": {
                 "description": (
-                    "Report changes without writing or committing; fails if anything is out of sync."
+                    "Report changes without writing; provider mirror drift fails while external updates "
+                    "remain informational."
                 ),
                 "default": "false",
             },

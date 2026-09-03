@@ -5,7 +5,12 @@ import tomllib
 import pytest
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
+from agent_sync.generation.artifact import (
+    generate_agents,
+    generate_codex_skills,
+    generate_hooks,
+    generate_linked_skills,
+)
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.registry import ARTIFACT_REGISTRY
 from agent_sync.generation.rule import (
@@ -62,7 +67,11 @@ class TestSkillGeneration:
         source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         context = load_context(workspace)
-        outputs = [output for provider in Provider for output in generate_skills(context, provider)]
+        outputs = [
+            *generate_linked_skills(context, Provider.CLAUDE),
+            *generate_linked_skills(context, Provider.CURSOR),
+            *generate_codex_skills(context, Provider.CODEX),
+        ]
         links = {
             output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
         }
@@ -88,7 +97,7 @@ class TestSkillGeneration:
         reference.write_text("Provider guidance.\n")
 
         context = load_context(workspace)
-        outputs = generate_skills(context, Provider.CODEX)
+        outputs = generate_codex_skills(context, Provider.CODEX)
         links = {
             output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
         }
@@ -105,15 +114,17 @@ class TestSkillGeneration:
     def test_rejects_canonical_codex_metadata(self, workspace: Workspace) -> None:
         """Test that provider metadata cannot be stored in canonical skills."""
 
-        front_matter = SkillFrontMatterFactory.build()
+        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
         source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         metadata = source.parent / "agents/openai.yaml"
         metadata.parent.mkdir()
         metadata.write_text("policy: {}\n")
 
+        context = load_context(workspace)
+
         with pytest.raises(AgentSyncError, match="Codex skill metadata is generated"):
-            load_context(workspace)
+            generate_codex_skills(context, Provider.CODEX)
 
     @pytest.mark.parametrize(
         "front_matter",
@@ -459,7 +470,13 @@ class TestMirrorIntegration:
         assert mirror_providers(workspace, dry_run=False) is False
 
         codex_skill = workspace.root / ".codex/skills/review"
+        claude_skill = workspace.root / ".claude/skills/review"
+        cursor_skill = workspace.root / ".cursor/skills/review"
 
+        assert claude_skill.is_symlink()
+        assert cursor_skill.is_symlink()
+        assert "disable-model-invocation: true" in (claude_skill / "SKILL.md").read_text()
+        assert "disable-model-invocation: true" in (cursor_skill / "SKILL.md").read_text()
         assert codex_skill.is_dir()
         assert not codex_skill.is_symlink()
         assert (codex_skill / "SKILL.md").is_symlink()

@@ -81,7 +81,8 @@ if __name__ == "__main__":
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
             case "vendor-skills":
-                differences_found = sync_external_skills(workspace, parsed.dry_run)
+                sync_external_skills(workspace, parsed.dry_run)
+                differences_found = False
 
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError) as exc:
