@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 EXTERNAL_SKILLS_FILENAME: Final[str] = "external_skills.json"
 
 
-def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
-    """Update external skills and report whether a dry run found changes."""
+def sync_external_skills(workspace: Workspace, dry_run: bool) -> None:
+    """Update external skills or report pending updates."""
 
     registry_path = workspace.agents_dir / EXTERNAL_SKILLS_FILENAME
     registry = load_json_model(registry_path, SkillsRegistry)
@@ -25,14 +25,14 @@ def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
     if registry is None:
         logger.info("No external-skill registry at %s; nothing to update.", registry_path)
 
-        return False
+        return
 
     updatable_skills = [skill for skill in registry.skills if skill.update_on_sync]
 
     if not updatable_skills:
         logger.info("No external skills are enabled for sync; nothing to update.")
 
-        return False
+        return
 
     skills_dir = workspace.agents_dir / "skills"
     results = [
@@ -44,8 +44,6 @@ def sync_external_skills(workspace: Workspace, dry_run: bool) -> bool:
     ]
 
     report_results(results, dry_run)
-
-    return dry_run and any(result.changed for result in results)
 
 
 def update_external_skill(

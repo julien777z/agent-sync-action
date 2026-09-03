@@ -2,6 +2,7 @@ import logging
 from typing import Final
 
 from agent_sync.document import render_front_matter
+from agent_sync.errors import AgentSyncError
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
 from agent_sync.models.output import Provider
@@ -64,17 +65,87 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
 
 
 def generate_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Generate one provider's skill links."""
+    """Generate one provider's skill links and native policy metadata."""
 
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    layout = PROVIDER_LAYOUTS[provider]
+    root = layout.root(context.workspace.root)
+    invocation_policy = layout.explicit_skill_invocation_policy
+    outputs: list[GeneratedOutput] = []
 
-    return [
-        GeneratedLink(
-            target_path=root / "skills" / source.slug,
-            link_target=source.directory,
-            artifact=ArtifactKind.SKILL,
-            source_path=source.path,
-            provider=provider,
+    for source in context.skills:
+        skill_root = root / "skills" / source.slug
+
+        if not source.front_matter.disable_model_invocation or invocation_policy is None:
+            outputs.append(
+                GeneratedLink(
+                    target_path=skill_root,
+                    link_target=source.directory,
+                    artifact=ArtifactKind.SKILL,
+                    source_path=source.path,
+                    provider=provider,
+                )
+            )
+
+            continue
+
+        metadata_directory = source.directory
+
+        for part in invocation_policy.relative_path.parent.parts:
+            metadata_directory /= part
+
+            if (
+                metadata_directory.exists() or metadata_directory.is_symlink()
+            ) and not metadata_directory.is_dir():
+                raise AgentSyncError(f"Generated skill metadata requires a directory at {metadata_directory}")
+
+        metadata_path = source.directory / invocation_policy.relative_path
+
+        if metadata_path.exists() or metadata_path.is_symlink():
+            raise AgentSyncError(
+                f"Generated skill metadata is derived from canonical front matter: remove {metadata_path}"
+            )
+
+        source_directory = source.directory
+
+        for metadata_part in invocation_policy.relative_path.parts[:-1]:
+            outputs.extend(
+                GeneratedLink(
+                    target_path=(skill_root / source_directory.relative_to(source.directory)) / child.name,
+                    link_target=child,
+                    artifact=ArtifactKind.SKILL,
+                    source_path=source.path,
+                    provider=provider,
+                )
+                for child in sorted(source_directory.iterdir(), key=lambda path: path.name)
+                if child.name != metadata_part
+            )
+
+            source_directory /= metadata_part
+
+            if not source_directory.is_dir():
+                break
+
+        if source_directory.is_dir():
+            outputs.extend(
+                GeneratedLink(
+                    target_path=(skill_root / source_directory.relative_to(source.directory)) / child.name,
+                    link_target=child,
+                    artifact=ArtifactKind.SKILL,
+                    source_path=source.path,
+                    provider=provider,
+                )
+                for child in sorted(source_directory.iterdir(), key=lambda path: path.name)
+                if child.name != invocation_policy.relative_path.name
+            )
+
+        outputs.append(
+            GeneratedFile(
+                target_path=skill_root / invocation_policy.relative_path,
+                content=invocation_policy.content,
+                artifact=ArtifactKind.SKILL,
+                source_path=source.path,
+                provider=provider,
+            )
         )
-        for source in context.skills
-    ]
+
+    return outputs

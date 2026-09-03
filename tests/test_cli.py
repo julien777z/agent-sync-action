@@ -1,6 +1,10 @@
+import runpy
 import subprocess
 import sys
 
+import pytest
+
+from agent_sync.external_skills import sync
 from agent_sync.workspace import Workspace
 
 
@@ -32,6 +36,31 @@ class TestCli:
         result = run_cli(["vendor-skills", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 0
+
+    def test_vendor_dry_run_updates_are_informational(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that pending external updates do not fail a dry run."""
+
+        def fake_sync_external_skills(resolved_workspace: Workspace, dry_run: bool) -> None:
+            """Represent a successful dry run with pending updates."""
+
+            assert resolved_workspace == workspace
+            assert dry_run
+
+        monkeypatch.setattr(sync, "sync_external_skills", fake_sync_external_skills)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["agent-sync", "vendor-skills", "--root", str(workspace.root), "--dry-run"],
+        )
+
+        with pytest.raises(SystemExit) as exit_result:
+            runpy.run_module("agent_sync", run_name="__main__")
+
+        assert exit_result.value.code == 0
 
     def test_mirror_dry_run_returns_exit_code_one_for_differences(
         self,
