@@ -6,7 +6,7 @@ directory.
 ## Features
 
 - Mirrors skills, rules, agents, hooks, and settings to each supported provider.
-- Links Claude, Cursor, and Codex skills directly to their canonical directories.
+- Links canonical skills directly unless a provider requires generated native policy metadata.
 - Maps `disable-model-invocation: true` to each provider's native explicit-invocation policy.
 - Links Claude and Cursor rules to their canonical files.
 - Scopes a rule to matching files from one declaration, kept consistent across every provider's front matter.
@@ -88,7 +88,7 @@ jobs:
 | `models/` | Per-agent provider model overrides. |
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
-| `skills/` | Skill directories linked into provider layouts. |
+| `skills/` | Skill directories mirrored into provider layouts with native policy metadata where required. |
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
 
 Only the directories and files your repository uses are required.

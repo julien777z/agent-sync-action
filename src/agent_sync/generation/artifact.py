@@ -88,38 +88,54 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
 
             continue
 
+        metadata_directory = source.directory
+
+        for part in invocation_policy.relative_path.parent.parts:
+            metadata_directory /= part
+
+            if (metadata_directory.exists() or metadata_directory.is_symlink()) and not metadata_directory.is_dir():
+                raise AgentSyncError(
+                    f"Generated skill metadata requires a directory at {metadata_directory}"
+                )
+
         metadata_path = source.directory / invocation_policy.relative_path
 
-        if metadata_path.exists():
+        if metadata_path.exists() or metadata_path.is_symlink():
             raise AgentSyncError(
-                f"Codex skill metadata is generated from canonical front matter: remove {metadata_path}"
+                f"Generated skill metadata is derived from canonical front matter: remove {metadata_path}"
             )
 
-        metadata_root_name = invocation_policy.relative_path.parts[0]
-        outputs.extend(
-            GeneratedLink(
-                target_path=skill_root / child.name,
-                link_target=child,
-                artifact=ArtifactKind.SKILL,
-                source_path=source.path,
-                provider=provider,
-            )
-            for child in sorted(source.directory.iterdir(), key=lambda path: path.name)
-            if child.name != metadata_root_name
-        )
+        source_directory = source.directory
 
-        metadata_directory = source.directory / invocation_policy.relative_path.parent
-
-        if metadata_directory.is_dir():
+        for metadata_part in invocation_policy.relative_path.parts[:-1]:
             outputs.extend(
                 GeneratedLink(
-                    target_path=skill_root / invocation_policy.relative_path.parent / child.name,
+                    target_path=(skill_root / source_directory.relative_to(source.directory)) / child.name,
                     link_target=child,
                     artifact=ArtifactKind.SKILL,
                     source_path=source.path,
                     provider=provider,
                 )
-                for child in sorted(metadata_directory.iterdir(), key=lambda path: path.name)
+                for child in sorted(source_directory.iterdir(), key=lambda path: path.name)
+                if child.name != metadata_part
+            )
+
+            source_directory /= metadata_part
+
+            if not source_directory.is_dir():
+                break
+
+        if source_directory.is_dir():
+            outputs.extend(
+                GeneratedLink(
+                    target_path=(skill_root / source_directory.relative_to(source.directory)) / child.name,
+                    link_target=child,
+                    artifact=ArtifactKind.SKILL,
+                    source_path=source.path,
+                    provider=provider,
+                )
+                for child in sorted(source_directory.iterdir(), key=lambda path: path.name)
+                if child.name != invocation_policy.relative_path.name
             )
 
         outputs.append(
