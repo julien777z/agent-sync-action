@@ -5,16 +5,12 @@ directory.
 
 ## Features
 
-- Mirrors skills, rules, agents, hooks, and settings to each supported provider.
-- Links canonical skills directly unless a provider requires generated native policy metadata.
-- Maps `disable-model-invocation: true` to each provider's native explicit-invocation policy.
-- Links Claude and Cursor rules to their canonical files.
-- Scopes a rule to matching files from one declaration, kept consistent across every provider's front matter.
+- Mirrors skills, rules, agents, hooks, and settings to Claude, Cursor, and Codex.
+- Supports the common skill and rule options, including explicit invocation and file scoping, in each provider's own format.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
-- Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
-- Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
-- Overwrites generated provider files so they always match `.agents/`.
-- Writes those provider trees at the repository root or under a directory you choose.
+- Generates `AGENTS.md` from your rules.
+- Validates your configuration, then rewrites generated files so they always match `.agents/`.
+- Writes generated files at the repository root or under a directory you choose.
 - Supports direct commits, pull requests, and read-only dry runs.
 
 ## Examples
@@ -71,17 +67,6 @@ jobs:
 
 ## Layout
 
-```text
-.agents/
-├── agents/
-├── hooks/
-├── models/
-├── rules/
-├── settings/
-├── skills/
-└── external_skills.json
-```
-
 | Path | Purpose |
 |---|---|
 | `agents/` | Agent definitions mirrored to supported providers. |
@@ -89,7 +74,7 @@ jobs:
 | `models/` | Per-agent provider model overrides. |
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
-| `skills/` | Skill directories mirrored into provider layouts with native policy metadata where required. |
+| `skills/` | Skill directories mirrored to each provider. |
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
 
 Only the directories and files your repository uses are required.
@@ -104,13 +89,12 @@ Only the directories and files your repository uses are required.
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `output-dir` | *(root)* | Directory holding the generated provider trees. |
-| `dry-run` | `false` | Report differences without writing or committing. |
+| `dry-run` | `false` | Report differences without writing or committing, failing the run when any are found. |
 
 ## Generated Output
 
 Generated provider trees land at the repository root by default, so Claude, Cursor, and Codex read
-them where each one looks. Point `output-dir` at a directory to gather them somewhere else, which
-suits a repository whose configuration is consumed by an installer rather than read in place.
+them where each one looks. Point `output-dir` at a directory to gather them somewhere else.
 
 ```yaml
 - uses: julien777z/agent-sync-action@v0
@@ -130,10 +114,10 @@ Each provider keeps its own tree below that directory:
 └── .cursor/
 ```
 
-`AGENTS.md` stays at the repository root, where agents read it. The value is relative to the
+`AGENTS.md` stays at the repository root, where agents read it. The path is relative to the
 repository root, and the workflow commits it alongside `.agents/`.
 
-## External skills
+## External Skills
 
 To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
 `.agents/external_skills.json`. Use its source repository and upstream slug, choose the local skill
@@ -164,14 +148,17 @@ For example, this installs the
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.
 
-Vendored skills include a `metadata.source` URL in their `SKILL.md` frontmatter and retain
-repository-root license, copying, and notice files from the same immutable source revision.
+Installed skills record their source URL and keep the upstream license files from the same revision.
 
-## Rule Scope
+## Options
 
-A rule applies to every task by default. Give it file patterns and set
-`alwaysApply: false` to load it only while matching files are in play. Changes
-are propagated to each provider in their accepted format.
+Declare an option once in canonical front matter and each provider receives it in the format it
+accepts, so no provider metadata enters your source.
+
+### Rule Scope
+
+A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
+it only while matching files are in play.
 
 ```markdown
 ---
@@ -181,20 +168,17 @@ alwaysApply: false
 ---
 ```
 
-## Disable Model Invocation
+### Explicit Invocation
 
-Set `disable-model-invocation: true` in a skill's `SKILL.md` front matter when the skill should run
-only after a user invokes it. Claude and Cursor read the canonical field directly. Agent Sync generates
-Codex's native `agents/openai.yaml` policy while keeping provider metadata out of the canonical skill.
+A skill runs whenever a model finds it useful. Set `disable-model-invocation: true` for one that
+should run only after a user invokes it.
 
-```md
+```markdown
 ---
 name: deploy
 description: Deploy the application after explicit user approval.
 disable-model-invocation: true
 ---
-
-# Deploy
 ```
 
 ## Local Development
@@ -205,7 +189,7 @@ poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync mirror-providers --root .
 ```
 
-Both commands support `--agents-dir` and `--dry-run`.
+Both commands take `--agents-dir` and `--dry-run`, and `mirror-providers` takes `--output-dir`.
 
 ## Versioning
 
