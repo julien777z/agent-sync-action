@@ -73,6 +73,14 @@ class TestAction:
         assert all('--output-dir "${{ inputs.output-dir }}"' in step["run"] for step in mirror_steps)
         assert action_text.count('"${{ inputs.output-dir }}" AGENTS.md') == 2
 
+    def test_stages_a_tracked_path_a_run_deleted(self) -> None:
+        """Test that both staging loops reach a tracked path no longer on disk, and skip an empty one."""
+
+        action_text = Path("action.yml").read_text(encoding="utf-8")
+
+        assert action_text.count('[ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]') == 2
+        assert action_text.count('if [ -z "$path" ]; then continue; fi') == 2
+
     def test_uses_the_installed_unified_cli(self) -> None:
         """Test that every action operation uses the canonical package entrypoint."""
 
