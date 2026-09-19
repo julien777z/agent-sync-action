@@ -74,10 +74,16 @@ jobs:
 | `models/` | Per-agent provider model overrides. |
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
-| `skills/` | Skill directories mirrored to each provider. |
+| `skills/` | Skill directories mirrored to each provider, grouped in folders when you want them sorted. |
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
 
 Only the directories and files your repository uses are required.
+
+Skills may sit in folders — `skills/doctors/schema-doctor/` — and the folders are yours to organize
+by. A directory holding a `SKILL.md` is a skill and everything beside it belongs to that skill;
+anything else is a grouping folder and is searched for skills. The folders never reach a provider:
+each skill still mirrors to `skills/<name>`, so its name stays unique across the whole tree and a
+grouping folder cannot namespace two skills apart.
 
 ## Inputs
 

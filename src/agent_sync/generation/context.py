@@ -90,8 +90,29 @@ def load_generation_context(
     )
 
 
+def discover_skill_directories(root: Path) -> list[Path]:
+    """Return every skill directory under a root, descending through grouping folders."""
+
+    directories: list[Path] = []
+
+    for path in sorted(entry for entry in root.iterdir() if entry.is_dir()):
+        if (path / "SKILL.md").exists():
+            directories.append(path)
+
+            continue
+
+        nested = discover_skill_directories(path)
+
+        if not nested:
+            raise AgentSyncError(f"Missing SKILL.md in {path}")
+
+        directories.extend(nested)
+
+    return directories
+
+
 def load_skills(workspace: Workspace) -> list[SkillSource]:
-    """Load validated skill directories."""
+    """Load validated skill directories, which may be grouped in folders."""
 
     skills_dir = workspace.agents_dir / "skills"
 
@@ -99,9 +120,18 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
         return []
 
     sources: list[SkillSource] = []
+    slugs: dict[str, Path] = {}
 
-    for directory in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
+    for directory in discover_skill_directories(skills_dir):
         slug = validate_slug(directory.name, directory)
+
+        if slug in slugs:
+            raise AgentSyncError(
+                f"Skill {slug!r} is defined twice, in {slugs[slug]} and {directory}; "
+                "a grouping folder does not namespace a skill"
+            )
+
+        slugs[slug] = directory
         path = directory / "SKILL.md"
         content = workspace.read_text(path)
 
