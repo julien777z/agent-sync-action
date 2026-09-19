@@ -91,31 +91,43 @@ Only the directories and files your repository uses are required.
 | `output-dir` | *(root)* | Directory holding the generated provider trees. |
 | `dry-run` | `false` | Report differences without writing or committing, failing the run when any are found. |
 
-## Generated Output
+## Options
 
-Generated provider trees land at the repository root by default, so Claude, Cursor, and Codex read
-them where each one looks. Point `output-dir` at a directory to gather them somewhere else.
+Each option is declared once — as an action input, or in canonical front matter — and the action
+applies it across every provider. A front-matter option reaches each provider in the format it
+accepts, so you never write a per-provider block.
 
-```yaml
-- uses: julien777z/agent-sync-action@v0
-  with:
-    output-dir: .agents/.auto_generated
+### Output Location
+
+The generated `.claude/`, `.cursor/`, and `.codex/` trees land at the repository root, where each
+provider looks. Point `output-dir` at a directory to gather them below it instead. `AGENTS.md`
+stays at the repository root either way, and the workflow commits it alongside `.agents/`.
+
+### Rule Scope
+
+A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
+it only while matching files are in play.
+
+```markdown
+---
+description: Python conventions.
+globs: "**/*.py"
+alwaysApply: false
+---
 ```
 
-Each provider keeps its own tree below that directory:
+### Explicit Invocation
 
-```text
-.agents/.auto_generated/
-├── .claude/
-│   ├── agents/
-│   ├── rules/
-│   └── skills/
-├── .codex/
-└── .cursor/
+A skill runs whenever a model finds it useful. Set `disable-model-invocation: true` for one that
+should run only after a user invokes it.
+
+```markdown
+---
+name: deploy
+description: Deploy the application after explicit user approval.
+disable-model-invocation: true
+---
 ```
-
-`AGENTS.md` stays at the repository root, where agents read it. The path is relative to the
-repository root, and the workflow commits it alongside `.agents/`.
 
 ## External Skills
 
@@ -149,37 +161,6 @@ For example, this installs the
   after a push changes `.agents/external_skills.json`.
 
 Installed skills record their source URL and keep the upstream license files from the same revision.
-
-## Options
-
-Declare an option once in canonical front matter and each provider receives it in the format it
-accepts, so no provider metadata enters your source.
-
-### Rule Scope
-
-A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
-it only while matching files are in play.
-
-```markdown
----
-description: Python conventions.
-globs: "**/*.py"
-alwaysApply: false
----
-```
-
-### Explicit Invocation
-
-A skill runs whenever a model finds it useful. Set `disable-model-invocation: true` for one that
-should run only after a user invokes it.
-
-```markdown
----
-name: deploy
-description: Deploy the application after explicit user approval.
-disable-model-invocation: true
----
-```
 
 ## Local Development
 
