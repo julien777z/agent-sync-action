@@ -106,7 +106,7 @@ runs:
         git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-        for path in .claude .cursor .codex "${{ inputs.agents-dir }}" "${{ inputs.output-dir }}" AGENTS.md AGENTS.override.md; do
+        for path in .claude .cursor .codex "${{ inputs.agents-dir }}" "${{ inputs.output-dir }}" AGENTS.md; do
           if [ -e "$path" ]; then
             git add -A -- "$path"
           fi
@@ -136,7 +136,7 @@ runs:
           fi
           python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --output-dir "${{ inputs.output-dir }}"
 
-          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" "${{ inputs.output-dir }}" AGENTS.md AGENTS.override.md; do
+          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" "${{ inputs.output-dir }}" AGENTS.md; do
             if [ -e "$path" ]; then
               git add -A -- "$path"
             fi
