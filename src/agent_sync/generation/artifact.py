@@ -22,7 +22,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
     """Generate one provider's agent files with resolved models."""
 
     outputs: list[GeneratedOutput] = []
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
 
     for source in context.agents:
         front_matter = source.front_matter.model_copy(
@@ -49,7 +49,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
 def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
     """Generate one provider's hook files."""
 
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
 
     return [
         GeneratedFile(
@@ -68,7 +68,7 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
     """Generate one provider's skill links and native policy metadata."""
 
     layout = PROVIDER_LAYOUTS[provider]
-    root = layout.root(context.workspace.root)
+    root = layout.root(context.workspace.output_root)
     invocation_policy = layout.explicit_skill_invocation_policy
     outputs: list[GeneratedOutput] = []
 

@@ -14,6 +14,7 @@ directory.
 - Validates canonical JSON, front matter, metadata, slugs, and provider configuration.
 - Generates `AGENTS.md` and synchronizes Codex `project_doc_max_bytes` automatically.
 - Overwrites generated provider files so they always match `.agents/`.
+- Writes those provider trees at the repository root or under a directory you choose.
 - Supports direct commits, pull requests, and read-only dry runs.
 
 ## Examples
@@ -102,7 +103,35 @@ Only the directories and files your repository uses are required.
 | `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
+| `output-dir` | *(root)* | Directory holding the generated provider trees. |
 | `dry-run` | `false` | Report differences without writing or committing. |
+
+## Generated Output
+
+Generated provider trees land at the repository root by default, so Claude, Cursor, and Codex read
+them where each one looks. Point `output-dir` at a directory to gather them somewhere else, which
+suits a repository whose configuration is consumed by an installer rather than read in place.
+
+```yaml
+- uses: julien777z/agent-sync-action@v0
+  with:
+    output-dir: .agents/.auto_generated
+```
+
+Each provider keeps its own tree below that directory:
+
+```text
+.agents/.auto_generated/
+├── .claude/
+│   ├── agents/
+│   ├── rules/
+│   └── skills/
+├── .codex/
+└── .cursor/
+```
+
+`AGENTS.md` stays at the repository root, where agents read it. The value is relative to the
+repository root, and the workflow commits it alongside `.agents/`.
 
 ## External skills
 

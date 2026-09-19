@@ -4,9 +4,10 @@ import shutil
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agent_sync.config import ACTION_CONFIG
+from agent_sync.utils import escapes_repository_root
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,29 @@ class Workspace(BaseModel):
 
     root: Path = Field(default_factory=Path.cwd)
     agents_dirname: str = ".agents"
+    output_dirname: str = ""
+
+    @field_validator("output_dirname")
+    @classmethod
+    def validate_output_dirname(cls, value: str) -> str:
+        """Require generated provider trees to stay inside the repository."""
+
+        if escapes_repository_root(Path(value)):
+            raise ValueError("Generated output directory must be a relative path inside the repository")
+
+        return value
 
     @property
     def agents_dir(self) -> Path:
         """Return the canonical agent source directory."""
 
         return self.root / self.agents_dirname
+
+    @property
+    def output_root(self) -> Path:
+        """Return the directory that holds every generated provider tree."""
+
+        return self.root / self.output_dirname if self.output_dirname else self.root
 
     @property
     def settings_dir(self) -> Path:
@@ -38,15 +56,22 @@ class Workspace(BaseModel):
         return self.agents_dir / "models"
 
     @classmethod
-    def resolve(cls, root: str | None, agents_dirname: str | None) -> Self:
+    def resolve(
+        cls,
+        root: str | None,
+        agents_dirname: str | None,
+        output_dirname: str | None,
+    ) -> Self:
         """Resolve CLI options, environment values, and defaults into a workspace."""
 
         resolved_root = root or ACTION_CONFIG.root or Path.cwd()
         resolved_agents_dirname = agents_dirname or ACTION_CONFIG.agents_dir
+        resolved_output_dirname = output_dirname if output_dirname is not None else ACTION_CONFIG.output_dir
 
         return cls(
             root=Path(resolved_root).resolve(),
             agents_dirname=resolved_agents_dirname,
+            output_dirname=resolved_output_dirname,
         )
 
     def read_text(self, path: Path) -> str | None:

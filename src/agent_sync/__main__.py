@@ -2,7 +2,7 @@ import argparse
 import logging
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.external_skills.sync import sync_external_skills
@@ -20,6 +20,7 @@ class CliArguments(BaseModel):
     command: Literal["mirror-providers", "vendor-skills"]
     root: str | None
     agents_dir: str | None
+    output_dir: str | None
     dry_run: bool
 
 
@@ -36,6 +37,15 @@ def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
         "--agents-dir",
         default=None,
         help="Canonical source directory (default: $AGENT_SYNC_AGENTS_DIR or .agents).",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help=(
+            "Directory that holds generated provider trees, relative to the root "
+            "(default: $AGENT_SYNC_OUTPUT_DIR or the root itself)."
+        ),
     )
 
     parser.add_argument(
@@ -74,9 +84,10 @@ if __name__ == "__main__":
     parser = create_parser()
     parsed = CliArguments.model_validate(vars(parser.parse_args()))
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    workspace = Workspace.resolve(parsed.root, parsed.agents_dir)
 
     try:
+        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir)
+
         match parsed.command:
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
@@ -85,7 +96,7 @@ if __name__ == "__main__":
                 differences_found = False
 
         exit_code = 1 if differences_found else 0
-    except (AgentSyncError, OSError, RuntimeError) as exc:
+    except (AgentSyncError, OSError, RuntimeError, ValidationError) as exc:
         logger.error("%s", exc)
         exit_code = 2
 

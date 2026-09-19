@@ -42,6 +42,13 @@ class TestAction:
                 ),
                 "default": ".agents",
             },
+            "output-dir": {
+                "description": (
+                    "Directory holding generated provider trees, relative to the repository "
+                    "root; empty writes them at the root."
+                ),
+                "default": "",
+            },
             "dry-run": {
                 "description": (
                     "Report changes without writing; provider mirror drift fails while external updates "
@@ -50,6 +57,21 @@ class TestAction:
                 "default": "false",
             },
         }
+
+    def test_threads_the_output_directory_through_mirroring_and_staging(self) -> None:
+        """Test that a configured output directory reaches every mirror run and both commits."""
+
+        action_text = Path("action.yml").read_text(encoding="utf-8")
+
+        mirror_steps = [
+            step
+            for step in yaml.safe_load(action_text)["runs"]["steps"]
+            if "mirror-providers" in step.get("run", "")
+        ]
+
+        assert mirror_steps
+        assert all('--output-dir "${{ inputs.output-dir }}"' in step["run"] for step in mirror_steps)
+        assert action_text.count('"${{ inputs.output-dir }}" AGENTS.md') == 2
 
     def test_uses_the_installed_unified_cli(self) -> None:
         """Test that every action operation uses the canonical package entrypoint."""

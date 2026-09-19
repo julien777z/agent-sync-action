@@ -149,6 +149,28 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
+    def test_output_directory_scopes_provider_ownership(
+        self,
+        relocated_workspace: Workspace,
+    ) -> None:
+        """Test that stale detection owns the configured output directory and not the root."""
+
+        stale = relocated_workspace.output_root / ".claude/rules/orphan.md"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("stale\n")
+
+        unowned = relocated_workspace.root / ".claude/rules/orphan.md"
+        unowned.parent.mkdir(parents=True)
+        unowned.write_text("stale\n")
+
+        plan = build_plan(
+            relocated_workspace,
+            generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
+        )
+
+        assert stale in plan.stale_paths
+        assert unowned not in plan.stale_paths
+
     @pytest.mark.parametrize(
         ("provider", "directory_name"),
         owned_provider_directories(),
