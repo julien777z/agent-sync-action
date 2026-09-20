@@ -3,6 +3,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
+from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
 from agent_sync.models.output import (
     ArtifactKind,
@@ -149,19 +150,22 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
-    def test_output_directory_reclaims_a_tree_a_move_left_behind(
+    def test_output_directory_reclaims_only_its_own_abandoned_output(
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that stale detection owns the configured output directory and the one it moved from."""
+        """Test that a relocated output reclaims what it generated and keeps what it did not."""
 
         stale = relocated_workspace.output_root / ".claude/rules/orphan.md"
         stale.parent.mkdir(parents=True)
         stale.write_text("stale\n")
 
-        orphaned = relocated_workspace.root / ".claude/rules/orphan.md"
-        orphaned.parent.mkdir(parents=True)
-        orphaned.write_text("stale\n")
+        abandoned = relocated_workspace.root / ".claude/rules/orphan.md"
+        abandoned.parent.mkdir(parents=True)
+        abandoned.write_text(f"# {GENERATED_FILE_NOTICE}\n\nOld.\n")
+
+        hand_authored = relocated_workspace.root / ".claude/rules/mine.md"
+        hand_authored.write_text("Written by a person.\n")
 
         plan = build_plan(
             relocated_workspace,
@@ -169,7 +173,8 @@ class TestReconciliation:
         )
 
         assert stale in plan.stale_paths
-        assert orphaned in plan.stale_paths
+        assert abandoned in plan.stale_paths
+        assert hand_authored not in plan.stale_paths
 
     @pytest.mark.parametrize(
         ("provider", "directory_name"),

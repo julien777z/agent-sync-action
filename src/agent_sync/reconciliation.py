@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Final
 
 from agent_sync.errors import AgentSyncError
+from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.registry import (
     ARTIFACT_REGISTRY,
     generate_manifest,
@@ -16,7 +17,6 @@ from agent_sync.models.output import (
     GeneratedLink,
     GeneratedOutput,
     Manifest,
-    Provider,
     ReconciliationPlan,
 )
 from agent_sync.providers import PROVIDER_LAYOUTS
@@ -103,22 +103,56 @@ def compare_output(
     return Change(output=output, existing=existing)
 
 
-def owned_provider_roots(workspace: Workspace, provider: Provider) -> list[Path]:
-    """Return every provider root this run owns, including one a moved output left behind."""
+def is_generated_artifact(workspace: Workspace, path: Path) -> bool:
+    """Report whether a path carries the marks of this action's own output."""
 
-    roots = [PROVIDER_LAYOUTS[provider].root(workspace.output_root)]
+    if path.is_symlink():
+        target = (path.parent / os.readlink(path)).resolve()
+        agents_dir = workspace.agents_dir.resolve()
 
-    if workspace.output_root != workspace.root:
-        roots.append(PROVIDER_LAYOUTS[provider].root(workspace.root))
+        return target == agents_dir or agents_dir in target.parents
 
-    return roots
+    if path.is_dir():
+        return all(is_generated_artifact(workspace, child) for child in path.iterdir())
+
+    try:
+        return GENERATED_FILE_NOTICE in path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def find_abandoned_outputs(workspace: Workspace) -> set[Path]:
+    """Find this action's own outputs left at the repository root by a relocated output directory."""
+
+    if workspace.output_root == workspace.root:
+        return set()
+
+    abandoned: set[Path] = set()
+
+    for provider, directory_name in owned_provider_directories():
+        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+
+        if directory.is_dir() and not directory.is_symlink():
+            abandoned.update(path for path in directory.iterdir() if is_generated_artifact(workspace, path))
+
+    for registration in ARTIFACT_REGISTRY.values():
+        for provider, filenames in registration["owned_files"].items():
+            provider_root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+
+            abandoned.update(
+                path
+                for filename in filenames
+                if (path := provider_root / filename).is_file() and is_generated_artifact(workspace, path)
+            )
+
+    return abandoned
 
 
 def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     """Find paths owned by Agent Sync but absent from the generated manifest."""
 
     expected = {output.target_path for output in manifest.outputs}
-    stale: set[Path] = set()
+    stale: set[Path] = find_abandoned_outputs(workspace)
 
     stale.update(
         blocker
@@ -127,37 +161,37 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     )
 
     for provider, directory_name in owned_provider_directories():
-        for provider_root in owned_provider_roots(workspace, provider):
-            directory = provider_root / directory_name
+        directory = PROVIDER_LAYOUTS[provider].root(workspace.output_root) / directory_name
 
-            if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
-                stale.add(directory)
-            elif directory.is_dir():
-                expected_descendants = {
-                    path
-                    for target in expected
-                    if directory in target.parents
-                    for path in (target, *target.parents)
-                    if directory in path.parents
-                }
-                directories = [directory]
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            stale.add(directory)
+        elif directory.is_dir():
+            expected_descendants = {
+                path
+                for target in expected
+                if directory in target.parents
+                for path in (target, *target.parents)
+                if directory in path.parents
+            }
+            directories = [directory]
 
-                while directories:
-                    current = directories.pop()
+            while directories:
+                current = directories.pop()
 
-                    for path in current.iterdir():
-                        if path not in expected_descendants:
-                            stale.add(path)
-                        elif path.is_dir() and not path.is_symlink() and path not in expected:
-                            directories.append(path)
+                for path in current.iterdir():
+                    if path not in expected_descendants:
+                        stale.add(path)
+                    elif path.is_dir() and not path.is_symlink() and path not in expected:
+                        directories.append(path)
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
+            root = PROVIDER_LAYOUTS[provider].root(workspace.output_root)
+
             stale.update(
                 path
-                for provider_root in owned_provider_roots(workspace, provider)
                 for filename in filenames
-                if ((path := provider_root / filename).exists() or path.is_symlink()) and path not in expected
+                if ((path := root / filename).exists() or path.is_symlink()) and path not in expected
             )
 
     return sorted(stale, key=str)
