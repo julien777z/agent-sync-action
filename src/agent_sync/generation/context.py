@@ -11,7 +11,7 @@ from agent_sync.models.document import (
     RuleFrontMatter,
     SkillFrontMatter,
 )
-from agent_sync.utils import validate_slug
+from agent_sync.utils import discover_skill_directories, validate_slug
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -90,27 +90,6 @@ def load_generation_context(
     )
 
 
-def discover_skill_directories(root: Path) -> list[Path]:
-    """Return every skill directory under a root, descending through grouping folders."""
-
-    directories: list[Path] = []
-
-    for path in sorted(entry for entry in root.iterdir() if entry.is_dir()):
-        if (path / "SKILL.md").exists():
-            directories.append(path)
-
-            continue
-
-        nested = discover_skill_directories(path)
-
-        if not nested:
-            raise AgentSyncError(f"Missing SKILL.md in {path}")
-
-        directories.extend(nested)
-
-    return directories
-
-
 def load_skills(workspace: Workspace) -> list[SkillSource]:
     """Load validated skill directories, which may be grouped in folders."""
 
@@ -133,11 +112,7 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
 
         slugs[slug] = directory
         path = directory / "SKILL.md"
-        content = workspace.read_text(path)
-
-        if content is None:
-            raise AgentSyncError(f"Missing SKILL.md in {directory}")
-
+        content = path.read_text(encoding="utf-8")
         front_matter, _ = parse_markdown(content, SkillFrontMatter, str(path))
 
         if front_matter.name != slug:

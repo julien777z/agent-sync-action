@@ -64,6 +64,39 @@ def validate_slug(slug: str, source_path: Path) -> str:
     return slug
 
 
+def discover_skill_directories(root: Path) -> list[Path]:
+    """Return every skill directory under a root, descending through grouping folders."""
+
+    directories: list[Path] = []
+
+    for path in sorted(entry for entry in root.iterdir() if entry.is_dir()):
+        if (path / "SKILL.md").exists():
+            directories.append(path)
+
+            continue
+
+        nested = discover_skill_directories(path)
+
+        if not nested:
+            raise AgentSyncError(f"Missing SKILL.md in {path}")
+
+        directories.extend(nested)
+
+    return directories
+
+
+def locate_skill_by_name(skills_dir: Path, name: str) -> Path | None:
+    """Return where a skill already lives under a skills directory, at any depth."""
+
+    if not skills_dir.is_dir():
+        return None
+
+    return next(
+        (directory for directory in discover_skill_directories(skills_dir) if directory.name == name),
+        None,
+    )
+
+
 def trees_differ(source: Path, destination: Path) -> bool:
     """Report whether two directory trees contain different files."""
 

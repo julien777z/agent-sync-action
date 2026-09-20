@@ -71,15 +71,25 @@ class TestAction:
 
         assert mirror_steps
         assert all('--output-dir "${{ inputs.output-dir }}"' in step["run"] for step in mirror_steps)
-        assert action_text.count('"${{ inputs.output-dir }}" AGENTS.md') == 2
+        assert '"${{ inputs.output-dir }}" AGENTS.md' in action_text
 
     def test_stages_a_tracked_path_a_run_deleted(self) -> None:
-        """Test that both staging loops reach a tracked path no longer on disk, and skip an empty one."""
+        """Test that staging reaches a tracked path no longer on disk, and skips an empty one."""
 
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
-        assert action_text.count('[ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]') == 2
-        assert action_text.count('if [ -z "$path" ]; then continue; fi') == 2
+        assert '[ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]' in action_text
+        assert 'if [ -z "$path" ]; then continue; fi' in action_text
+
+    def test_both_persist_modes_stage_through_one_definition(self) -> None:
+        """Test that each mode reaches staging through the single shared definition."""
+
+        action_text = Path("action.yml").read_text(encoding="utf-8")
+
+        calls = [line for line in action_text.splitlines() if line.strip() == "stage_generated_paths"]
+
+        assert action_text.count("stage_generated_paths() {") == 1
+        assert len(calls) == 2
 
     def test_uses_the_installed_unified_cli(self) -> None:
         """Test that every action operation uses the canonical package entrypoint."""

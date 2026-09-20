@@ -95,7 +95,7 @@ grouping folder cannot namespace two skills apart.
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `output-dir` | *(root)* | Directory holding the generated provider trees. |
-| `dry-run` | `false` | Report differences without writing or committing, failing the run when any are found. |
+| `dry-run` | `false` | Report differences without writing or committing; mirror drift fails the run, external-skill differences are informational. |
 
 ## Options
 

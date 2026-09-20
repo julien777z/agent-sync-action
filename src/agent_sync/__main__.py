@@ -20,7 +20,7 @@ class CliArguments(BaseModel):
     command: Literal["mirror-providers", "vendor-skills"]
     root: str | None
     agents_dir: str | None
-    output_dir: str | None
+    output_dir: str | None = None
     dry_run: bool
 
 
@@ -37,15 +37,6 @@ def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
         "--agents-dir",
         default=None,
         help="Canonical source directory (default: $AGENT_SYNC_AGENTS_DIR or .agents).",
-    )
-
-    parser.add_argument(
-        "--output-dir",
-        default=None,
-        help=(
-            "Directory that holds generated provider trees, relative to the root "
-            "(default: $AGENT_SYNC_OUTPUT_DIR or the root itself)."
-        ),
     )
 
     parser.add_argument(
@@ -70,6 +61,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="Mirror canonical sources into provider configuration paths.",
     )
     add_workspace_arguments(mirror_parser)
+
+    # Only this command writes provider trees, so only it takes their location.
+    mirror_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help=(
+            "Directory that holds generated provider trees, relative to the root "
+            "(default: $AGENT_SYNC_OUTPUT_DIR or the root itself)."
+        ),
+    )
 
     vendor_parser = commands.add_parser(
         "vendor-skills",
