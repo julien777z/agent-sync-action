@@ -70,8 +70,23 @@ class TestAction:
         ]
 
         assert mirror_steps
-        assert all('--output-dir "${{ inputs.output-dir }}"' in step["run"] for step in mirror_steps)
-        assert '"${{ inputs.output-dir }}" AGENTS.md' in action_text
+        assert all('--output-dir "$OUTPUT_DIR"' in step["run"] for step in mirror_steps)
+        assert all(step.get("env", {}).get("OUTPUT_DIR") for step in mirror_steps)
+        assert '"$OUTPUT_DIR" AGENTS.md' in action_text
+
+    def test_keeps_configurable_values_out_of_the_scripts(self) -> None:
+        """Test that a consumer's value reaches bash as data rather than as script text."""
+
+        steps = yaml.safe_load(Path("action.yml").read_text(encoding="utf-8"))["runs"]["steps"]
+        interpolations = [
+            line
+            for step in steps
+            for line in step.get("run", "").splitlines()
+            # A conditional selecting a fixed flag carries no consumer value.
+            if "${{" in line and "--dry-run" not in line
+        ]
+
+        assert not interpolations
 
     def test_stages_a_tracked_path_a_run_deleted(self) -> None:
         """Test that staging reaches a tracked path no longer on disk, and skips an empty one."""

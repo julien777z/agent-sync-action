@@ -8,7 +8,8 @@ from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_skills import github, installer
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
-from agent_sync.utils import load_json_model, locate_skill_by_name, trees_differ
+from agent_sync.skills import locate_skill_by_name
+from agent_sync.utils import load_json_model, trees_differ
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -80,8 +81,6 @@ def update_external_skill(
 
         normalize_skill_metadata(installed, skill)
 
-        # A skill a repository sorted into a grouping folder is updated where it sits,
-        # so a sync cannot shadow it with a second copy at the top level.
         destination = locate_skill_by_name(skills_dir, skill.name) or skills_dir / skill.name
         changed = trees_differ(installed, destination)
 

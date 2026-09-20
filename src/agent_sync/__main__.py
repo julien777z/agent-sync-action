@@ -62,7 +62,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_workspace_arguments(mirror_parser)
 
-    # Only this command writes provider trees, so only it takes their location.
     mirror_parser.add_argument(
         "--output-dir",
         default=None,

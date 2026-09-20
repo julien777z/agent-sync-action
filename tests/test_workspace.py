@@ -40,20 +40,21 @@ class TestWorkspace:
 
         assert workspace.output_dirname == ".agents/.auto_generated"
 
-    def test_resolve_prefers_an_explicit_output_directory_over_the_environment(
+    def test_resolve_falls_back_to_the_environment_for_an_unset_output_directory(
         self,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """Test that an explicit empty output directory overrides the configured one."""
+        """Test that an absent or empty output directory takes the configured one."""
 
         monkeypatch.setattr(
             "agent_sync.workspace.ACTION_CONFIG",
             ActionConfig(output_dir=".generated"),
         )
 
-        assert Workspace.resolve(str(tmp_path), None, "").output_root == tmp_path
         assert Workspace.resolve(str(tmp_path), None, None).output_dirname == ".generated"
+        assert Workspace.resolve(str(tmp_path), None, "").output_dirname == ".generated"
+        assert Workspace.resolve(str(tmp_path), None, "chosen").output_dirname == "chosen"
 
     def test_reads_current_disk_state(self, workspace: Workspace) -> None:
         """Test that workspace reads never return stale cached content."""

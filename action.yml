@@ -35,19 +35,25 @@ runs:
     - name: Decide external-skill refresh
       id: refresh
       shell: bash
+      env:
+        REFRESH: ${{ inputs.refresh-external-skills }}
+        EVENT_NAME: ${{ github.event_name }}
+        BEFORE: ${{ github.event.before }}
+        CURRENT_SHA: ${{ github.sha }}
+        AGENTS_DIR: ${{ inputs.agents-dir }}
       run: |
         set -uo pipefail
         enabled=false
-        if [ "${{ inputs.refresh-external-skills }}" = "true" ]; then
+        if [ "$REFRESH" = "true" ]; then
           enabled=true
-        elif [ "${{ github.event_name }}" = "push" ]; then
-          before="${{ github.event.before }}"
+        elif [ "$EVENT_NAME" = "push" ]; then
+          before="$BEFORE"
           if [ -n "$before" ] && ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
             git fetch --depth=1 origin "$before" 2>/dev/null || true
           fi
           if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
-             && git diff --name-only "$before" "${{ github.sha }}" \
-                  | grep -qx "${{ inputs.agents-dir }}/external_skills.json"; then
+             && git diff --name-only "$before" "$CURRENT_SHA" \
+                  | grep -qx "$AGENTS_DIR/external_skills.json"; then
             enabled=true
           fi
         fi
@@ -82,11 +88,15 @@ runs:
       shell: bash
       env:
         AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
-      run: python -m agent_sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+        AGENTS_DIR: ${{ inputs.agents-dir }}
+      run: python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash
-      run: python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --output-dir "${{ inputs.output-dir }}" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      env:
+        AGENTS_DIR: ${{ inputs.agents-dir }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Persist changes
       if: ${{ inputs.dry-run != 'true' }}
@@ -95,12 +105,14 @@ runs:
         AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
         GH_TOKEN: ${{ inputs.github-token }}
         MODE: ${{ inputs.mode }}
+        AGENTS_DIR: ${{ inputs.agents-dir }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        REF_NAME: ${{ github.ref_name }}
       run: |
         set -euo pipefail
 
         stage_generated_paths() {
-          for path in .claude .cursor .codex "${{ inputs.agents-dir }}" "${{ inputs.output-dir }}" AGENTS.md; do
-            # An unset output-dir is an empty pathspec, which would match the whole tree.
+          for path in .claude .cursor .codex "$AGENTS_DIR" "$OUTPUT_DIR" AGENTS.md; do
             if [ -z "$path" ]; then continue; fi
             # A path git still tracks is staged even once a run has deleted it.
             if [ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]; then
@@ -125,23 +137,23 @@ runs:
         fi
 
         if [ "$MODE" = "pull-request" ]; then
-          branch="agent-sync/${{ github.ref_name }}"
+          branch="agent-sync/$REF_NAME"
           git commit -m "chore: run agent sync"
           git push --force origin "HEAD:$branch"
           if ! gh pr view "$branch" >/dev/null 2>&1; then
-            gh pr create --base "${{ github.ref_name }}" --head "$branch" \
+            gh pr create --base "$REF_NAME" --head "$branch" \
               --title "chore: agent sync" \
               --body "Automated Agent Sync update (provider mirroring and skill vendoring)."
           fi
         else
           git commit -m "chore: run agent sync"
           pre_rebase_head="$(git rev-parse HEAD)"
-          git pull --rebase origin "${{ github.ref_name }}"
+          git pull --rebase origin "$REF_NAME"
 
-          if ! git diff --quiet "$pre_rebase_head" HEAD -- "${{ inputs.agents-dir }}/external_skills.json"; then
-            python -m agent_sync vendor-skills --root . --agents-dir "${{ inputs.agents-dir }}"
+          if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_skills.json"; then
+            python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR"
           fi
-          python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --output-dir "${{ inputs.output-dir }}"
+          python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR"
 
           stage_generated_paths
 
@@ -149,10 +161,13 @@ runs:
             git commit --amend --no-edit
           fi
 
-          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "HEAD:$REF_NAME"
         fi
 
     - name: Verify sync idempotence
       if: ${{ inputs.dry-run != 'true' }}
       shell: bash
-      run: python -m agent_sync mirror-providers --root . --agents-dir "${{ inputs.agents-dir }}" --output-dir "${{ inputs.output-dir }}" --dry-run
+      env:
+        AGENTS_DIR: ${{ inputs.agents-dir }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR" --dry-run

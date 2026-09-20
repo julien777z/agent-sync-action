@@ -7,7 +7,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agent_sync.config import ACTION_CONFIG
-from agent_sync.utils import escapes_repository_root
+from agent_sync.utils import escapes_base_directory
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class Workspace(BaseModel):
     def validate_output_dirname(cls, value: str) -> str:
         """Require generated provider trees to stay inside the repository."""
 
-        if escapes_repository_root(Path(value)):
+        if escapes_base_directory(Path(value)):
             raise ValueError("Generated output directory must be a relative path inside the repository")
 
         return value
@@ -66,7 +66,7 @@ class Workspace(BaseModel):
 
         resolved_root = root or ACTION_CONFIG.root or Path.cwd()
         resolved_agents_dirname = agents_dirname or ACTION_CONFIG.agents_dir
-        resolved_output_dirname = output_dirname if output_dirname is not None else ACTION_CONFIG.output_dir
+        resolved_output_dirname = output_dirname or ACTION_CONFIG.output_dir
 
         return cls(
             root=Path(resolved_root).resolve(),

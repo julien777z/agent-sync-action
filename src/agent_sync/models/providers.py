@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from agent_sync.utils import escapes_repository_root
+from agent_sync.utils import escapes_base_directory
 
 
 class ExplicitSkillInvocationPolicy(BaseModel):
@@ -18,7 +18,7 @@ class ExplicitSkillInvocationPolicy(BaseModel):
     def validate_relative_path(cls, value: Path) -> Path:
         """Require generated metadata to live below the skill root."""
 
-        if escapes_repository_root(value) or len(value.parts) < 2:
+        if escapes_base_directory(value) or len(value.parts) < 2:
             raise ValueError("Skill invocation metadata must use a nested relative path")
 
         return value
