@@ -3,8 +3,8 @@ from pathlib import Path
 from agent_sync.errors import AgentSyncError
 
 
-def grouping_folders(root: Path) -> list[Path]:
-    """Return the directories under a root that may hold skills, in a stable order."""
+def child_directories(root: Path) -> list[Path]:
+    """Return every directory directly under a root, in a stable order."""
 
     return sorted(entry for entry in root.iterdir() if entry.is_dir())
 
@@ -14,13 +14,12 @@ def discover_skill_directories(root: Path) -> list[Path]:
 
     directories: list[Path] = []
 
-    for path in grouping_folders(root):
+    for path in child_directories(root):
         if (path / "SKILL.md").exists():
             directories.append(path)
 
             continue
 
-        # Following a linked directory lets a cycle recurse without end.
         nested = [] if path.is_symlink() else discover_skill_directories(path)
 
         if not nested:
@@ -37,7 +36,7 @@ def locate_skill_by_name(skills_dir: Path, name: str) -> Path | None:
     if not skills_dir.is_dir():
         return None
 
-    for path in grouping_folders(skills_dir):
+    for path in child_directories(skills_dir):
         if (path / "SKILL.md").exists():
             if path.name == name:
                 return path
