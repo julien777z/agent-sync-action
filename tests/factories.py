@@ -100,7 +100,7 @@ def materialize_tree(base: Path, files: dict[str, str]) -> None:
         target.write_text(content, encoding="utf-8")
 
 
-def materialize_every_source_kind(workspace: Workspace) -> None:
+def materialize_every_source_kind(workspace: Workspace, explicit_invocation: bool = False) -> None:
     """Write one canonical source of every kind a provider tree mirrors."""
 
     materialize_rule(
@@ -114,7 +114,8 @@ def materialize_every_source_kind(workspace: Workspace) -> None:
 
     skill = workspace.agents_dir / "skills/sample"
     skill.mkdir(parents=True, exist_ok=True)
+    invocation = "disable-model-invocation: true\n" if explicit_invocation else ""
     (skill / "SKILL.md").write_text(
-        "---\nname: sample\ndescription: A skill.\n---\n\nContent.\n",
+        f"---\nname: sample\ndescription: A skill.\n{invocation}---\n\nContent.\n",
         encoding="utf-8",
     )

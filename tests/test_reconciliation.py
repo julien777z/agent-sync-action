@@ -153,10 +153,34 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
+    def test_relocated_output_reclaims_a_file_its_directory_cannot_carry(
+        self,
+        relocated_workspace: Workspace,
+    ) -> None:
+        """Test that a policy file is reclaimed on its own while its neighbours are kept."""
+
+        materialize_every_source_kind(relocated_workspace, explicit_invocation=True)
+
+        abandoned = relocated_workspace.root / ".codex/skills/sample/agents/openai.yaml"
+        abandoned.parent.mkdir(parents=True)
+        abandoned.write_text("left behind\n")
+
+        foreign = relocated_workspace.root / ".codex/notes.txt"
+        foreign.write_text("Written by a person.\n")
+
+        plan = build_plan(
+            relocated_workspace,
+            generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
+        )
+
+        assert abandoned in plan.stale_paths
+        assert foreign not in plan.stale_paths
+        assert not any(stale_path in foreign.parents for stale_path in plan.stale_paths)
+
     @pytest.mark.parametrize(
         "relative_path",
-        [".claude/rules/sample.md", ".claude/hooks/setup.sh", ".codex/skills/sample/agents/openai.yaml"],
-        ids=["rule", "hook", "invocation-policy"],
+        [".claude/rules/sample.md", ".claude/hooks/setup.sh"],
+        ids=["rule", "hook"],
     )
     def test_relocated_output_reclaims_every_kind_it_writes(
         self,
