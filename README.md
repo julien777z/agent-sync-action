@@ -79,7 +79,7 @@ jobs:
 
 Only the directories and files your repository uses are required.
 
-Skills may sit in folders — `skills/doctors/schema-doctor/` — and the folders are yours to organize
+Skills may sit in folders — `skills/review/lint-diff/` — and the folders are yours to organize
 by. A directory holding a `SKILL.md` is a skill and everything beside it belongs to that skill;
 anything else is a grouping folder and is searched for skills. The folders never reach a provider:
 each skill still mirrors to `skills/<name>`, so its name stays unique across the whole tree and a
