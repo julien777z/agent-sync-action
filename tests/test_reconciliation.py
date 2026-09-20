@@ -3,7 +3,6 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
 from agent_sync.models.output import (
     ArtifactKind,
@@ -16,7 +15,11 @@ from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
-from tests.factories import RuleFrontMatterFactory, materialize_rule
+from tests.factories import (
+    RuleFrontMatterFactory,
+    materialize_every_source_kind,
+    materialize_rule,
+)
 
 
 class TestManifest:
@@ -150,21 +153,43 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
-    def test_output_directory_reclaims_only_its_own_abandoned_output(
+    @pytest.mark.parametrize(
+        "relative_path",
+        [".claude/rules/sample.md", ".claude/hooks/setup.sh", ".codex/skills/sample/agents/openai.yaml"],
+        ids=["rule", "hook", "invocation-policy"],
+    )
+    def test_relocated_output_reclaims_every_kind_it_writes(
+        self,
+        relocated_workspace: Workspace,
+        relative_path: str,
+    ) -> None:
+        """Test that an output this run writes elsewhere is reclaimed wherever the root still holds it."""
+
+        materialize_every_source_kind(relocated_workspace)
+
+        abandoned = relocated_workspace.root / relative_path
+        abandoned.parent.mkdir(parents=True, exist_ok=True)
+        abandoned.write_text("left behind\n")
+
+        plan = build_plan(
+            relocated_workspace,
+            generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
+        )
+
+        assert any(
+            abandoned == stale_path or stale_path in abandoned.parents for stale_path in plan.stale_paths
+        )
+
+    def test_relocated_output_keeps_what_it_does_not_write(
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that a relocated output reclaims what it generated and keeps what it did not."""
+        """Test that a file the run writes nowhere survives at the repository root."""
 
-        stale = relocated_workspace.output_root / ".claude/rules/orphan.md"
-        stale.parent.mkdir(parents=True)
-        stale.write_text("stale\n")
-
-        abandoned = relocated_workspace.root / ".claude/rules/orphan.md"
-        abandoned.parent.mkdir(parents=True)
-        abandoned.write_text(f"# {GENERATED_FILE_NOTICE}\n\nOld.\n")
+        materialize_every_source_kind(relocated_workspace)
 
         hand_authored = relocated_workspace.root / ".claude/rules/mine.md"
+        hand_authored.parent.mkdir(parents=True)
         hand_authored.write_text("Written by a person.\n")
 
         plan = build_plan(
@@ -172,9 +197,8 @@ class TestReconciliation:
             generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
         )
 
-        assert stale in plan.stale_paths
-        assert abandoned in plan.stale_paths
         assert hand_authored not in plan.stale_paths
+        assert not any(stale_path in hand_authored.parents for stale_path in plan.stale_paths)
 
     @pytest.mark.parametrize(
         ("provider", "directory_name"),
