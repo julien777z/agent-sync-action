@@ -72,6 +72,7 @@ class TestWorkspace:
     @pytest.mark.parametrize(
         "output_dirname",
         [".agents/skills", ".agents/skills/nested", ".agents/rules", ".agents/hooks"],
+        ids=["skills", "below-skills", "rules", "hooks"],
     )
     def test_rejects_an_output_directory_a_run_reads(self, output_dirname: str) -> None:
         """Test that generated trees cannot land where a later run would read them as sources."""
