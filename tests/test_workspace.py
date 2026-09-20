@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent_sync.config import ActionConfig
+from agent_sync.errors import AgentSyncError
 from agent_sync.workspace import Workspace
 
 
@@ -67,3 +68,32 @@ class TestWorkspace:
         path.write_text("second")
 
         assert workspace.read_text(path) == "second"
+
+    @pytest.mark.parametrize(
+        "output_dirname",
+        [".agents/skills", ".agents/skills/nested", ".agents/rules", ".agents/hooks"],
+    )
+    def test_rejects_an_output_directory_a_run_reads(self, output_dirname: str) -> None:
+        """Test that generated trees cannot land where a later run would read them as sources."""
+
+        with pytest.raises(ValidationError, match="outside the directories a run reads"):
+            Workspace(output_dirname=output_dirname)
+
+    def test_accepts_an_output_directory_beside_the_read_sources(self) -> None:
+        """Test that a directory inside the source tree but read by nothing is allowed."""
+
+        assert Workspace(output_dirname=".agents/.auto_generated").output_dirname
+
+    def test_refuses_to_delete_through_a_linked_ancestor(self, tmp_path: Path) -> None:
+        """Test that a link in an output path cannot reach a deletion outside the repository."""
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        outside = tmp_path / "outside"
+        (outside / "keep").mkdir(parents=True)
+        (root / "linked").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(AgentSyncError, match="outside the repository"):
+            Workspace(root=root).delete(root / "linked/keep")
+
+        assert (outside / "keep").is_dir()

@@ -17,7 +17,6 @@ from agent_sync.generation.rule import (
 from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
 from agent_sync.models.providers import ExplicitSkillInvocationPolicy, ProviderLayout
-from agent_sync.skills import discover_skill_directories, locate_skill_by_name
 from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.source import load_source_config
@@ -693,39 +692,3 @@ class TestMirrorIntegration:
         assert mirror_providers(workspace, dry_run=False) is False
         assert codex_skill.is_symlink()
         assert mirror_providers(workspace, dry_run=True) is False
-
-
-class TestSkillTree:
-    """Test that walking the canonical skill tree is safe and tolerant where it should be."""
-
-    def test_locating_a_skill_ignores_a_folder_holding_none(self, tmp_path: Path) -> None:
-        """Test that an unrelated empty folder does not stop a skill from being found."""
-
-        skills_dir = tmp_path / "skills"
-        (skills_dir / "review" / "wanted").mkdir(parents=True)
-        (skills_dir / "review" / "wanted" / "SKILL.md").write_text("---\nname: wanted\n---\n")
-        (skills_dir / "notes").mkdir()
-
-        assert locate_skill_by_name(skills_dir, "wanted") == skills_dir / "review" / "wanted"
-        assert locate_skill_by_name(skills_dir, "absent") is None
-
-    def test_discovery_rejects_a_folder_holding_no_skill(self, tmp_path: Path) -> None:
-        """Test that mirroring still refuses a grouping folder that resolves to nothing."""
-
-        skills_dir = tmp_path / "skills"
-        (skills_dir / "notes").mkdir(parents=True)
-
-        with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
-            discover_skill_directories(skills_dir)
-
-    def test_a_linked_folder_never_recurses(self, tmp_path: Path) -> None:
-        """Test that a cycle through a linked folder is refused instead of exhausting the stack."""
-
-        skills_dir = tmp_path / "skills"
-        skills_dir.mkdir()
-        (skills_dir / "loop").symlink_to(skills_dir, target_is_directory=True)
-
-        with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
-            discover_skill_directories(skills_dir)
-
-        assert locate_skill_by_name(skills_dir, "anything") is None

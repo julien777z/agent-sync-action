@@ -16,6 +16,7 @@ from agent_sync.models.output import (
     GeneratedLink,
     GeneratedOutput,
     Manifest,
+    Provider,
     ReconciliationPlan,
 )
 from agent_sync.providers import PROVIDER_LAYOUTS
@@ -102,6 +103,17 @@ def compare_output(
     return Change(output=output, existing=existing)
 
 
+def owned_provider_roots(workspace: Workspace, provider: Provider) -> list[Path]:
+    """Return every provider root this run owns, including one a moved output left behind."""
+
+    roots = [PROVIDER_LAYOUTS[provider].root(workspace.output_root)]
+
+    if workspace.output_root != workspace.root:
+        roots.append(PROVIDER_LAYOUTS[provider].root(workspace.root))
+
+    return roots
+
+
 def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     """Find paths owned by Agent Sync but absent from the generated manifest."""
 
@@ -115,37 +127,37 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     )
 
     for provider, directory_name in owned_provider_directories():
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.output_root) / directory_name
+        for provider_root in owned_provider_roots(workspace, provider):
+            directory = provider_root / directory_name
 
-        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
-            stale.add(directory)
-        elif directory.is_dir():
-            expected_descendants = {
-                path
-                for target in expected
-                if directory in target.parents
-                for path in (target, *target.parents)
-                if directory in path.parents
-            }
-            directories = [directory]
+            if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+                stale.add(directory)
+            elif directory.is_dir():
+                expected_descendants = {
+                    path
+                    for target in expected
+                    if directory in target.parents
+                    for path in (target, *target.parents)
+                    if directory in path.parents
+                }
+                directories = [directory]
 
-            while directories:
-                current = directories.pop()
+                while directories:
+                    current = directories.pop()
 
-                for path in current.iterdir():
-                    if path not in expected_descendants:
-                        stale.add(path)
-                    elif path.is_dir() and not path.is_symlink() and path not in expected:
-                        directories.append(path)
+                    for path in current.iterdir():
+                        if path not in expected_descendants:
+                            stale.add(path)
+                        elif path.is_dir() and not path.is_symlink() and path not in expected:
+                            directories.append(path)
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
-            root = PROVIDER_LAYOUTS[provider].root(workspace.output_root)
-
             stale.update(
                 path
+                for provider_root in owned_provider_roots(workspace, provider)
                 for filename in filenames
-                if ((path := root / filename).exists() or path.is_symlink()) and path not in expected
+                if ((path := provider_root / filename).exists() or path.is_symlink()) and path not in expected
             )
 
     return sorted(stale, key=str)

@@ -2,14 +2,19 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Self
+from typing import Final, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agent_sync.config import ACTION_CONFIG
+from agent_sync.errors import AgentSyncError
 from agent_sync.utils import escapes_base_directory
 
 logger = logging.getLogger(__name__)
+
+SOURCE_DIRECTORY_NAMES: Final[frozenset[str]] = frozenset(
+    {"skills", "agents", "rules", "hooks", "settings", "models"}
+)
 
 
 class Workspace(BaseModel):
@@ -30,6 +35,21 @@ class Workspace(BaseModel):
             raise ValueError("Generated output directory must be a relative path inside the repository")
 
         return value
+
+    @model_validator(mode="after")
+    def validate_output_avoids_read_sources(self) -> Self:
+        """Require generated provider trees to sit outside every directory the run reads."""
+
+        if not self.output_dirname:
+            return self
+
+        output = Path(self.output_dirname)
+        enclosing = {output, *output.parents}
+
+        if enclosing & {Path(self.agents_dirname) / name for name in SOURCE_DIRECTORY_NAMES}:
+            raise ValueError("Generated output directory must sit outside the directories a run reads")
+
+        return self
 
     @property
     def agents_dir(self) -> Path:
@@ -136,8 +156,19 @@ class Workspace(BaseModel):
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
+    def contains(self, path: Path) -> bool:
+        """Report whether a path resolves to somewhere inside this repository."""
+
+        root = self.root.resolve()
+        resolved = path.parent.resolve() / path.name
+
+        return resolved == root or root in resolved.parents
+
     def delete(self, path: Path) -> None:
         """Delete a file, directory, or symlink without following links."""
+
+        if not self.contains(path):
+            raise AgentSyncError(f"Refusing to delete {path}, which resolves outside the repository")
 
         if path.is_symlink():
             path.unlink()
