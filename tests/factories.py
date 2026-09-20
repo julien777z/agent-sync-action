@@ -112,10 +112,7 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
 
-    skill = workspace.agents_dir / "skills/sample"
-    skill.mkdir(parents=True, exist_ok=True)
-    invocation = "disable-model-invocation: true\n" if explicit_invocation else ""
-    (skill / "SKILL.md").write_text(
-        f"---\nname: sample\ndescription: A skill.\n{invocation}---\n\nContent.\n",
-        encoding="utf-8",
+    materialize_skill(
+        workspace.agents_dir / "skills/sample/SKILL.md",
+        SkillFrontMatterFactory.build(name="sample", disable_model_invocation=explicit_invocation),
     )

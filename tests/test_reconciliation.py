@@ -195,14 +195,17 @@ class TestReconciliation:
         abandoned.parent.mkdir(parents=True, exist_ok=True)
         abandoned.write_text("left behind\n")
 
+        neighbour = abandoned.with_name("mine.txt")
+        neighbour.write_text("Written by a person.\n")
+
         plan = build_plan(
             relocated_workspace,
             generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
         )
 
-        assert any(
-            abandoned == stale_path or stale_path in abandoned.parents for stale_path in plan.stale_paths
-        )
+        assert abandoned in plan.stale_paths
+        assert neighbour not in plan.stale_paths
+        assert not any(stale_path in neighbour.parents for stale_path in plan.stale_paths)
 
     def test_relocated_output_keeps_what_it_does_not_write(
         self,
