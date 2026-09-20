@@ -2,6 +2,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from agent_sync.utils import escapes_base_directory
+
 
 class ExplicitSkillInvocationPolicy(BaseModel):
     """Describe one provider's generated explicit-invocation policy."""
@@ -16,7 +18,7 @@ class ExplicitSkillInvocationPolicy(BaseModel):
     def validate_relative_path(cls, value: Path) -> Path:
         """Require generated metadata to live below the skill root."""
 
-        if value.is_absolute() or ".." in value.parts or len(value.parts) < 2:
+        if escapes_base_directory(value) or len(value.parts) < 2:
             raise ValueError("Skill invocation metadata must use a nested relative path")
 
         return value
@@ -31,7 +33,7 @@ class ProviderLayout(BaseModel):
     rule_extension: str
     explicit_skill_invocation_policy: ExplicitSkillInvocationPolicy | None = None
 
-    def root(self, repository_root: Path) -> Path:
+    def root(self, output_root: Path) -> Path:
         """Return the provider configuration root."""
 
-        return repository_root / self.directory
+        return output_root / self.directory

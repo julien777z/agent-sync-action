@@ -5,6 +5,7 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from agent_sync.document import render_front_matter
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.workspace import Workspace
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
@@ -97,3 +98,21 @@ def materialize_tree(base: Path, files: dict[str, str]) -> None:
         target = base / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
+
+
+def materialize_every_source_kind(workspace: Workspace, explicit_invocation: bool = False) -> None:
+    """Write one canonical source of every kind a provider tree mirrors."""
+
+    materialize_rule(
+        workspace.agents_dir / "rules/sample.md",
+        RuleFrontMatterFactory.build(name="sample"),
+    )
+
+    hook = workspace.agents_dir / "hooks/setup.sh"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
+
+    materialize_skill(
+        workspace.agents_dir / "skills/sample/SKILL.md",
+        SkillFrontMatterFactory.build(name="sample", disable_model_invocation=explicit_invocation),
+    )

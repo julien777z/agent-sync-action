@@ -11,6 +11,7 @@ from agent_sync.models.document import (
     RuleFrontMatter,
     SkillFrontMatter,
 )
+from agent_sync.skills import discover_skill_directories
 from agent_sync.utils import validate_slug
 from agent_sync.workspace import Workspace
 
@@ -91,7 +92,7 @@ def load_generation_context(
 
 
 def load_skills(workspace: Workspace) -> list[SkillSource]:
-    """Load validated skill directories."""
+    """Load validated skill directories, which may be grouped in folders."""
 
     skills_dir = workspace.agents_dir / "skills"
 
@@ -99,15 +100,20 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
         return []
 
     sources: list[SkillSource] = []
+    slugs: dict[str, Path] = {}
 
-    for directory in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
+    for directory in discover_skill_directories(skills_dir):
         slug = validate_slug(directory.name, directory)
+
+        if slug in slugs:
+            raise AgentSyncError(
+                f"Skill {slug!r} is defined twice, in {slugs[slug]} and {directory}; "
+                "a grouping folder does not namespace a skill"
+            )
+
+        slugs[slug] = directory
         path = directory / "SKILL.md"
-        content = workspace.read_text(path)
-
-        if content is None:
-            raise AgentSyncError(f"Missing SKILL.md in {directory}")
-
+        content = path.read_text(encoding="utf-8")
         front_matter, _ = parse_markdown(content, SkillFrontMatter, str(path))
 
         if front_matter.name != slug:

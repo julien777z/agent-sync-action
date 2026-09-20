@@ -19,6 +19,12 @@ def ensure_trailing_newline(text: str) -> str:
     return text if text.endswith("\n") else text + "\n"
 
 
+def escapes_base_directory(value: Path) -> bool:
+    """Report whether a path is absolute or reaches outside its base with a parent segment."""
+
+    return value.is_absolute() or ".." in value.parts
+
+
 def serialized_field_names(model: type[BaseModel]) -> tuple[str, ...]:
     """Return a model's serialized keys, declared fields first then computed ones."""
 

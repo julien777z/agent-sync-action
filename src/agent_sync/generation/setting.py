@@ -26,7 +26,7 @@ def generate_claude_settings(
 
     return [
         GeneratedFile(
-            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.root) / "settings.json",
+            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.output_root) / "settings.json",
             content=ensure_trailing_newline(
                 json.dumps(
                     {
@@ -69,7 +69,7 @@ def generate_codex_settings(
             provider=provider,
         ),
         GeneratedFile(
-            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.root) / "config.toml",
+            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.output_root) / "config.toml",
             content=render_codex_settings(synchronized),
             artifact=ArtifactKind.SETTING,
             source_path=source_path,

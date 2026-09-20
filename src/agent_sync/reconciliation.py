@@ -102,11 +102,42 @@ def compare_output(
     return Change(output=output, existing=existing)
 
 
+def holds_only(path: Path, paths: set[Path]) -> bool:
+    """Report whether every entry a directory holds belongs to a known set of paths."""
+
+    if path.is_symlink() or not path.is_dir():
+        return path in paths
+
+    return all(holds_only(child, paths) for child in path.iterdir())
+
+
+def find_abandoned_outputs(workspace: Workspace, manifest: Manifest) -> set[Path]:
+    """Find where this run's own outputs sit at the repository root, left by a relocated output."""
+
+    if workspace.output_root == workspace.root:
+        return set()
+
+    relocated = {
+        workspace.root / output.target_path.relative_to(workspace.output_root)
+        for output in manifest.outputs
+        if output.target_path.is_relative_to(workspace.output_root)
+    }
+    abandoned = {path for path in relocated if path.is_symlink() or path.exists()}
+
+    for provider in {output.provider for output in manifest.outputs if output.provider is not None}:
+        provider_root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+
+        if provider_root.is_dir() and not provider_root.is_symlink() and holds_only(provider_root, relocated):
+            abandoned.add(provider_root)
+
+    return abandoned
+
+
 def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     """Find paths owned by Agent Sync but absent from the generated manifest."""
 
     expected = {output.target_path for output in manifest.outputs}
-    stale: set[Path] = set()
+    stale: set[Path] = find_abandoned_outputs(workspace, manifest)
 
     stale.update(
         blocker
@@ -115,7 +146,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     )
 
     for provider, directory_name in owned_provider_directories():
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+        directory = PROVIDER_LAYOUTS[provider].root(workspace.output_root) / directory_name
 
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             stale.add(directory)
@@ -140,7 +171,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
-            root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+            root = PROVIDER_LAYOUTS[provider].root(workspace.output_root)
 
             stale.update(
                 path

@@ -377,6 +377,67 @@ class TestExternalSkillBoundaries:
             "Content.\n"
         )
 
+    def test_vendor_updates_a_skill_where_a_grouping_folder_holds_it(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a sorted skill is updated in place rather than copied to the top level."""
+
+        skill = ExternalSkill(
+            name="local-skill",
+            repo="example/repository",
+            skill="upstream-skill",
+            update_on_sync=True,
+        )
+        grouped = workspace.agents_dir / "skills/review/local-skill"
+        grouped.mkdir(parents=True)
+        (grouped / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
+
+        def fake_resolve(repository: str) -> str:
+            """Return a stable synthetic revision."""
+
+            return "a" * 40
+
+        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+
+        def fake_download(repository: str, revision: str, destination: Path) -> Path:
+            """Create a root-level upstream skill document."""
+
+            source_root = destination / "repository"
+            source_root.mkdir(parents=True)
+            (source_root / "SKILL.md").write_text(
+                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+            )
+
+            return source_root
+
+        monkeypatch.setattr(github, "download_snapshot", fake_download)
+
+        def fake_install(
+            installed_skill: ExternalSkill,
+            working_directory: Path,
+            source_root: Path,
+        ) -> None:
+            """Create the installed skill in the staging directory."""
+
+            installed = working_directory / ".staging/skills" / installed_skill.name
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text(
+                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+            )
+
+        monkeypatch.setattr(installer, "install_skill", fake_install)
+
+        assert sync.update_external_skill(
+            workspace,
+            skill,
+            workspace.agents_dir / "skills",
+            dry_run=False,
+        )
+        assert "Content." in (grouped / "SKILL.md").read_text()
+        assert not (workspace.agents_dir / "skills/local-skill").exists()
+
     def test_vendor_preserves_root_legal_files_for_nested_skills(
         self,
         monkeypatch: pytest.MonkeyPatch,

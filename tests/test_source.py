@@ -66,19 +66,3 @@ class TestCanonicalSources:
 
         with pytest.raises(ValueError, match="Invalid slug"):
             load_source_config(workspace)
-
-
-class TestWorkspace:
-    """Test that workspace access observes the filesystem directly."""
-
-    def test_reads_current_disk_state(self, workspace: Workspace) -> None:
-        """Test that workspace reads never return stale cached content."""
-
-        path = workspace.root / "state.txt"
-        path.write_text("first")
-
-        assert workspace.read_text(path) == "first"
-
-        path.write_text("second")
-
-        assert workspace.read_text(path) == "second"

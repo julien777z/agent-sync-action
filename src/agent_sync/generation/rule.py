@@ -82,7 +82,7 @@ def generate_rule_links(
     return [
         GeneratedLink(
             target_path=(
-                PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+                PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
                 / "rules"
                 / f"{source.slug}{PROVIDER_LAYOUTS[provider].rule_extension}"
             ),
@@ -102,7 +102,7 @@ def generate_codex_rules(
 ) -> list[GeneratedOutput]:
     """Generate Codex Starlark rule files."""
 
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.root)
+    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
 
     return [
         GeneratedFile(

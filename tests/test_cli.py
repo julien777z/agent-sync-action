@@ -72,6 +72,23 @@ class TestCli:
 
         assert result.returncode == 1
 
+    def test_output_directory_outside_the_repository_returns_exit_code_two(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a rejected output directory is reported with exit code two."""
+
+        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--output-dir", "../escape"])
+
+        assert result.returncode == 2
+
+    def test_vendor_command_rejects_an_output_directory(self, workspace: Workspace) -> None:
+        """Test that the command writing no provider trees does not accept their location."""
+
+        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--output-dir", "generated"])
+
+        assert result.returncode == 2
+
     def test_invalid_source_returns_exit_code_two(self, workspace: Workspace) -> None:
         """Test that invalid canonical input is reported with exit code two."""
 

@@ -87,6 +87,52 @@ class TestSkillGeneration:
             workspace.root / ".codex/skills/sample-skill": source.parent,
         }
 
+    def test_a_grouped_skill_still_mirrors_at_its_slug(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a skill inside a grouping folder links from the flat provider path."""
+
+        front_matter = SkillFrontMatterFactory.build()
+        source = workspace.agents_dir / "skills" / "doctors" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
+        context = load_context(workspace)
+        outputs = [output for provider in Provider for output in generate_skills(context, provider)]
+        links = {
+            output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
+        }
+
+        assert links == {
+            workspace.root / ".claude/skills/sample-skill": source.parent,
+            workspace.root / ".cursor/skills/sample-skill": source.parent,
+            workspace.root / ".codex/skills/sample-skill": source.parent,
+        }
+
+    def test_a_grouping_folder_does_not_namespace_a_skill(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that the same slug in two grouping folders is rejected rather than silently shadowed."""
+
+        front_matter = SkillFrontMatterFactory.build()
+        skills_dir = workspace.agents_dir / "skills"
+        materialize_skill(skills_dir / "doctors" / front_matter.name / "SKILL.md", front_matter)
+        materialize_skill(skills_dir / "git" / front_matter.name / "SKILL.md", front_matter)
+
+        with pytest.raises(AgentSyncError, match="defined twice"):
+            load_context(workspace)
+
+    def test_a_folder_holding_no_skill_is_rejected(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a directory with neither a SKILL.md nor a nested skill is still an error."""
+
+        (workspace.agents_dir / "skills" / "doctors" / "references").mkdir(parents=True)
+
+        with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
+            load_context(workspace)
+
     def test_codex_generates_explicit_invocation_policy(
         self,
         workspace: Workspace,
@@ -559,6 +605,54 @@ class TestMirrorIntegration:
         assert os.readlink(workspace.root / ".claude/rules/python.md") == ("../../.agents/rules/python.md")
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
         assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_output_directory_holds_every_generated_provider_tree(
+        self,
+        relocated_workspace: Workspace,
+    ) -> None:
+        """Test that a configured output directory receives every provider artifact."""
+
+        materialize_skill(
+            relocated_workspace.agents_dir / "skills/review/SKILL.md",
+            SkillFrontMatterFactory.build(name="review"),
+        )
+        materialize_rule(
+            relocated_workspace.agents_dir / "rules/python.md",
+            RuleFrontMatterFactory.build(name="removed"),
+        )
+        materialize_rule(
+            relocated_workspace.agents_dir / "rules/typescript.md",
+            RuleFrontMatterFactory.build(name="removed", starlark="allow_rule()"),
+        )
+
+        agents_dir = relocated_workspace.agents_dir / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
+
+        hooks_dir = relocated_workspace.agents_dir / "hooks"
+        hooks_dir.mkdir()
+        (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
+
+        relocated_workspace.settings_dir.mkdir()
+        (relocated_workspace.settings_dir / "claude.json").write_text('{"model":"default"}')
+        (relocated_workspace.settings_dir / "codex.json").write_text(
+            '{"model":"gpt-5","project_doc_max_bytes":1}'
+        )
+
+        assert mirror_providers(relocated_workspace, dry_run=False) is False
+
+        output_root = relocated_workspace.output_root
+
+        assert (output_root / ".claude/skills/review").is_symlink()
+        assert (output_root / ".claude/rules/python.md").is_symlink()
+        assert (output_root / ".codex/rules/typescript.rules").is_file()
+        assert (output_root / ".claude/agents/review.md").is_file()
+        assert (output_root / ".claude/hooks/check").is_file()
+        assert (output_root / ".claude/settings.json").is_file()
+        assert (output_root / ".codex/config.toml").is_file()
+        assert (relocated_workspace.root / "AGENTS.md").is_file()
+        assert not (relocated_workspace.root / ".claude").exists()
+        assert mirror_providers(relocated_workspace, dry_run=True) is False
 
     def test_codex_skill_policy_transitions_are_idempotent(self, workspace: Workspace) -> None:
         """Test that invocation-policy changes replace either Codex skill shape."""
