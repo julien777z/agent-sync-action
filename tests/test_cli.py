@@ -6,6 +6,7 @@ import pytest
 
 from agent_sync.external_skills import sync
 from agent_sync.workspace import Workspace
+from tests.factories import materialize_every_source_kind
 
 
 def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
@@ -98,3 +99,34 @@ class TestCli:
         result = run_cli(["mirror-providers", "--root", str(workspace.root)])
 
         assert result.returncode == 2
+
+    @pytest.mark.parametrize(
+        ("environment_value", "flags", "expected_generation"),
+        [
+            ("true", ["--no-generate-agents-md"], False),
+            ("false", [], False),
+            ("TRUE", [], True),
+            ("false", ["--generate-agents-md"], True),
+        ],
+        ids=["cli-disables", "environment-disables", "environment-enables-uppercase", "cli-enables"],
+    )
+    def test_instruction_generation_setting(
+        self,
+        workspace: Workspace,
+        monkeypatch: pytest.MonkeyPatch,
+        environment_value: str,
+        flags: list[str],
+        expected_generation: bool,
+    ) -> None:
+        """Test that CLI flags override the environment while other mirrors still converge."""
+
+        monkeypatch.setenv("AGENT_SYNC_GENERATE_AGENTS_MD", environment_value)
+        materialize_every_source_kind(workspace)
+        arguments = ["mirror-providers", "--root", str(workspace.root), *flags]
+
+        assert run_cli(arguments).returncode == 0
+        assert (workspace.root / "AGENTS.md").exists() is expected_generation
+        assert (workspace.root / ".codex/skills/sample/SKILL.md").is_file()
+        assert (workspace.root / ".claude/rules/sample.md").is_file()
+        assert (workspace.root / ".cursor/hooks/setup.sh").is_file()
+        assert run_cli([*arguments, "--dry-run"]).returncode == 0

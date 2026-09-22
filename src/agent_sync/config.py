@@ -22,6 +22,7 @@ class ActionConfig(BaseSettings):
     root: Path | None = None
     agents_dir: str = ".agents"
     output_dir: str = ""
+    generate_agents_md: bool = True
 
 
 ACTION_CONFIG = ActionConfig()
@@ -41,7 +42,7 @@ class CodexSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     model: str | None = None
-    project_doc_max_bytes: int
+    project_doc_max_bytes: int | None = None
     features: dict[str, bool] = Field(default_factory=dict)
 
 

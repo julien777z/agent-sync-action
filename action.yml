@@ -25,6 +25,9 @@ inputs:
   output-dir:
     description: Directory holding generated provider trees, relative to the repository root; empty writes them at the root.
     default: ""
+  generate-agents-md:
+    description: Generate AGENTS.md and synchronize its Codex document capacity; false leaves AGENTS.md unmanaged.
+    default: "true"
   dry-run:
     description: Report changes without writing; provider mirror drift fails while external updates remain informational.
     default: "false"
@@ -96,6 +99,7 @@ runs:
       env:
         AGENTS_DIR: ${{ inputs.agents-dir }}
         OUTPUT_DIR: ${{ inputs.output-dir }}
+        AGENT_SYNC_GENERATE_AGENTS_MD: ${{ inputs.generate-agents-md }}
       run: python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Persist changes
@@ -107,12 +111,24 @@ runs:
         MODE: ${{ inputs.mode }}
         AGENTS_DIR: ${{ inputs.agents-dir }}
         OUTPUT_DIR: ${{ inputs.output-dir }}
+        AGENT_SYNC_GENERATE_AGENTS_MD: ${{ inputs.generate-agents-md }}
         REF_NAME: ${{ github.ref_name }}
       run: |
         set -euo pipefail
 
         stage_generated_paths() {
-          for path in .claude .cursor .codex "$AGENTS_DIR" "$OUTPUT_DIR" AGENTS.md; do
+          if [ -n "$OUTPUT_DIR" ] && [ "$OUTPUT_DIR" != "." ]; then
+            paths=("$OUTPUT_DIR/.claude" "$OUTPUT_DIR/.cursor" "$OUTPUT_DIR/.codex" "$AGENTS_DIR")
+            while IFS= read -r -d '' deleted_path; do
+              git add -u -- "$deleted_path"
+            done < <(git ls-files --deleted -z -- .claude .cursor .codex)
+          else
+            paths=(.claude .cursor .codex "$AGENTS_DIR")
+          fi
+          case "$AGENT_SYNC_GENERATE_AGENTS_MD" in
+            1|[Tt]|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn]) paths+=(AGENTS.md) ;;
+          esac
+          for path in "${paths[@]}"; do
             if [ -z "$path" ]; then continue; fi
             # A path git still tracks is staged even once a run has deleted it.
             if [ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]; then
@@ -170,4 +186,5 @@ runs:
       env:
         AGENTS_DIR: ${{ inputs.agents-dir }}
         OUTPUT_DIR: ${{ inputs.output-dir }}
+        AGENT_SYNC_GENERATE_AGENTS_MD: ${{ inputs.generate-agents-md }}
       run: python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR" --dry-run

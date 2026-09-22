@@ -21,6 +21,7 @@ class CliArguments(BaseModel):
     root: str | None
     agents_dir: str | None
     output_dir: str | None = None
+    generate_agents_md: bool | None = None
     dry_run: bool
 
 
@@ -71,6 +72,13 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    mirror_parser.add_argument(
+        "--generate-agents-md",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Manage AGENTS.md and its Codex document capacity (default: $AGENT_SYNC_GENERATE_AGENTS_MD or true).",
+    )
+
     vendor_parser = commands.add_parser(
         "vendor-skills",
         help="Vendor registered external skills into canonical sources.",
@@ -86,7 +94,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     try:
-        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir)
+        workspace = Workspace.resolve(
+            parsed.root, parsed.agents_dir, parsed.output_dir, parsed.generate_agents_md
+        )
 
         match parsed.command:
             case "mirror-providers":
