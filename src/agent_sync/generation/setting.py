@@ -54,9 +54,12 @@ def generate_codex_settings(
     if not isinstance(settings, CodexSettings):
         return []
 
-    synchronized = settings.model_copy(
-        update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
-    )
+    synchronized = settings
+
+    if context.workspace.generate_agents_md:
+        synchronized = settings.model_copy(
+            update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
+        )
 
     source_path = context.workspace.settings_dir / "codex.json"
 
@@ -86,7 +89,8 @@ def render_codex_settings(settings: CodexSettings) -> str:
     if settings.model:
         lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
 
-    lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
+    if settings.project_doc_max_bytes is not None:
+        lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
 
     if settings.features:
         lines.append("")

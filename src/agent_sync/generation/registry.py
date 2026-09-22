@@ -11,8 +11,6 @@ from agent_sync.generation.rule import (
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import generate_claude_settings, generate_codex_settings
-
-logger = logging.getLogger(__name__)
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
@@ -21,6 +19,8 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.workspace import Workspace
+
+logger = logging.getLogger(__name__)
 
 type GenerationHandler = Callable[[GenerationContext, Provider], list[GeneratedOutput]]
 
@@ -90,13 +90,15 @@ def generate_manifest(
 
     context = load_generation_context(workspace, source_config)
     shared_outputs = generate_shared_rule_outputs(context)
-    instructions = next(
-        output
-        for output in shared_outputs
-        if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
-    )
 
-    context = context.model_copy(update={"instructions": instructions.content})
+    if workspace.generate_agents_md:
+        instructions = next(
+            output
+            for output in shared_outputs
+            if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
+        )
+
+        context = context.model_copy(update={"instructions": instructions.content})
 
     provider_outputs = [
         output

@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
+import subprocess
 
+import pytest
 import yaml
 
 
@@ -55,6 +58,13 @@ class TestAction:
                 ),
                 "default": "",
             },
+            "generate-agents-md": {
+                "description": (
+                    "Generate AGENTS.md and synchronize its Codex document capacity; "
+                    "false leaves AGENTS.md unmanaged."
+                ),
+                "default": "true",
+            },
             "dry-run": {
                 "description": (
                     "Report changes without writing; provider mirror drift fails while external updates "
@@ -78,7 +88,11 @@ class TestAction:
         assert mirror_steps
         assert all('--output-dir "$OUTPUT_DIR"' in step["run"] for step in mirror_steps)
         assert all(step.get("env", {}).get("OUTPUT_DIR") for step in mirror_steps)
-        assert '"$OUTPUT_DIR" AGENTS.md' in action_text
+        assert all(
+            step["env"]["AGENT_SYNC_GENERATE_AGENTS_MD"] == "${{ inputs.generate-agents-md }}"
+            for step in mirror_steps
+        )
+        assert '"$OUTPUT_DIR/.claude"' in action_text
 
     def test_keeps_configurable_values_out_of_the_scripts(self) -> None:
         """Test that a consumer's value reaches bash as data rather than as script text."""
@@ -148,3 +162,44 @@ class TestAction:
 
         assert "branches: [main]" not in workflow_text
         assert "uses: ./" in workflow_text
+
+    @pytest.mark.parametrize("output_dir", ["", ".", ".generated"], ids=["root", "dot", "nested"])
+    @pytest.mark.parametrize("generate_agents_md", [True, False], ids=["managed", "unmanaged"])
+    def test_staging_respects_instruction_ownership(
+        self, tmp_path: Path, output_dir: str, generate_agents_md: bool
+    ) -> None:
+        """Test that staging includes only owned paths and the selected root instructions."""
+
+        action = yaml.safe_load(Path("action.yml").read_text())
+        persist = next(step for step in action["runs"]["steps"] if step["name"] == "Persist changes")
+        stage_function = persist["run"].split("git config user.name", 1)[0]
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+
+        provider_file = tmp_path / output_dir / ".codex/config.toml"
+        provider_file.parent.mkdir(parents=True)
+        provider_file.write_text('model = "test"\n')
+        (tmp_path / "AGENTS.md").write_text("Authored instructions.\n")
+        (tmp_path / "CLAUDE.md").write_text("Authored Claude instructions.\n")
+        (tmp_path / "unrelated.txt").write_text("User work.\n")
+
+        subprocess.run(
+            ["bash", "-c", stage_function + "\nstage_generated_paths\n"],
+            cwd=tmp_path,
+            env={
+                **os.environ,
+                "OUTPUT_DIR": output_dir,
+                "AGENTS_DIR": ".agents",
+                "AGENT_SYNC_GENERATE_AGENTS_MD": str(generate_agents_md).lower(),
+            },
+            check=True,
+        )
+
+        staged = subprocess.check_output(
+            ["git", "diff", "--cached", "--name-only"], cwd=tmp_path, text=True
+        ).splitlines()
+        expected = {str(provider_file.relative_to(tmp_path))}
+
+        if generate_agents_md:
+            expected.add("AGENTS.md")
+
+        assert set(staged) == expected

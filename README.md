@@ -8,7 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to Claude, Cursor, and Codex.
 - Supports the common skill and rule options, including explicit invocation and file scoping, in each provider's own format.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
-- Generates `AGENTS.md` from your rules.
+- Optionally generates `AGENTS.md` from your rules.
 - Validates your configuration, then rewrites generated files so they always match `.agents/`.
 - Writes generated files at the repository root or under a directory you choose.
 - Supports direct commits, pull requests, and read-only dry runs.
@@ -95,6 +95,7 @@ grouping folder cannot namespace two skills apart.
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `output-dir` | *(root)* | Directory holding the generated provider trees. |
+| `generate-agents-md` | `true` | Generate root instructions and size Codex document capacity to fit them. Set `false` to leave `AGENTS.md` unmanaged. |
 | `dry-run` | `false` | Report differences without writing or committing; mirror drift fails the run, external-skill differences are informational. |
 
 ## Options
@@ -107,7 +108,20 @@ accepts, so you never write a per-provider block.
 
 The generated `.claude/`, `.cursor/`, and `.codex/` trees land at the repository root, where each
 provider looks. Point `output-dir` at a directory to gather them below it instead. `AGENTS.md`
-stays at the repository root either way, and the workflow commits it alongside `.agents/`.
+stays at the repository root when generation is enabled, and the workflow commits it alongside `.agents/`.
+
+### Root Instructions
+
+Set `generate-agents-md: false` to sync provider configuration while managing root instructions
+yourself. Agent Sync leaves any existing `AGENTS.md` untouched, excludes it from staging, and
+preserves an explicitly configured `project_doc_max_bytes`. Omit that setting to use Codex's default
+capacity. Rules, skills, agents, hooks, and other provider settings continue to sync.
+
+```yaml
+- uses: julien777z/agent-sync-action@v0
+  with:
+    generate-agents-md: false
+```
 
 ### Rule Scope
 
@@ -176,7 +190,9 @@ poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync mirror-providers --root .
 ```
 
-Both commands take `--agents-dir` and `--dry-run`, and `mirror-providers` takes `--output-dir`.
+Both commands take `--agents-dir` and `--dry-run`. `mirror-providers` also takes `--output-dir` and
+`--no-generate-agents-md`. Set `AGENT_SYNC_GENERATE_AGENTS_MD=false` for the equivalent environment
+option; explicit `--generate-agents-md` or `--no-generate-agents-md` flags take precedence.
 
 ## Versioning
 

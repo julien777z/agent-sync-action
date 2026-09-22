@@ -51,6 +51,9 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
         if source.body
     ]
 
+    if not context.workspace.generate_agents_md:
+        return outputs
+
     outputs.append(
         GeneratedFile(
             target_path=context.workspace.root / "AGENTS.md",
