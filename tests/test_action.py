@@ -164,9 +164,17 @@ class TestAction:
         assert "uses: ./" in workflow_text
 
     @pytest.mark.parametrize("output_dir", ["", ".", ".generated"], ids=["root", "dot", "nested"])
-    @pytest.mark.parametrize("generate_agents_md", [True, False], ids=["managed", "unmanaged"])
+    @pytest.mark.parametrize(
+        ("generate_agents_md", "manages_instructions"),
+        [("true", True), ("TRUE", True), ("false", False)],
+        ids=["managed", "managed-uppercase", "unmanaged"],
+    )
     def test_staging_respects_instruction_ownership(
-        self, tmp_path: Path, output_dir: str, generate_agents_md: bool
+        self,
+        tmp_path: Path,
+        output_dir: str,
+        generate_agents_md: str,
+        manages_instructions: bool,
     ) -> None:
         """Test that staging includes only owned paths and the selected root instructions."""
 
@@ -189,7 +197,7 @@ class TestAction:
                 **os.environ,
                 "OUTPUT_DIR": output_dir,
                 "AGENTS_DIR": ".agents",
-                "AGENT_SYNC_GENERATE_AGENTS_MD": str(generate_agents_md).lower(),
+                "AGENT_SYNC_GENERATE_AGENTS_MD": generate_agents_md,
             },
             check=True,
         )
@@ -199,7 +207,62 @@ class TestAction:
         ).splitlines()
         expected = {str(provider_file.relative_to(tmp_path))}
 
-        if generate_agents_md:
+        if manages_instructions:
             expected.add("AGENTS.md")
 
         assert set(staged) == expected
+
+    def test_staging_relocated_outputs_ignores_root_provider_files(self, tmp_path: Path) -> None:
+        """Test that staging a relocated output does not include root provider files."""
+
+        action = yaml.safe_load(Path("action.yml").read_text())
+        persist = next(step for step in action["runs"]["steps"] if step["name"] == "Persist changes")
+        stage_function = persist["run"].split("git config user.name", 1)[0]
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+
+        generated_file = tmp_path / ".generated/.codex/config.toml"
+        generated_file.parent.mkdir(parents=True)
+        generated_file.write_text('model = "test"\n')
+        abandoned_generated_file = tmp_path / ".codex/config.toml"
+        abandoned_generated_file.parent.mkdir()
+        abandoned_generated_file.write_text('model = "generated"\n')
+        root_provider_file = tmp_path / ".codex/repository.toml"
+        root_provider_file.write_text('model = "repository"\n')
+        subprocess.run(["git", "add", ".codex/config.toml"], cwd=tmp_path, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "--quiet",
+                "-m",
+                "test: add generated provider file",
+            ],
+            cwd=tmp_path,
+            check=True,
+        )
+        abandoned_generated_file.unlink()
+
+        subprocess.run(
+            ["bash", "-c", stage_function + "\nstage_generated_paths\n"],
+            cwd=tmp_path,
+            env={
+                **os.environ,
+                "OUTPUT_DIR": ".generated",
+                "AGENTS_DIR": ".agents",
+                "AGENT_SYNC_GENERATE_AGENTS_MD": "false",
+            },
+            check=True,
+        )
+
+        staged = subprocess.check_output(
+            ["git", "diff", "--cached", "--name-only"], cwd=tmp_path, text=True
+        ).splitlines()
+
+        assert set(staged) == {
+            str(generated_file.relative_to(tmp_path)),
+            str(abandoned_generated_file.relative_to(tmp_path)),
+        }

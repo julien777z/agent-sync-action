@@ -105,9 +105,10 @@ class TestCli:
         [
             ("true", ["--no-generate-agents-md"], False),
             ("false", [], False),
+            ("TRUE", [], True),
             ("false", ["--generate-agents-md"], True),
         ],
-        ids=["cli-disables", "environment-disables", "cli-enables"],
+        ids=["cli-disables", "environment-disables", "environment-enables-uppercase", "cli-enables"],
     )
     def test_instruction_generation_setting(
         self,

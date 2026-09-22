@@ -117,13 +117,17 @@ runs:
         set -euo pipefail
 
         stage_generated_paths() {
-          paths=(.claude .cursor .codex "$AGENTS_DIR")
-          if [ -n "$OUTPUT_DIR" ]; then
-            paths+=("$OUTPUT_DIR/.claude" "$OUTPUT_DIR/.cursor" "$OUTPUT_DIR/.codex")
+          if [ -n "$OUTPUT_DIR" ] && [ "$OUTPUT_DIR" != "." ]; then
+            paths=("$OUTPUT_DIR/.claude" "$OUTPUT_DIR/.cursor" "$OUTPUT_DIR/.codex" "$AGENTS_DIR")
+            while IFS= read -r -d '' deleted_path; do
+              git add -u -- "$deleted_path"
+            done < <(git ls-files --deleted -z -- .claude .cursor .codex)
+          else
+            paths=(.claude .cursor .codex "$AGENTS_DIR")
           fi
-          if [ "$AGENT_SYNC_GENERATE_AGENTS_MD" = "true" ]; then
-            paths+=(AGENTS.md)
-          fi
+          case "$AGENT_SYNC_GENERATE_AGENTS_MD" in
+            1|[Tt]|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn]) paths+=(AGENTS.md) ;;
+          esac
           for path in "${paths[@]}"; do
             if [ -z "$path" ]; then continue; fi
             # A path git still tracks is staged even once a run has deleted it.
