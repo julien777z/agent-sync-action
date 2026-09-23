@@ -16,7 +16,6 @@ from tests.factories import (
     materialize_registry,
 )
 
-
 ROOT_LEVEL_SKILL = ExternalSkill(
     name="local-skill",
     repo="example/repository",
@@ -100,7 +99,9 @@ class TestExternalSkillModel:
 
         assert skill.relative_path == expected
 
-    @pytest.mark.parametrize("folder", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"])
+    @pytest.mark.parametrize(
+        "folder", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"]
+    )
     def test_invalid_folders_fail(self, folder: str) -> None:
         """Test that unsafe or malformed grouping folders are rejected."""
 
@@ -469,7 +470,9 @@ class TestExternalSkillBoundaries:
         skills_dir = workspace.agents_dir / "skills"
         for name in ("local-skill", "neighbour"):
             (skills_dir / "review" / name).mkdir(parents=True)
-            (skills_dir / "review" / name / "SKILL.md").write_text(f"---\nname: {name}\ndescription: A.\n---\n")
+            (skills_dir / "review" / name / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: A.\n---\n"
+            )
 
         assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
         assert (skills_dir / "local-skill/SKILL.md").exists()

@@ -44,7 +44,9 @@ class ExternalSkill(BaseModel):
     def validate_folder(cls, value: str | None) -> str | None:
         """Reject grouping folders whose segments are not safe slugs."""
 
-        if value is not None and not all(SAFE_SLUG_PATTERN.fullmatch(segment) for segment in value.split("/")):
+        if value is not None and not all(
+            SAFE_SLUG_PATTERN.fullmatch(segment) for segment in value.split("/")
+        ):
             raise ValueError(
                 f"Invalid folder '{value}' (each '/'-separated segment must match {SAFE_SLUG_PATTERN.pattern})"
             )
