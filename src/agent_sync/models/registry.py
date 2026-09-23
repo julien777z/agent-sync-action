@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -8,13 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 class ExternalSkill(BaseModel):
-    """A single skills.sh skill to vendor into .agents/skills/<name>/."""
+    """A single skills.sh skill to vendor into .agents/skills/[<folder>/]<name>/."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     name: str
     repo: str
     skill: str | None = None
+    folder: str | None = None
     update_on_sync: bool
 
     @field_validator("name")
@@ -36,6 +38,27 @@ class ExternalSkill(BaseModel):
             raise ValueError(f"Invalid upstream skill '{value}' (must match {SAFE_SLUG_PATTERN.pattern})")
 
         return value
+
+    @field_validator("folder")
+    @classmethod
+    def validate_folder(cls, value: str | None) -> str | None:
+        """Reject grouping folders whose segments are not safe slugs."""
+
+        if value is not None and not all(SAFE_SLUG_PATTERN.fullmatch(segment) for segment in value.split("/")):
+            raise ValueError(
+                f"Invalid folder '{value}' (each '/'-separated segment must match {SAFE_SLUG_PATTERN.pattern})"
+            )
+
+        return value
+
+    @property
+    def relative_path(self) -> Path:
+        """Return the skill's directory relative to the skills directory."""
+
+        if self.folder is None:
+            return Path(self.name)
+
+        return Path(*self.folder.split("/"), self.name)
 
     @property
     def upstream_skill(self) -> str:

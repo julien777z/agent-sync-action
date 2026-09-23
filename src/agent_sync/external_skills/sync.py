@@ -81,15 +81,27 @@ def update_external_skill(
 
         normalize_skill_metadata(installed, skill)
 
-        destination = locate_skill_by_name(skills_dir, skill.name) or skills_dir / skill.name
-        changed = trees_differ(installed, destination)
+        destination = skills_dir / skill.relative_path
+        current = locate_skill_by_name(skills_dir, skill.name)
+        changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
-            workspace.delete(destination)
+            if current is not None:
+                workspace.delete(current)
+                remove_empty_folders(current.parent, skills_dir)
+
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(installed, destination)
 
     return changed
+
+
+def remove_empty_folders(folder: Path, skills_dir: Path) -> None:
+    """Remove grouping folders a moved skill left empty, stopping at the skills directory."""
+
+    while folder != skills_dir and folder.is_dir() and not any(folder.iterdir()):
+        folder.rmdir()
+        folder = folder.parent
 
 
 def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:

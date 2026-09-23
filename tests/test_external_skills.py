@@ -17,6 +17,45 @@ from tests.factories import (
 )
 
 
+ROOT_LEVEL_SKILL = ExternalSkill(
+    name="local-skill",
+    repo="example/repository",
+    skill="upstream-skill",
+    update_on_sync=True,
+)
+
+
+def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Serve a synthetic upstream repository whose root is the skill."""
+
+    upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+
+    def fake_resolve(repository: str) -> str:
+        """Return a stable synthetic revision."""
+
+        return "a" * 40
+
+    def fake_download(repository: str, revision: str, destination: Path) -> Path:
+        """Create a root-level upstream skill document."""
+
+        source_root = destination / "repository"
+        source_root.mkdir(parents=True)
+        (source_root / "SKILL.md").write_text(upstream_document)
+
+        return source_root
+
+    def fake_install(installed_skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+        """Create the installed skill in the staging directory."""
+
+        installed = working_directory / ".staging/skills" / installed_skill.name
+        installed.mkdir(parents=True)
+        (installed / "SKILL.md").write_text(upstream_document)
+
+    monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(github, "download_snapshot", fake_download)
+    monkeypatch.setattr(installer, "install_skill", fake_install)
+
+
 class TestExternalSkillModel:
     """Test that external-skill registry validation and defaults work."""
 
@@ -49,6 +88,24 @@ class TestExternalSkillModel:
                 skill=skill,
                 update_on_sync=True,
             )
+
+    @pytest.mark.parametrize(
+        ("folder", "expected"),
+        [(None, Path("sample")), ("review", Path("review/sample")), ("web/react", Path("web/react/sample"))],
+    )
+    def test_folder_places_the_skill(self, folder: str | None, expected: Path) -> None:
+        """Test that the declared folder becomes the skill's path under the skills directory."""
+
+        skill = ExternalSkill(name="sample", repo="example/sample", folder=folder, update_on_sync=True)
+
+        assert skill.relative_path == expected
+
+    @pytest.mark.parametrize("folder", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"])
+    def test_invalid_folders_fail(self, folder: str) -> None:
+        """Test that unsafe or malformed grouping folders are rejected."""
+
+        with pytest.raises(ValidationError):
+            ExternalSkill(name="sample", repo="example/sample", folder=folder, update_on_sync=True)
 
     def test_update_on_sync_is_required(self) -> None:
         """Test that every registry entry chooses its update behavior explicitly."""
@@ -319,51 +376,11 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that root asset copying cannot undo the local metadata rewrite."""
 
-        skill = ExternalSkill(
-            name="local-skill",
-            repo="example/repository",
-            skill="upstream-skill",
-            update_on_sync=True,
-        )
-
-        def fake_resolve(repository: str) -> str:
-            """Return a stable synthetic revision."""
-
-            return "a" * 40
-
-        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
-
-        def fake_download(repository: str, revision: str, destination: Path) -> Path:
-            """Create a root-level upstream skill document."""
-
-            source_root = destination / "repository"
-            source_root.mkdir(parents=True)
-            (source_root / "SKILL.md").write_text(
-                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
-            )
-
-            return source_root
-
-        monkeypatch.setattr(github, "download_snapshot", fake_download)
-
-        def fake_install(
-            installed_skill: ExternalSkill,
-            working_directory: Path,
-            source_root: Path,
-        ) -> None:
-            """Create the installed skill before root assets are copied."""
-
-            installed = working_directory / ".staging/skills" / installed_skill.name
-            installed.mkdir(parents=True)
-            (installed / "SKILL.md").write_text(
-                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
-            )
-
-        monkeypatch.setattr(installer, "install_skill", fake_install)
+        stub_root_level_upstream(monkeypatch)
 
         assert sync.update_external_skill(
             workspace,
-            skill,
+            ROOT_LEVEL_SKILL,
             workspace.agents_dir / "skills",
             dry_run=False,
         )
@@ -377,66 +394,108 @@ class TestExternalSkillBoundaries:
             "Content.\n"
         )
 
-    def test_vendor_updates_a_skill_where_a_grouping_folder_holds_it(
+    def test_vendor_installs_a_new_skill_into_its_declared_folder(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
-        """Test that a sorted skill is updated in place rather than copied to the top level."""
+        """Test that a first install lands in the folder the registry declares."""
 
-        skill = ExternalSkill(
-            name="local-skill",
-            repo="example/repository",
-            skill="upstream-skill",
-            update_on_sync=True,
-        )
+        stub_root_level_upstream(monkeypatch)
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review/style"})
+
+        assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
+        assert "Content." in (workspace.agents_dir / "skills/review/style/local-skill/SKILL.md").read_text()
+        assert not (workspace.agents_dir / "skills/local-skill").exists()
+
+    def test_vendor_updates_a_skill_in_its_declared_folder(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a skill already in its declared folder is refreshed where it is."""
+
+        stub_root_level_upstream(monkeypatch)
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review"})
         grouped = workspace.agents_dir / "skills/review/local-skill"
         grouped.mkdir(parents=True)
         (grouped / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
 
-        def fake_resolve(repository: str) -> str:
-            """Return a stable synthetic revision."""
-
-            return "a" * 40
-
-        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
-
-        def fake_download(repository: str, revision: str, destination: Path) -> Path:
-            """Create a root-level upstream skill document."""
-
-            source_root = destination / "repository"
-            source_root.mkdir(parents=True)
-            (source_root / "SKILL.md").write_text(
-                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
-            )
-
-            return source_root
-
-        monkeypatch.setattr(github, "download_snapshot", fake_download)
-
-        def fake_install(
-            installed_skill: ExternalSkill,
-            working_directory: Path,
-            source_root: Path,
-        ) -> None:
-            """Create the installed skill in the staging directory."""
-
-            installed = working_directory / ".staging/skills" / installed_skill.name
-            installed.mkdir(parents=True)
-            (installed / "SKILL.md").write_text(
-                "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
-            )
-
-        monkeypatch.setattr(installer, "install_skill", fake_install)
-
-        assert sync.update_external_skill(
-            workspace,
-            skill,
-            workspace.agents_dir / "skills",
-            dry_run=False,
-        )
+        assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
         assert "Content." in (grouped / "SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
+
+    @pytest.mark.parametrize(
+        ("current", "folder", "expected"),
+        [
+            ("local-skill", "review", "review/local-skill"),
+            ("review/local-skill", None, "local-skill"),
+            ("review/local-skill", "authoring", "authoring/local-skill"),
+        ],
+    )
+    def test_vendor_moves_a_skill_to_its_declared_folder(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+        current: str,
+        folder: str | None,
+        expected: str,
+    ) -> None:
+        """Test that the registry's folder wins over wherever the skill currently sits."""
+
+        stub_root_level_upstream(monkeypatch)
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": folder})
+        skills_dir = workspace.agents_dir / "skills"
+        stray = skills_dir / current
+        stray.mkdir(parents=True)
+        (stray / "SKILL.md").write_text(
+            "---\nname: local-skill\ndescription: A skill.\nmetadata:\n"
+            "  source: https://github.com/example/repository\n---\n\nContent.\n"
+        )
+
+        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        assert "Content." in (skills_dir / expected / "SKILL.md").read_text()
+        assert list(skills_dir.rglob("SKILL.md")) == [skills_dir / expected / "SKILL.md"]
+        assert all(any(path.iterdir()) for path in skills_dir.rglob("*") if path.is_dir())
+
+    def test_moving_a_skill_keeps_a_folder_that_still_holds_others(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that only folders the move emptied are removed."""
+
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        for name in ("local-skill", "neighbour"):
+            (skills_dir / "review" / name).mkdir(parents=True)
+            (skills_dir / "review" / name / "SKILL.md").write_text(f"---\nname: {name}\ndescription: A.\n---\n")
+
+        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        assert (skills_dir / "local-skill/SKILL.md").exists()
+        assert not (skills_dir / "review/local-skill").exists()
+        assert (skills_dir / "review/neighbour/SKILL.md").exists()
+
+    def test_dry_run_reports_a_pending_move_without_moving(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a dry run reports an identical skill in the wrong folder as a change."""
+
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        stray = skills_dir / "local-skill"
+        stray.mkdir(parents=True)
+        (stray / "SKILL.md").write_text(
+            "---\nname: local-skill\ndescription: A skill.\nmetadata:\n"
+            "  source: https://github.com/example/repository\n---\n\nContent.\n"
+        )
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review"})
+
+        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=True)
+        assert (stray / "SKILL.md").exists()
+        assert not (skills_dir / "review").exists()
 
     def test_vendor_preserves_root_legal_files_for_nested_skills(
         self,

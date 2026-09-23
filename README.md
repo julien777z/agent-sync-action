@@ -157,7 +157,7 @@ directory name you want, and set `update_on_sync` to keep it current.
 
 For example, this installs the
 [React best-practices](https://www.skills.sh/vercel-labs/agent-skills/vercel-react-best-practices) skill as
-`.agents/skills/react-best-practices`:
+`.agents/skills/frontend/react-best-practices`:
 
 ```json
 {
@@ -167,15 +167,19 @@ For example, this installs the
       "name": "react-best-practices",
       "repo": "vercel-labs/agent-skills",
       "skill": "vercel-react-best-practices",
+      "folder": "frontend",
       "update_on_sync": true
     }
   ]
 }
 ```
 
-- `name`: local directory under `.agents/skills/`.
+- `name`: local skill directory name.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
+- `folder`: grouping folder under `.agents/skills/`, with `/` between nested folders. Omit it to
+  keep the skill at the top level. Each refresh installs the skill here and moves it here from
+  anywhere else in the tree.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.

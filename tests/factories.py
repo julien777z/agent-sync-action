@@ -37,6 +37,7 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
     name = "sample"
     repo = "example/repository"
     skill = None
+    folder = None
     update_on_sync = True
 
 
