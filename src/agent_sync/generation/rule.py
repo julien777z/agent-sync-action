@@ -13,7 +13,6 @@ from agent_sync.models.output import (
     GeneratedOutput,
     Provider,
 )
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.utils import ensure_trailing_newline, serialized_field_names
 
 logger = logging.getLogger(__name__)
@@ -85,9 +84,9 @@ def generate_rule_links(
     return [
         GeneratedLink(
             target_path=(
-                PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
+                provider.root(context.workspace.output_root)
                 / "rules"
-                / f"{source.slug}{PROVIDER_LAYOUTS[provider].rule_extension}"
+                / f"{source.slug}{provider.rule_extension}"
             ),
             link_target=source.path,
             artifact=ArtifactKind.RULE,
@@ -105,7 +104,7 @@ def generate_codex_rules(
 ) -> list[GeneratedOutput]:
     """Generate Codex Starlark rule files."""
 
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
+    root = provider.root(context.workspace.output_root)
 
     return [
         GeneratedFile(

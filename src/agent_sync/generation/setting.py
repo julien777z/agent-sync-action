@@ -7,7 +7,6 @@ from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.utils import ensure_trailing_newline
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ def generate_claude_settings(
 
     return [
         GeneratedFile(
-            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.output_root) / "settings.json",
+            target_path=provider.root(context.workspace.output_root) / "settings.json",
             content=ensure_trailing_newline(
                 json.dumps(
                     {
@@ -72,7 +71,7 @@ def generate_codex_settings(
             provider=provider,
         ),
         GeneratedFile(
-            target_path=PROVIDER_LAYOUTS[provider].root(context.workspace.output_root) / "config.toml",
+            target_path=provider.root(context.workspace.output_root) / "config.toml",
             content=render_codex_settings(synchronized),
             artifact=ArtifactKind.SETTING,
             source_path=source_path,

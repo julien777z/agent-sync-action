@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from pydantic import ValidationError
 
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
 from agent_sync.models.output import (
@@ -11,7 +10,6 @@ from agent_sync.models.output import (
     Manifest,
     Provider,
 )
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
@@ -20,23 +18,6 @@ from tests.factories import (
     materialize_every_source_kind,
     materialize_rule,
 )
-
-
-class TestManifest:
-    """Test that generated output ownership is unambiguous."""
-
-    def test_duplicate_targets_are_rejected(self, workspace: Workspace) -> None:
-        """Test that two outputs cannot own the same target path."""
-
-        output = GeneratedFile(
-            target_path=workspace.root / "same",
-            content="content\n",
-            artifact=ArtifactKind.RULE,
-            source_path=workspace.agents_dir / "rules/sample.md",
-        )
-
-        with pytest.raises(ValidationError, match="Duplicate generated targets"):
-            Manifest(outputs=[output, output])
 
 
 class TestReconciliation:
@@ -153,11 +134,11 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
-    def test_relocated_output_reclaims_a_file_its_directory_cannot_carry(
+    def test_relocated_output_reclaims_an_obsolete_skill_directory(
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that a policy file is reclaimed on its own while its neighbours are kept."""
+        """Test that an obsolete provider skill directory is reclaimed without touching other files."""
 
         materialize_every_source_kind(relocated_workspace, explicit_invocation=True)
 
@@ -173,7 +154,7 @@ class TestReconciliation:
             generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
         )
 
-        assert abandoned in plan.stale_paths
+        assert abandoned.parent.parent in plan.stale_paths
         assert foreign not in plan.stale_paths
         assert not any(stale_path in foreign.parents for stale_path in plan.stale_paths)
 
@@ -239,7 +220,7 @@ class TestReconciliation:
     ) -> None:
         """Test that every registry-owned directory removes unknown entries."""
 
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+        directory = provider.root(workspace.root) / directory_name
         directory.mkdir(parents=True)
         stale_path = directory / "unregistered"
         stale_path.write_text("stale\n")

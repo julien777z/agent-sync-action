@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -55,7 +56,7 @@ def update_external_skill(
 ) -> bool:
     """Update one external skill from a single immutable source snapshot."""
 
-    logger.info("Updating %s from %s", skill.name, skill.repo)
+    logger.info("Updating %s from %s", skill.local_name, skill.repo)
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as temporary_directory:
         working_directory = Path(temporary_directory)
@@ -69,7 +70,7 @@ def update_external_skill(
         installer.install_skill(skill, working_directory, source_root)
         installed = installer.locate_skill_directory(
             working_directory,
-            skill.name,
+            skill.upstream_skill,
             excluded_root=source_root,
         )
         source_skill = installer.locate_skill_directory(source_root, skill.upstream_skill)
@@ -81,13 +82,66 @@ def update_external_skill(
 
         normalize_skill_metadata(installed, skill)
 
-        destination = locate_skill_by_name(skills_dir, skill.name) or skills_dir / skill.name
-        changed = trees_differ(installed, destination)
+        destination = skills_dir / skill.relative_path
+        current = locate_skill_by_name(skills_dir, skill.local_name)
+        previous = (
+            locate_skill_by_name(skills_dir, skill.name)
+            if skill.skill_name_override is not None and skill.name != skill.local_name
+            else None
+        )
+        if current is None:
+            current = previous
+        elif previous is not None and previous != current:
+            raise RuntimeError(
+                f"Both '{skill.name}' and '{skill.local_name}' exist; resolve the old skill before syncing"
+            )
+        if current is not None:
+            if current.is_symlink():
+                raise RuntimeError(f"Skill directory is a link, not a managed installation: {current}")
+            current_document = current / "SKILL.md"
+            front_matter, _ = parse_markdown(
+                current_document.read_text(encoding="utf-8"),
+                SkillFrontMatter,
+                str(current_document),
+            )
+            if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
+                raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
+        changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
-            workspace.delete(destination)
+            if destination.exists() or destination.is_symlink():
+                if current != destination:
+                    raise RuntimeError(f"Skill destination already exists: {destination}")
+            for parent in destination.parents:
+                if parent == skills_dir:
+                    break
+                if parent.is_symlink() or (parent / "SKILL.md").exists():
+                    raise RuntimeError(f"Skill category is occupied by a skill or link: {parent}")
+            if current is not None and current != destination and current in destination.parents:
+                raise RuntimeError(f"Skill destination is inside its existing directory: {destination}")
+
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(installed, destination)
+            with tempfile.TemporaryDirectory(
+                prefix=".agent-sync-skill-", dir=destination.parent
+            ) as stage_root:
+                stage = Path(stage_root)
+                staged_skill = stage / "skill"
+                old_skill = stage / "old"
+                shutil.copytree(installed, staged_skill)
+                if current is not None:
+                    os.replace(current, old_skill)
+                try:
+                    os.replace(staged_skill, destination)
+                except OSError:
+                    if current is not None:
+                        os.replace(old_skill, current)
+                    raise
+
+            if current is not None and current != destination:
+                folder = current.parent
+                while folder != skills_dir and folder.is_dir() and not any(folder.iterdir()):
+                    folder.rmdir()
+                    folder = folder.parent
 
     return changed
 
@@ -105,7 +159,7 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         render_front_matter(
             front_matter.model_copy(
                 update={
-                    "name": skill.name,
+                    "name": skill.local_name,
                     "metadata": metadata,
                 }
             ),
@@ -113,6 +167,16 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         ),
         encoding="utf-8",
     )
+
+    provider_metadata = installed / "agents"
+    if provider_metadata.is_symlink():
+        raise RuntimeError(f"Skill provider metadata directory is a link: {provider_metadata}")
+
+    forbidden_metadata = provider_metadata / "openai.yaml"
+    if forbidden_metadata.is_symlink() or forbidden_metadata.is_file():
+        forbidden_metadata.unlink()
+        if not any(provider_metadata.iterdir()):
+            provider_metadata.rmdir()
 
 
 def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
@@ -124,7 +188,7 @@ def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
         else:
             status = "unchanged"
 
-        logger.info("  %s (%s): %s", result.skill.name, result.skill.repo, status)
+        logger.info("  %s (%s): %s", result.skill.local_name, result.skill.repo, status)
 
     changed_count = sum(result.changed for result in results)
     verb = "would change" if dry_run else "changed"

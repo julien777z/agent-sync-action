@@ -138,8 +138,9 @@ alwaysApply: false
 
 ### Explicit Invocation
 
-A skill runs whenever a model finds it useful. Set `disable-model-invocation: true` for one that
-should run only after a user invokes it.
+A skill can be offered when a model finds it useful. Set `disable-model-invocation: true` for one
+that should run only after a user invokes it. Agent Sync links the same `SKILL.md` to each provider;
+the skill must also state its direct-invocation rule in its instructions.
 
 ```markdown
 ---
@@ -173,12 +174,33 @@ For example, this installs the
 }
 ```
 
-- `name`: local directory under `.agents/skills/`.
+- `name`: skill name, used locally unless `skill_name_override` is set.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
+- `category`: optional grouping path under `.agents/skills/`, with `/` between nested categories.
+  Omitted, the skill sits at the top level. Each refresh installs the skill in this category and
+  moves it here from anywhere else in the tree.
+- `skill_name_override`: optional local name for the skill directory and `SKILL.md` front matter.
+  The upstream skill still comes from `skill` (or `name` when `skill` is omitted). A refresh
+  moves an existing vendored skill from `name` to `skill_name_override`.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.
+
+### Category Folders
+
+Add `category` to keep a vendored skill beside the skills it belongs with. This entry installs the
+same skill as `.agents/skills/frontend/react-best-practices`:
+
+```json
+{
+  "name": "react-best-practices",
+  "repo": "vercel-labs/agent-skills",
+  "skill": "vercel-react-best-practices",
+  "category": "frontend",
+  "update_on_sync": true
+}
+```
 
 Installed skills record their source URL and keep the upstream license files from the same revision.
 
