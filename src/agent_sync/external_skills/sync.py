@@ -95,6 +95,17 @@ def update_external_skill(
             raise RuntimeError(
                 f"Both '{skill.name}' and '{skill.local_name}' exist; resolve the old skill before syncing"
             )
+        if current is not None:
+            if current.is_symlink():
+                raise RuntimeError(f"Skill directory is a link, not a managed installation: {current}")
+            current_document = current / "SKILL.md"
+            front_matter, _ = parse_markdown(
+                current_document.read_text(encoding="utf-8"),
+                SkillFrontMatter,
+                str(current_document),
+            )
+            if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
+                raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
@@ -158,10 +169,14 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
     )
 
     provider_metadata = installed / "agents"
-    if provider_metadata.is_symlink() or provider_metadata.is_file():
-        provider_metadata.unlink()
-    elif provider_metadata.is_dir():
-        shutil.rmtree(provider_metadata)
+    if provider_metadata.is_symlink():
+        raise RuntimeError(f"Skill provider metadata directory is a link: {provider_metadata}")
+
+    forbidden_metadata = provider_metadata / "openai.yaml"
+    if forbidden_metadata.is_symlink() or forbidden_metadata.is_file():
+        forbidden_metadata.unlink()
+        if not any(provider_metadata.iterdir()):
+            provider_metadata.rmdir()
 
 
 def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:

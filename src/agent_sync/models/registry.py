@@ -71,7 +71,7 @@ class ExternalSkill(BaseModel):
 
     @property
     def upstream_skill(self) -> str:
-        """Return the skill slug to request from the source repo (defaults to the local name)."""
+        """Return the source skill slug, defaulting to the registry name."""
 
         return self.skill or self.name
 

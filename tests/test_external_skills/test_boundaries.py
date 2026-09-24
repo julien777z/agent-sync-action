@@ -254,12 +254,16 @@ class TestExternalSkillBoundaries:
         )
 
     def test_vendor_drops_provider_ui_metadata(self, tmp_path: Path) -> None:
+        """Test that OpenAI metadata is removed without discarding other skill assets."""
+
         installed = tmp_path / "renamed-skill"
         installed.mkdir()
         (installed / "SKILL.md").write_text("---\nname: original\ndescription: A skill.\n---\n")
         provider_file = installed / "agents/openai.yaml"
         provider_file.parent.mkdir()
         provider_file.write_text('display_name: "/original"\n')
+        other_asset = provider_file.parent / "guide.md"
+        other_asset.write_text("Skill reference.\n")
         skill = ExternalSkill(
             name="original",
             skill_name_override="renamed-skill",
@@ -271,7 +275,7 @@ class TestExternalSkillBoundaries:
 
         assert "name: renamed-skill\n" in (installed / "SKILL.md").read_text()
         assert not provider_file.exists()
-        assert not provider_file.parent.exists()
+        assert other_asset.read_text() == "Skill reference.\n"
 
     def test_root_assets_do_not_restore_upstream_metadata(
         self,
@@ -320,8 +324,14 @@ class TestExternalSkillBoundaries:
         stub_root_level_upstream(monkeypatch)
         skills_dir = workspace.agents_dir / "skills"
         previous = skills_dir / "review/local-skill"
-        previous.mkdir(parents=True)
-        (previous / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
+        materialize_skill(
+            previous / "SKILL.md",
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.name,
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+            body="Old.",
+        )
         skill = ROOT_LEVEL_SKILL.model_copy(
             update={"category": "review", "skill_name_override": "renamed-skill"}
         )
@@ -341,8 +351,14 @@ class TestExternalSkillBoundaries:
         stub_root_level_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
         grouped = workspace.agents_dir / "skills/review/local-skill"
-        grouped.mkdir(parents=True)
-        (grouped / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
+        materialize_skill(
+            grouped / "SKILL.md",
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.name,
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+            body="Old.",
+        )
 
         assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
         assert "Content." in (grouped / "SKILL.md").read_text()
@@ -358,7 +374,13 @@ class TestExternalSkillBoundaries:
         stub_root_level_upstream(monkeypatch)
         skills_dir = workspace.agents_dir / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
-        materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
+        materialize_skill(
+            current,
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.local_name,
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+        )
         original = current.read_text()
         destination = skills_dir / "review" / ROOT_LEVEL_SKILL.local_name
         destination.mkdir(parents=True)
@@ -371,6 +393,54 @@ class TestExternalSkillBoundaries:
 
         assert current.read_text() == original
         assert marker.read_text() == "keep\n"
+
+    def test_unmanaged_same_name_preserves_existing_skill(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that an unmanaged same-named skill survives a registry refresh."""
+
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
+        materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
+        original = current.read_text()
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
+
+        with pytest.raises(RuntimeError, match="not managed"):
+            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+
+        assert current.read_text() == original
+        assert not (skills_dir / "review" / ROOT_LEVEL_SKILL.local_name).exists()
+
+    def test_linked_same_name_preserves_existing_skill(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a linked skill cannot be claimed as a managed installation."""
+
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        source = workspace.root / "linked-skill" / "SKILL.md"
+        materialize_skill(
+            source,
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.local_name,
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+        )
+        link = skills_dir / ROOT_LEVEL_SKILL.local_name
+        skills_dir.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(source.parent, target_is_directory=True)
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
+
+        with pytest.raises(RuntimeError, match="not a managed installation"):
+            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+
+        assert link.is_symlink()
+        assert source.exists()
 
     @pytest.mark.parametrize(
         ("current", "category", "expected"),
@@ -415,9 +485,16 @@ class TestExternalSkillBoundaries:
         stub_root_level_upstream(monkeypatch)
         skills_dir = workspace.agents_dir / "skills"
         for name in ("local-skill", "neighbour"):
-            (skills_dir / "review" / name).mkdir(parents=True)
-            (skills_dir / "review" / name / "SKILL.md").write_text(
-                f"---\nname: {name}\ndescription: A.\n---\n"
+            materialize_skill(
+                skills_dir / "review" / name / "SKILL.md",
+                SkillFrontMatterFactory.build(
+                    name=name,
+                    metadata=(
+                        {"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"}
+                        if name == ROOT_LEVEL_SKILL.name
+                        else None
+                    ),
+                ),
             )
 
         assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)

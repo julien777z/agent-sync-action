@@ -9,8 +9,8 @@ from agent_sync.models.registry import ExternalSkill, SkillsRegistry
 class TestExternalSkillModel:
     """Test that external-skill registry validation and defaults work."""
 
-    def test_upstream_slug_defaults_to_local_name(self) -> None:
-        """Test that an omitted upstream slug uses the local skill name."""
+    def test_upstream_slug_defaults_to_registry_name(self) -> None:
+        """Test that an omitted upstream selector uses the registry name."""
 
         skill = ExternalSkill(
             name="sample-skill",
