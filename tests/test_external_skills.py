@@ -108,6 +108,19 @@ class TestExternalSkillModel:
         with pytest.raises(ValidationError):
             ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
 
+    def test_old_folder_key_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            ExternalSkill.model_validate(
+                {"name": "sample", "repo": "example/sample", "folder": "review", "update_on_sync": True}
+            )
+
+    @pytest.mark.parametrize("name_override", ["Bad Name", "UPPER", "../escape"])
+    def test_invalid_name_overrides_fail(self, name_override: str) -> None:
+        with pytest.raises(ValidationError):
+            ExternalSkill(
+                name="sample", repo="example/sample", name_override=name_override, update_on_sync=True
+            )
+
     def test_update_on_sync_is_required(self) -> None:
         """Test that every registry entry chooses its update behavior explicitly."""
 
