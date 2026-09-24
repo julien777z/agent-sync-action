@@ -12,25 +12,26 @@ logger = logging.getLogger(__name__)
 class Provider(StrEnum):
     """Identify a generated provider layout."""
 
-    CLAUDE = "claude"
-    CURSOR = "cursor"
-    CODEX = "codex"
+    rule_extension: str
+
+    CLAUDE = ("claude", ".md")
+    CURSOR = ("cursor", ".mdc")
+    CODEX = ("codex", ".rules")
+
+    def __new__(cls, name: str, rule_extension: str) -> "Provider":
+        """Store each provider's rule extension with its enum member."""
+
+        member = str.__new__(cls, name)
+        member._value_ = name
+        member.rule_extension = rule_extension
+
+        return member
 
     @property
     def directory(self) -> str:
         """Return this provider's output directory."""
 
         return f".{self.value}"
-
-    @property
-    def rule_extension(self) -> str:
-        """Return this provider's rule-file extension."""
-
-        return {
-            Provider.CLAUDE: ".md",
-            Provider.CURSOR: ".mdc",
-            Provider.CODEX: ".rules",
-        }[self]
 
     def root(self, output_root: Path) -> Path:
         """Return this provider's configuration root."""
