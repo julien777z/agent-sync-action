@@ -89,24 +89,24 @@ class TestExternalSkillModel:
             )
 
     @pytest.mark.parametrize(
-        ("folder", "expected"),
+        ("category", "expected"),
         [(None, Path("sample")), ("review", Path("review/sample")), ("web/react", Path("web/react/sample"))],
     )
-    def test_folder_places_the_skill(self, folder: str | None, expected: Path) -> None:
+    def test_category_places_the_skill(self, category: str | None, expected: Path) -> None:
         """Test that the declared folder becomes the skill's path under the skills directory."""
 
-        skill = ExternalSkill(name="sample", repo="example/sample", folder=folder, update_on_sync=True)
+        skill = ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
 
         assert skill.relative_path == expected
 
     @pytest.mark.parametrize(
-        "folder", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"]
+        "category", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"]
     )
-    def test_invalid_folders_fail(self, folder: str) -> None:
+    def test_invalid_categories_fail(self, category: str) -> None:
         """Test that unsafe or malformed grouping folders are rejected."""
 
         with pytest.raises(ValidationError):
-            ExternalSkill(name="sample", repo="example/sample", folder=folder, update_on_sync=True)
+            ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
 
     def test_update_on_sync_is_required(self) -> None:
         """Test that every registry entry chooses its update behavior explicitly."""
@@ -130,6 +130,30 @@ class TestExternalSkillModel:
                         repo="example/second",
                         update_on_sync=True,
                     ),
+                ]
+            )
+
+    def test_override_name_sets_local_path_without_changing_upstream_selector(self) -> None:
+        skill = ExternalSkill(
+            name="no-ai-slop",
+            repo="example/writing",
+            name_override="no-text-ai-slop",
+            category="review",
+            update_on_sync=True,
+        )
+
+        assert skill.upstream_skill == "no-ai-slop"
+        assert skill.local_name == "no-text-ai-slop"
+        assert skill.relative_path == Path("review/no-text-ai-slop")
+
+    def test_duplicate_override_names_fail(self) -> None:
+        with pytest.raises(ValidationError, match="names must be unique"):
+            SkillsRegistry(
+                skills=[
+                    ExternalSkill(
+                        name="original", repo="example/one", name_override="shared", update_on_sync=True
+                    ),
+                    ExternalSkill(name="shared", repo="example/two", update_on_sync=True),
                 ]
             )
 
@@ -346,7 +370,7 @@ class TestExternalSkillBoundaries:
             "name: vercel-react-best-practices\n"
             "description: React guidance.\n"
             "metadata:\n"
-            "  category: frontend\n"
+            "  folder: frontend\n"
             "---\n\n"
             "# React\n"
         )
@@ -364,11 +388,31 @@ class TestExternalSkillBoundaries:
             "name: react-best-practices\n"
             "description: React guidance.\n"
             "metadata:\n"
-            "  category: frontend\n"
+            "  folder: frontend\n"
             "  source: https://github.com/vercel-labs/agent-skills\n"
             "---\n\n"
             "# React\n"
         )
+
+    def test_vendor_drops_provider_ui_metadata(self, tmp_path: Path) -> None:
+        installed = tmp_path / "renamed-skill"
+        installed.mkdir()
+        (installed / "SKILL.md").write_text("---\nname: original\ndescription: A skill.\n---\n")
+        provider_file = installed / "agents/openai.yaml"
+        provider_file.parent.mkdir()
+        provider_file.write_text('display_name: "/original"\n')
+        skill = ExternalSkill(
+            name="original",
+            name_override="renamed-skill",
+            repo="example/repository",
+            update_on_sync=True,
+        )
+
+        sync.normalize_skill_metadata(installed, skill)
+
+        assert "name: renamed-skill\n" in (installed / "SKILL.md").read_text()
+        assert not provider_file.exists()
+        assert not provider_file.parent.exists()
 
     def test_root_assets_do_not_restore_upstream_metadata(
         self,
@@ -395,7 +439,7 @@ class TestExternalSkillBoundaries:
             "Content.\n"
         )
 
-    def test_vendor_installs_a_new_skill_into_its_declared_folder(
+    def test_vendor_installs_a_new_skill_into_its_declared_category(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
@@ -403,11 +447,28 @@ class TestExternalSkillBoundaries:
         """Test that a first install lands in the folder the registry declares."""
 
         stub_root_level_upstream(monkeypatch)
-        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review/style"})
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review/style"})
 
         assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
         assert "Content." in (workspace.agents_dir / "skills/review/style/local-skill/SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
+
+    def test_vendor_renames_an_existing_skill_with_an_override(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        previous = skills_dir / "review/local-skill"
+        previous.mkdir(parents=True)
+        (previous / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review", "name_override": "renamed-skill"})
+
+        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        renamed = skills_dir / "review/renamed-skill/SKILL.md"
+        assert "name: renamed-skill\n" in renamed.read_text()
+        assert not previous.exists()
 
     def test_vendor_updates_a_skill_in_its_declared_folder(
         self,
@@ -417,7 +478,7 @@ class TestExternalSkillBoundaries:
         """Test that a skill already in its declared folder is refreshed where it is."""
 
         stub_root_level_upstream(monkeypatch)
-        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review"})
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
         grouped = workspace.agents_dir / "skills/review/local-skill"
         grouped.mkdir(parents=True)
         (grouped / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
@@ -427,7 +488,7 @@ class TestExternalSkillBoundaries:
         assert not (workspace.agents_dir / "skills/local-skill").exists()
 
     @pytest.mark.parametrize(
-        ("current", "folder", "expected"),
+        ("current", "category", "expected"),
         [
             ("local-skill", "review", "review/local-skill"),
             ("review/local-skill", None, "local-skill"),
@@ -439,13 +500,13 @@ class TestExternalSkillBoundaries:
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
         current: str,
-        folder: str | None,
+        category: str | None,
         expected: str,
     ) -> None:
         """Test that the registry's folder wins over wherever the skill currently sits."""
 
         stub_root_level_upstream(monkeypatch)
-        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": folder})
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": category})
         skills_dir = workspace.agents_dir / "skills"
         stray = skills_dir / current
         stray.mkdir(parents=True)
@@ -494,7 +555,7 @@ class TestExternalSkillBoundaries:
             "---\nname: local-skill\ndescription: A skill.\nmetadata:\n"
             "  source: https://github.com/example/repository\n---\n\nContent.\n"
         )
-        skill = ROOT_LEVEL_SKILL.model_copy(update={"folder": "review"})
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=True)
         assert (stray / "SKILL.md").exists()

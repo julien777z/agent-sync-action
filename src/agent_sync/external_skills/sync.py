@@ -55,7 +55,7 @@ def update_external_skill(
 ) -> bool:
     """Update one external skill from a single immutable source snapshot."""
 
-    logger.info("Updating %s from %s", skill.name, skill.repo)
+    logger.info("Updating %s from %s", skill.local_name, skill.repo)
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as temporary_directory:
         working_directory = Path(temporary_directory)
@@ -69,7 +69,7 @@ def update_external_skill(
         installer.install_skill(skill, working_directory, source_root)
         installed = installer.locate_skill_directory(
             working_directory,
-            skill.name,
+            skill.upstream_skill,
             excluded_root=source_root,
         )
         source_skill = installer.locate_skill_directory(source_root, skill.upstream_skill)
@@ -82,7 +82,18 @@ def update_external_skill(
         normalize_skill_metadata(installed, skill)
 
         destination = skills_dir / skill.relative_path
-        current = locate_skill_by_name(skills_dir, skill.name)
+        current = locate_skill_by_name(skills_dir, skill.local_name)
+        previous = (
+            locate_skill_by_name(skills_dir, skill.name)
+            if skill.name_override is not None and skill.name != skill.local_name
+            else None
+        )
+        if current is None:
+            current = previous
+        elif previous is not None and previous != current:
+            raise RuntimeError(
+                f"Both '{skill.name}' and '{skill.local_name}' exist; resolve the old skill before syncing"
+            )
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
@@ -117,7 +128,7 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         render_front_matter(
             front_matter.model_copy(
                 update={
-                    "name": skill.name,
+                    "name": skill.local_name,
                     "metadata": metadata,
                 }
             ),
@@ -125,6 +136,11 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         ),
         encoding="utf-8",
     )
+
+    provider_metadata = installed / "agents/openai.yaml"
+    if provider_metadata.exists():
+        provider_metadata.unlink()
+        remove_empty_folders(provider_metadata.parent, installed)
 
 
 def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
@@ -136,7 +152,7 @@ def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
         else:
             status = "unchanged"
 
-        logger.info("  %s (%s): %s", result.skill.name, result.skill.repo, status)
+        logger.info("  %s (%s): %s", result.skill.local_name, result.skill.repo, status)
 
     changed_count = sum(result.changed for result in results)
     verb = "would change" if dry_run else "changed"

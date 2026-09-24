@@ -173,19 +173,22 @@ For example, this installs the
 }
 ```
 
-- `name`: local skill directory name.
+- `name`: skill name, used locally unless `name_override` is set.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
-- `folder`: optional grouping folder under `.agents/skills/`, with `/` between nested folders.
-  Omitted, the skill sits at the top level. Each refresh installs the skill in this folder and
+- `category`: optional grouping path under `.agents/skills/`, with `/` between nested categories.
+  Omitted, the skill sits at the top level. Each refresh installs the skill in this category and
   moves it here from anywhere else in the tree.
+- `name_override`: optional local name for the skill directory and `SKILL.md` front matter.
+  The upstream skill still comes from `skill` (or `name` when `skill` is omitted). A refresh
+  moves an existing vendored skill from `name` to `name_override`.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.
 
 ### Category Folders
 
-Add `folder` to keep a vendored skill beside the skills it belongs with. This entry installs the
+Add `category` to keep a vendored skill beside the skills it belongs with. This entry installs the
 same skill as `.agents/skills/frontend/react-best-practices`:
 
 ```json
@@ -193,7 +196,7 @@ same skill as `.agents/skills/frontend/react-best-practices`:
   "name": "react-best-practices",
   "repo": "vercel-labs/agent-skills",
   "skill": "vercel-react-best-practices",
-  "folder": "frontend",
+  "category": "frontend",
   "update_on_sync": true
 }
 ```
