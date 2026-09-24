@@ -138,8 +138,9 @@ alwaysApply: false
 
 ### Explicit Invocation
 
-A skill runs whenever a model finds it useful. Set `disable-model-invocation: true` for one that
-should run only after a user invokes it.
+A skill can be offered when a model finds it useful. Set `disable-model-invocation: true` for one
+that should run only after a user invokes it. Agent Sync links the same `SKILL.md` to each provider;
+the skill must also state its direct-invocation rule in its instructions.
 
 ```markdown
 ---

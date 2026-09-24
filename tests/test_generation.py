@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 import tomllib
 
 import pytest
@@ -17,8 +16,6 @@ from agent_sync.generation.rule import (
 )
 from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
-from agent_sync.models.providers import ExplicitSkillInvocationPolicy, ProviderLayout
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
@@ -56,17 +53,6 @@ class TestArtifactRegistry:
 
 class TestSkillGeneration:
     """Test that canonical skills become provider directory links."""
-
-    @pytest.mark.parametrize(
-        "relative_path",
-        [Path("../openai.yaml"), Path("agents/../../openai.yaml")],
-        ids=["parent", "nested-parent"],
-    )
-    def test_rejects_metadata_path_traversal(self, relative_path: Path) -> None:
-        """Test that generated metadata remains within a skill directory."""
-
-        with pytest.raises(ValueError, match="nested relative path"):
-            ExplicitSkillInvocationPolicy(relative_path=relative_path, content="policy: {}\n")
 
     def test_links_every_provider_to_the_canonical_directory(
         self,
@@ -135,152 +121,36 @@ class TestSkillGeneration:
         with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
             load_context(workspace)
 
-    def test_codex_generates_explicit_invocation_policy(
-        self,
-        workspace: Workspace,
-    ) -> None:
-        """Test that explicit-only skills receive Codex's native policy."""
-
+    def test_explicit_only_skill_links_to_one_canonical_directory(self, workspace: Workspace) -> None:
         front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
         source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
-        references = source.parent / "references"
-        references.mkdir()
-        reference = references / "provider.md"
-        reference.write_text("Provider guidance.\n")
 
-        context = load_context(workspace)
-        outputs = generate_skills(context, Provider.CODEX)
-        links = {
-            output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
+        outputs = [
+            output for provider in Provider for output in generate_skills(load_context(workspace), provider)
+        ]
+        assert all(isinstance(output, GeneratedLink) for output in outputs)
+        assert {output.link_target for output in outputs if isinstance(output, GeneratedLink)} == {
+            source.parent
         }
-        policy = next(output for output in outputs if isinstance(output, GeneratedFile))
-        skill_root = workspace.root / ".codex/skills/sample-skill"
+        assert {output.provider for output in outputs} == set(Provider)
 
-        assert links == {
-            skill_root / "SKILL.md": source,
-            skill_root / "references": references,
-        }
-        assert policy.target_path == skill_root / "agents/openai.yaml"
-        assert policy.content == "policy:\n  allow_implicit_invocation: false\n"
-
-    def test_rejects_canonical_codex_metadata(self, workspace: Workspace) -> None:
-        """Test that provider metadata cannot be stored in canonical skills."""
-
-        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
+    @pytest.mark.parametrize("as_symlink", [False, True], ids=["file", "symlink"])
+    def test_rejects_provider_metadata_in_canonical_skill(
+        self, workspace: Workspace, as_symlink: bool
+    ) -> None:
+        front_matter = SkillFrontMatterFactory.build()
         source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         metadata = source.parent / "agents/openai.yaml"
         metadata.parent.mkdir()
-        metadata.write_text("policy: {}\n")
+        if as_symlink:
+            metadata.symlink_to("missing-openai.yaml")
+        else:
+            metadata.write_text("policy: {}\n")
 
-        context = load_context(workspace)
-
-        with pytest.raises(AgentSyncError, match="Generated skill metadata is derived"):
-            generate_skills(context, Provider.CODEX)
-
-    def test_rejects_metadata_directory_file_collision(self, workspace: Workspace) -> None:
-        """Test that generated metadata cannot replace a canonical file."""
-
-        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
-        materialize_skill(source, front_matter)
-        metadata_directory = source.parent / "agents"
-        metadata_directory.write_text("Canonical asset.\n")
-
-        context = load_context(workspace)
-
-        with pytest.raises(AgentSyncError, match="requires a directory"):
-            generate_skills(context, Provider.CODEX)
-
-    def test_rejects_broken_canonical_codex_metadata(self, workspace: Workspace) -> None:
-        """Test that generated metadata cannot replace a dangling symlink."""
-
-        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
-        materialize_skill(source, front_matter)
-        metadata = source.parent / "agents/openai.yaml"
-        metadata.parent.mkdir()
-        metadata.symlink_to("missing-openai.yaml")
-
-        context = load_context(workspace)
-
-        with pytest.raises(AgentSyncError, match="Generated skill metadata is derived"):
-            generate_skills(context, Provider.CODEX)
-
-    def test_rejects_nested_metadata_ancestor_collision(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        workspace: Workspace,
-    ) -> None:
-        """Test that generated metadata cannot replace a nested canonical file."""
-
-        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
-        materialize_skill(source, front_matter)
-        (source.parent / "agents").write_text("Canonical asset.\n")
-        monkeypatch.setitem(
-            PROVIDER_LAYOUTS,
-            Provider.CODEX,
-            ProviderLayout(
-                directory=".codex",
-                rule_extension=".rules",
-                explicit_skill_invocation_policy=ExplicitSkillInvocationPolicy(
-                    relative_path=Path("agents/native/openai.yaml"),
-                    content="policy: {}\n",
-                ),
-            ),
-        )
-
-        context = load_context(workspace)
-
-        with pytest.raises(AgentSyncError, match="requires a directory"):
-            generate_skills(context, Provider.CODEX)
-
-    def test_preserves_nested_metadata_ancestor_assets(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        workspace: Workspace,
-    ) -> None:
-        """Test that nested metadata generation preserves canonical siblings."""
-
-        front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
-        materialize_skill(source, front_matter)
-        agents_directory = source.parent / "agents"
-        agents_directory.mkdir()
-        agents_asset = agents_directory / "guide.md"
-        agents_asset.write_text("Guide.\n")
-        native_directory = agents_directory / "native"
-        native_directory.mkdir()
-        native_asset = native_directory / "settings.md"
-        native_asset.write_text("Settings.\n")
-        monkeypatch.setitem(
-            PROVIDER_LAYOUTS,
-            Provider.CODEX,
-            ProviderLayout(
-                directory=".codex",
-                rule_extension=".rules",
-                explicit_skill_invocation_policy=ExplicitSkillInvocationPolicy(
-                    relative_path=Path("agents/native/openai.yaml"),
-                    content="policy: {}\n",
-                ),
-            ),
-        )
-
-        outputs = generate_skills(load_context(workspace), Provider.CODEX)
-        links = {
-            output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
-        }
-        policy = next(output for output in outputs if isinstance(output, GeneratedFile))
-        skill_root = workspace.root / ".codex/skills/sample-skill"
-
-        assert links == {
-            skill_root / "SKILL.md": source,
-            skill_root / "agents/guide.md": agents_asset,
-            skill_root / "agents/native/settings.md": native_asset,
-        }
-        assert policy.target_path == skill_root / "agents/native/openai.yaml"
+        with pytest.raises(AgentSyncError, match="Repository skills cannot contain"):
+            load_context(workspace)
 
     @pytest.mark.parametrize(
         "front_matter",
@@ -656,43 +526,16 @@ class TestMirrorIntegration:
         assert not (relocated_workspace.root / ".claude").exists()
         assert mirror_providers(relocated_workspace, dry_run=True) is False
 
-    def test_codex_skill_policy_transitions_are_idempotent(self, workspace: Workspace) -> None:
-        """Test that invocation-policy changes replace either Codex skill shape."""
-
+    def test_explicit_skill_remains_a_canonical_link(self, workspace: Workspace) -> None:
         source = workspace.agents_dir / "skills/review/SKILL.md"
-        front_matter = SkillFrontMatterFactory.build(name="review")
+        front_matter = SkillFrontMatterFactory.build(name="review", disable_model_invocation=True)
         materialize_skill(source, front_matter)
 
         assert mirror_providers(workspace, dry_run=False) is False
-        assert (workspace.root / ".codex/skills/review").is_symlink()
-
-        materialize_skill(
-            source,
-            front_matter.model_copy(update={"disable_model_invocation": True}),
-        )
-
-        assert mirror_providers(workspace, dry_run=False) is False
-
-        codex_skill = workspace.root / ".codex/skills/review"
-        claude_skill = workspace.root / ".claude/skills/review"
-        cursor_skill = workspace.root / ".cursor/skills/review"
-
-        assert claude_skill.is_symlink()
-        assert cursor_skill.is_symlink()
-        assert "disable-model-invocation: true" in (claude_skill / "SKILL.md").read_text()
-        assert "disable-model-invocation: true" in (cursor_skill / "SKILL.md").read_text()
-        assert codex_skill.is_dir()
-        assert not codex_skill.is_symlink()
-        assert (codex_skill / "SKILL.md").is_symlink()
-        assert (codex_skill / "agents/openai.yaml").read_text() == (
-            "policy:\n  allow_implicit_invocation: false\n"
-        )
-        assert mirror_providers(workspace, dry_run=True) is False
-
-        materialize_skill(source, front_matter)
-
-        assert mirror_providers(workspace, dry_run=False) is False
-        assert codex_skill.is_symlink()
+        for provider in (".claude", ".codex", ".cursor"):
+            skill = workspace.root / provider / "skills/review"
+            assert skill.is_symlink()
+            assert "disable-model-invocation: true" in (skill / "SKILL.md").read_text()
         assert mirror_providers(workspace, dry_run=True) is False
 
 

@@ -153,11 +153,11 @@ class TestReconciliation:
         assert duplicate_rule in plan.stale_paths
         assert stale_codex_rule in plan.stale_paths
 
-    def test_relocated_output_reclaims_a_file_its_directory_cannot_carry(
+    def test_relocated_output_reclaims_an_obsolete_skill_directory(
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that a policy file is reclaimed on its own while its neighbours are kept."""
+        """Test that an obsolete provider skill directory is reclaimed without touching other files."""
 
         materialize_every_source_kind(relocated_workspace, explicit_invocation=True)
 
@@ -173,7 +173,7 @@ class TestReconciliation:
             generate_manifest(relocated_workspace, load_source_config(relocated_workspace)),
         )
 
-        assert abandoned in plan.stale_paths
+        assert abandoned.parent.parent in plan.stale_paths
         assert foreign not in plan.stale_paths
         assert not any(stale_path in foreign.parents for stale_path in plan.stale_paths)
 

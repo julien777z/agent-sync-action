@@ -137,10 +137,11 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         encoding="utf-8",
     )
 
-    provider_metadata = installed / "agents/openai.yaml"
-    if provider_metadata.exists():
+    provider_metadata = installed / "agents"
+    if provider_metadata.is_symlink() or provider_metadata.is_file():
         provider_metadata.unlink()
-        remove_empty_folders(provider_metadata.parent, installed)
+    elif provider_metadata.is_dir():
+        shutil.rmtree(provider_metadata)
 
 
 def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
