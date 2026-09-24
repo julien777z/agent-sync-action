@@ -85,7 +85,7 @@ def update_external_skill(
         current = locate_skill_by_name(skills_dir, skill.local_name)
         previous = (
             locate_skill_by_name(skills_dir, skill.name)
-            if skill.name_override is not None and skill.name != skill.local_name
+            if skill.skill_name_override is not None and skill.name != skill.local_name
             else None
         )
         if current is None:

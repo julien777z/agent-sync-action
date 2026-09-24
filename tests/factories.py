@@ -38,7 +38,7 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
     repo = "example/repository"
     skill = None
     category = None
-    name_override = None
+    skill_name_override = None
     update_on_sync = True
 
 

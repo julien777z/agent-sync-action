@@ -17,10 +17,10 @@ class ExternalSkill(BaseModel):
     repo: str
     skill: str | None = None
     category: str | None = None
-    name_override: str | None = None
+    skill_name_override: str | None = None
     update_on_sync: bool
 
-    @field_validator("name", "name_override")
+    @field_validator("name", "skill_name_override")
     @classmethod
     def validate_name(cls, value: str | None) -> str | None:
         """Reject names that would not be a safe skill directory slug."""
@@ -67,7 +67,7 @@ class ExternalSkill(BaseModel):
     def local_name(self) -> str:
         """Return the canonical name used in the vendored skill and provider mirrors."""
 
-        return self.name_override or self.name
+        return self.skill_name_override or self.name
 
     @property
     def upstream_skill(self) -> str:

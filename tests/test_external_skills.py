@@ -114,11 +114,25 @@ class TestExternalSkillModel:
                 {"name": "sample", "repo": "example/sample", "folder": "review", "update_on_sync": True}
             )
 
-    @pytest.mark.parametrize("name_override", ["Bad Name", "UPPER", "../escape"])
-    def test_invalid_name_overrides_fail(self, name_override: str) -> None:
+    def test_old_name_override_key_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            ExternalSkill.model_validate(
+                {
+                    "name": "sample",
+                    "repo": "example/sample",
+                    "name_override": "renamed",
+                    "update_on_sync": True,
+                }
+            )
+
+    @pytest.mark.parametrize("skill_name_override", ["Bad Name", "UPPER", "../escape"])
+    def test_invalid_skill_name_overrides_fail(self, skill_name_override: str) -> None:
         with pytest.raises(ValidationError):
             ExternalSkill(
-                name="sample", repo="example/sample", name_override=name_override, update_on_sync=True
+                name="sample",
+                repo="example/sample",
+                skill_name_override=skill_name_override,
+                update_on_sync=True,
             )
 
     def test_update_on_sync_is_required(self) -> None:
@@ -150,7 +164,7 @@ class TestExternalSkillModel:
         skill = ExternalSkill(
             name="no-ai-slop",
             repo="example/writing",
-            name_override="no-text-ai-slop",
+            skill_name_override="no-text-ai-slop",
             category="review",
             update_on_sync=True,
         )
@@ -164,7 +178,7 @@ class TestExternalSkillModel:
             SkillsRegistry(
                 skills=[
                     ExternalSkill(
-                        name="original", repo="example/one", name_override="shared", update_on_sync=True
+                        name="original", repo="example/one", skill_name_override="shared", update_on_sync=True
                     ),
                     ExternalSkill(name="shared", repo="example/two", update_on_sync=True),
                 ]
@@ -416,7 +430,7 @@ class TestExternalSkillBoundaries:
         provider_file.write_text('display_name: "/original"\n')
         skill = ExternalSkill(
             name="original",
-            name_override="renamed-skill",
+            skill_name_override="renamed-skill",
             repo="example/repository",
             update_on_sync=True,
         )
@@ -476,7 +490,9 @@ class TestExternalSkillBoundaries:
         previous = skills_dir / "review/local-skill"
         previous.mkdir(parents=True)
         (previous / "SKILL.md").write_text("---\nname: local-skill\ndescription: Old.\n---\n\nOld.\n")
-        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review", "name_override": "renamed-skill"})
+        skill = ROOT_LEVEL_SKILL.model_copy(
+            update={"category": "review", "skill_name_override": "renamed-skill"}
+        )
 
         assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
         renamed = skills_dir / "review/renamed-skill/SKILL.md"

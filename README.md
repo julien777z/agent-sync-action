@@ -173,15 +173,15 @@ For example, this installs the
 }
 ```
 
-- `name`: skill name, used locally unless `name_override` is set.
+- `name`: skill name, used locally unless `skill_name_override` is set.
 - `repo`: source GitHub repository in `owner/repo` form.
 - `skill`: upstream slug when it differs from `name`.
 - `category`: optional grouping path under `.agents/skills/`, with `/` between nested categories.
   Omitted, the skill sits at the top level. Each refresh installs the skill in this category and
   moves it here from anywhere else in the tree.
-- `name_override`: optional local name for the skill directory and `SKILL.md` front matter.
+- `skill_name_override`: optional local name for the skill directory and `SKILL.md` front matter.
   The upstream skill still comes from `skill` (or `name` when `skill` is omitted). A refresh
-  moves an existing vendored skill from `name` to `name_override`.
+  moves an existing vendored skill from `name` to `skill_name_override`.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.
