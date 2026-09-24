@@ -201,9 +201,8 @@ build-backend = "poetry.core.masonry.api"
 
 ## Skill Files
 
-- A repository skill must never contain `agents/openai.yaml`. Agent Sync must neither accept it
-  as canonical skill content nor generate it for any provider. Keep invocation guidance in
-  `SKILL.md` and link the same canonical skill directory into each provider.
+- Agent Sync must reject `agents/openai.yaml` in canonical skill content and never generate it
+  for any provider. Link the same canonical skill directory into each provider.
 
 ## PR Monitoring And Background Timers
 
