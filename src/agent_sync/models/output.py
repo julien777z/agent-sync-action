@@ -16,6 +16,27 @@ class Provider(StrEnum):
     CURSOR = "cursor"
     CODEX = "codex"
 
+    @property
+    def directory(self) -> str:
+        """Return this provider's output directory."""
+
+        return f".{self.value}"
+
+    @property
+    def rule_extension(self) -> str:
+        """Return this provider's rule-file extension."""
+
+        return {
+            Provider.CLAUDE: ".md",
+            Provider.CURSOR: ".mdc",
+            Provider.CODEX: ".rules",
+        }[self]
+
+    def root(self, output_root: Path) -> Path:
+        """Return this provider's configuration root."""
+
+        return output_root / self.directory
+
 
 class ArtifactKind(StrEnum):
     """Identify the canonical artifact represented by a generated output."""

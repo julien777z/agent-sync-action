@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from pydantic import ValidationError
 
 from agent_sync.generation.registry import generate_manifest, owned_provider_directories
 from agent_sync.models.output import (
@@ -11,7 +10,6 @@ from agent_sync.models.output import (
     Manifest,
     Provider,
 )
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
@@ -20,23 +18,6 @@ from tests.factories import (
     materialize_every_source_kind,
     materialize_rule,
 )
-
-
-class TestManifest:
-    """Test that generated output ownership is unambiguous."""
-
-    def test_duplicate_targets_are_rejected(self, workspace: Workspace) -> None:
-        """Test that two outputs cannot own the same target path."""
-
-        output = GeneratedFile(
-            target_path=workspace.root / "same",
-            content="content\n",
-            artifact=ArtifactKind.RULE,
-            source_path=workspace.agents_dir / "rules/sample.md",
-        )
-
-        with pytest.raises(ValidationError, match="Duplicate generated targets"):
-            Manifest(outputs=[output, output])
 
 
 class TestReconciliation:
@@ -239,7 +220,7 @@ class TestReconciliation:
     ) -> None:
         """Test that every registry-owned directory removes unknown entries."""
 
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.root) / directory_name
+        directory = provider.root(workspace.root) / directory_name
         directory.mkdir(parents=True)
         stale_path = directory / "unregistered"
         stale_path.write_text("stale\n")

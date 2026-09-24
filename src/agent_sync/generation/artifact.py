@@ -5,7 +5,6 @@ from agent_sync.document import render_front_matter
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
 from agent_sync.models.output import Provider
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.source import resolve_agent_model
 from agent_sync.utils import ensure_trailing_newline
 
@@ -21,7 +20,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
     """Generate one provider's agent files with resolved models."""
 
     outputs: list[GeneratedOutput] = []
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
+    root = provider.root(context.workspace.output_root)
 
     for source in context.agents:
         front_matter = source.front_matter.model_copy(
@@ -48,7 +47,7 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
 def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
     """Generate one provider's hook files."""
 
-    root = PROVIDER_LAYOUTS[provider].root(context.workspace.output_root)
+    root = provider.root(context.workspace.output_root)
 
     return [
         GeneratedFile(
@@ -66,8 +65,7 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
 def generate_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
     """Link each provider skill to its canonical directory."""
 
-    layout = PROVIDER_LAYOUTS[provider]
-    root = layout.root(context.workspace.output_root)
+    root = provider.root(context.workspace.output_root)
 
     return [
         GeneratedLink(

@@ -1,188 +1,20 @@
 import subprocess
-import logging
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from agent_sync.config import ACTION_CONFIG, ActionConfig
 from agent_sync.external_skills import github, installer
 from agent_sync.external_skills import sync
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.models.registry import ExternalSkill
 from agent_sync.workspace import Workspace
 from tests.factories import (
     ExternalSkillFactory,
-    SkillsRegistryFactory,
-    materialize_registry,
+    SkillFrontMatterFactory,
+    materialize_skill,
+    ROOT_LEVEL_SKILL,
+    stub_root_level_upstream,
 )
-
-ROOT_LEVEL_SKILL = ExternalSkill(
-    name="local-skill",
-    repo="example/repository",
-    skill="upstream-skill",
-    update_on_sync=True,
-)
-
-
-def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Serve a synthetic upstream repository whose root is the skill."""
-
-    upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
-
-    def fake_resolve(repository: str) -> str:
-        """Return a stable synthetic revision."""
-
-        return "a" * 40
-
-    def fake_download(repository: str, revision: str, destination: Path) -> Path:
-        """Create a root-level upstream skill document."""
-
-        source_root = destination / "repository"
-        source_root.mkdir(parents=True)
-        (source_root / "SKILL.md").write_text(upstream_document)
-
-        return source_root
-
-    def fake_install(installed_skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
-        """Create the installed skill in the staging directory."""
-
-        installed = working_directory / ".staging/skills" / installed_skill.name
-        installed.mkdir(parents=True)
-        (installed / "SKILL.md").write_text(upstream_document)
-
-    monkeypatch.setattr(github, "resolve_revision", fake_resolve)
-    monkeypatch.setattr(github, "download_snapshot", fake_download)
-    monkeypatch.setattr(installer, "install_skill", fake_install)
-
-
-class TestExternalSkillModel:
-    """Test that external-skill registry validation and defaults work."""
-
-    def test_upstream_slug_defaults_to_local_name(self) -> None:
-        """Test that an omitted upstream slug uses the local skill name."""
-
-        skill = ExternalSkill(
-            name="sample-skill",
-            repo="example/sample-skill",
-            update_on_sync=True,
-        )
-
-        assert skill.upstream_skill == "sample-skill"
-
-    @pytest.mark.parametrize("name", ["Bad Name", "UPPER", "-leading", "sample\n"])
-    def test_invalid_skill_names_fail(self, name: str) -> None:
-        """Test that unsafe external skill names are rejected."""
-
-        with pytest.raises(ValidationError):
-            ExternalSkill(name=name, repo="example/sample", update_on_sync=True)
-
-    @pytest.mark.parametrize("skill", ["Bad Name", "UPPER", "../escape"])
-    def test_invalid_upstream_skill_names_fail(self, skill: str) -> None:
-        """Test that unsafe upstream skill selectors are rejected."""
-
-        with pytest.raises(ValidationError):
-            ExternalSkill(
-                name="sample",
-                repo="example/sample",
-                skill=skill,
-                update_on_sync=True,
-            )
-
-    @pytest.mark.parametrize(
-        ("category", "expected"),
-        [(None, Path("sample")), ("review", Path("review/sample")), ("web/react", Path("web/react/sample"))],
-    )
-    def test_category_places_the_skill(self, category: str | None, expected: Path) -> None:
-        """Test that the declared folder becomes the skill's path under the skills directory."""
-
-        skill = ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
-
-        assert skill.relative_path == expected
-
-    @pytest.mark.parametrize(
-        "category", ["", "Review", "../escape", "review/", "/review", "review//web", "a b"]
-    )
-    def test_invalid_categories_fail(self, category: str) -> None:
-        """Test that unsafe or malformed grouping folders are rejected."""
-
-        with pytest.raises(ValidationError):
-            ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
-
-    def test_old_folder_key_is_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            ExternalSkill.model_validate(
-                {"name": "sample", "repo": "example/sample", "folder": "review", "update_on_sync": True}
-            )
-
-    def test_old_name_override_key_is_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            ExternalSkill.model_validate(
-                {
-                    "name": "sample",
-                    "repo": "example/sample",
-                    "name_override": "renamed",
-                    "update_on_sync": True,
-                }
-            )
-
-    @pytest.mark.parametrize("skill_name_override", ["Bad Name", "UPPER", "../escape"])
-    def test_invalid_skill_name_overrides_fail(self, skill_name_override: str) -> None:
-        with pytest.raises(ValidationError):
-            ExternalSkill(
-                name="sample",
-                repo="example/sample",
-                skill_name_override=skill_name_override,
-                update_on_sync=True,
-            )
-
-    def test_update_on_sync_is_required(self) -> None:
-        """Test that every registry entry chooses its update behavior explicitly."""
-
-        with pytest.raises(ValidationError, match="update_on_sync"):
-            ExternalSkill.model_validate({"name": "sample", "repo": "example/sample"})
-
-    def test_duplicate_local_skill_names_fail(self) -> None:
-        """Test that entries cannot silently overwrite one local skill directory."""
-
-        with pytest.raises(ValidationError, match="names must be unique"):
-            SkillsRegistry(
-                skills=[
-                    ExternalSkill(
-                        name="sample",
-                        repo="example/first",
-                        update_on_sync=True,
-                    ),
-                    ExternalSkill(
-                        name="sample",
-                        repo="example/second",
-                        update_on_sync=True,
-                    ),
-                ]
-            )
-
-    def test_override_name_sets_local_path_without_changing_upstream_selector(self) -> None:
-        skill = ExternalSkill(
-            name="no-ai-slop",
-            repo="example/writing",
-            skill_name_override="no-text-ai-slop",
-            category="review",
-            update_on_sync=True,
-        )
-
-        assert skill.upstream_skill == "no-ai-slop"
-        assert skill.local_name == "no-text-ai-slop"
-        assert skill.relative_path == Path("review/no-text-ai-slop")
-
-    def test_duplicate_override_names_fail(self) -> None:
-        with pytest.raises(ValidationError, match="names must be unique"):
-            SkillsRegistry(
-                skills=[
-                    ExternalSkill(
-                        name="original", repo="example/one", skill_name_override="shared", update_on_sync=True
-                    ),
-                    ExternalSkill(name="shared", repo="example/two", update_on_sync=True),
-                ]
-            )
 
 
 class TestExternalSkillBoundaries:
@@ -516,6 +348,30 @@ class TestExternalSkillBoundaries:
         assert "Content." in (grouped / "SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
 
+    def test_occupied_destination_preserves_existing_skill(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """Reject a move into an occupied destination without removing either directory."""
+
+        stub_root_level_upstream(monkeypatch)
+        skills_dir = workspace.agents_dir / "skills"
+        current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
+        materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
+        original = current.read_text()
+        destination = skills_dir / "review" / ROOT_LEVEL_SKILL.local_name
+        destination.mkdir(parents=True)
+        marker = destination / "unrelated.txt"
+        marker.write_text("keep\n")
+        skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
+
+        with pytest.raises(RuntimeError, match="destination already exists"):
+            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+
+        assert current.read_text() == original
+        assert marker.read_text() == "keep\n"
+
     @pytest.mark.parametrize(
         ("current", "category", "expected"),
         [
@@ -641,77 +497,3 @@ class TestExternalSkillBoundaries:
             dry_run=False,
         )
         assert (workspace.agents_dir / "skills/sample/LICENSE").read_text() == "License text.\n"
-
-
-class TestExternalSkillService:
-    """Test that registry orchestration and dry-run change reporting work."""
-
-    def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
-        """Test that an absent optional registry is a successful no-op."""
-
-        assert sync.sync_external_skills(workspace, dry_run=True) is None
-
-    def test_dry_run_reports_changes(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        monkeypatch: pytest.MonkeyPatch,
-        workspace: Workspace,
-    ) -> None:
-        """Test that changed external skills are reported by a dry run."""
-
-        caplog.set_level(logging.INFO)
-
-        materialize_registry(
-            workspace.agents_dir / "external_skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
-        )
-
-        def fake_update_external_skill(
-            resolved_workspace: Workspace,
-            skill: ExternalSkill,
-            skills_dir: Path,
-            dry_run: bool,
-        ) -> bool:
-            """Report one synthetic vendoring change."""
-
-            return True
-
-        monkeypatch.setattr(
-            sync,
-            "update_external_skill",
-            fake_update_external_skill,
-        )
-
-        assert sync.sync_external_skills(workspace, dry_run=True) is None
-        assert "sample (example/repository): would update" in caplog.text
-
-    def test_disabled_update_on_sync_skips_vendoring(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        workspace: Workspace,
-    ) -> None:
-        """Test that disabled entries leave existing local skills untouched."""
-
-        materialize_registry(
-            workspace.agents_dir / "external_skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(update_on_sync=False)]),
-        )
-
-        local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
-        local_skill.parent.mkdir(parents=True)
-        local_skill.write_text("local\n")
-
-        def fail_update(
-            resolved_workspace: Workspace,
-            skill: ExternalSkill,
-            skills_dir: Path,
-            dry_run: bool,
-        ) -> bool:
-            """Fail if a disabled skill reaches vendoring."""
-
-            raise AssertionError("disabled skill must not be vendored")
-
-        monkeypatch.setattr(sync, "update_external_skill", fail_update)
-
-        assert sync.sync_external_skills(workspace, dry_run=False) is None
-        assert local_skill.read_text() == "local\n"

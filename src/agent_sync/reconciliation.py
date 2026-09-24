@@ -18,7 +18,6 @@ from agent_sync.models.output import (
     Manifest,
     ReconciliationPlan,
 )
-from agent_sync.providers import PROVIDER_LAYOUTS
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
@@ -125,7 +124,7 @@ def find_abandoned_outputs(workspace: Workspace, manifest: Manifest) -> set[Path
     abandoned = {path for path in relocated if path.is_symlink() or path.exists()}
 
     for provider in {output.provider for output in manifest.outputs if output.provider is not None}:
-        provider_root = PROVIDER_LAYOUTS[provider].root(workspace.root)
+        provider_root = provider.root(workspace.root)
 
         if provider_root.is_dir() and not provider_root.is_symlink() and holds_only(provider_root, relocated):
             abandoned.add(provider_root)
@@ -146,7 +145,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     )
 
     for provider, directory_name in owned_provider_directories():
-        directory = PROVIDER_LAYOUTS[provider].root(workspace.output_root) / directory_name
+        directory = provider.root(workspace.output_root) / directory_name
 
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             stale.add(directory)
@@ -171,7 +170,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
-            root = PROVIDER_LAYOUTS[provider].root(workspace.output_root)
+            root = provider.root(workspace.output_root)
 
             stale.update(
                 path

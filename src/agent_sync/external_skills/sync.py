@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -97,22 +98,41 @@ def update_external_skill(
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
-            if current is not None:
-                workspace.delete(current)
-                remove_empty_folders(current.parent, skills_dir)
+            if destination.exists() or destination.is_symlink():
+                if current != destination:
+                    raise RuntimeError(f"Skill destination already exists: {destination}")
+            for parent in destination.parents:
+                if parent == skills_dir:
+                    break
+                if parent.is_symlink() or (parent / "SKILL.md").exists():
+                    raise RuntimeError(f"Skill category is occupied by a skill or link: {parent}")
+            if current is not None and current != destination and current in destination.parents:
+                raise RuntimeError(f"Skill destination is inside its existing directory: {destination}")
 
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(installed, destination)
+            with tempfile.TemporaryDirectory(
+                prefix=".agent-sync-skill-", dir=destination.parent
+            ) as stage_root:
+                stage = Path(stage_root)
+                staged_skill = stage / "skill"
+                old_skill = stage / "old"
+                shutil.copytree(installed, staged_skill)
+                if current is not None:
+                    os.replace(current, old_skill)
+                try:
+                    os.replace(staged_skill, destination)
+                except OSError:
+                    if current is not None:
+                        os.replace(old_skill, current)
+                    raise
+
+            if current is not None and current != destination:
+                folder = current.parent
+                while folder != skills_dir and folder.is_dir() and not any(folder.iterdir()):
+                    folder.rmdir()
+                    folder = folder.parent
 
     return changed
-
-
-def remove_empty_folders(folder: Path, skills_dir: Path) -> None:
-    """Remove grouping folders a moved skill left empty, stopping at the skills directory."""
-
-    while folder != skills_dir and folder.is_dir() and not any(folder.iterdir()):
-        folder.rmdir()
-        folder = folder.parent
 
 
 def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:

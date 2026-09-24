@@ -1,11 +1,59 @@
 from pathlib import Path
 
+import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
+from agent_sync.external_skills import github, installer
+from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
+
+ROOT_LEVEL_SKILL = ExternalSkill(
+    name="local-skill",
+    repo="example/repository",
+    skill="upstream-skill",
+    update_on_sync=True,
+)
+
+
+def load_context(workspace: Workspace) -> GenerationContext:
+    """Load generation inputs from one test workspace."""
+
+    return load_generation_context(workspace, load_source_config(workspace))
+
+
+def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Serve a synthetic upstream repository whose root is the skill."""
+
+    upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+
+    def fake_resolve(repository: str) -> str:
+        """Return a stable synthetic revision."""
+
+        return "a" * 40
+
+    def fake_download(repository: str, revision: str, destination: Path) -> Path:
+        """Create a root-level upstream skill document."""
+
+        source_root = destination / "repository"
+        source_root.mkdir(parents=True)
+        (source_root / "SKILL.md").write_text(upstream_document)
+
+        return source_root
+
+    def fake_install(installed_skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+        """Create the installed skill in the staging directory."""
+
+        installed = working_directory / ".staging/skills" / installed_skill.name
+        installed.mkdir(parents=True)
+        (installed / "SKILL.md").write_text(upstream_document)
+
+    monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(github, "download_snapshot", fake_download)
+    monkeypatch.setattr(installer, "install_skill", fake_install)
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
