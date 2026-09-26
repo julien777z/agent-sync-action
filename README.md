@@ -40,13 +40,13 @@ jobs:
       - uses: julien777z/agent-sync-action@v0
 ```
 
-### Sync External Skills
+### Sync External Sources
 
-Use this scheduled workflow to install the latest registered external skills and
-mirror any resulting changes.
+Use this scheduled workflow to install registered external skills and reference
+directories, then mirror any resulting skill changes.
 
 ```yaml
-name: Sync External Skills
+name: Sync External Sources
 
 on:
   schedule:
@@ -76,8 +76,30 @@ jobs:
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories mirrored to each provider, grouped in folders when you want them sorted. |
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
+| `external_resources.json` | Registry of external reference directories that Agent Sync can update. |
+| `resources/` | Vendored reference directories, preserved as files rather than mirrored as skills. |
 
 Only the directories and files your repository uses are required.
+
+Register a reference collection with a directory path inside its upstream repository:
+
+```json
+{
+  "version": 1,
+  "resources": [
+    {
+      "name": "design-reference",
+      "repo": "example/design-reference",
+      "source_path": "guides",
+      "update_on_sync": true
+    }
+  ]
+}
+```
+
+Agent Sync copies that directory and repository legal files to `resources/design-reference/`,
+and records its source in a small marker file. It does not expose the directory as a skill or
+generate provider skill mirrors.
 
 Skills may sit in folders — `skills/review/lint-diff/` — and the folders are yours to organize
 by. A directory holding a `SKILL.md` is a skill and everything beside it belongs to that skill;

@@ -11,7 +11,7 @@ inputs:
     description: Token used to commit and push changes (or open a pull request).
     default: ${{ github.token }}
   refresh-external-skills:
-    description: Force vendoring external skills from the registry before mirroring.
+    description: Force vendoring external skills and resources from their registries before mirroring.
     default: "false"
   skills-cli-version:
     description: Version of the skills CLI used to update external skills.
@@ -20,7 +20,7 @@ inputs:
     description: How to persist changes — commit (push to the branch) or pull-request.
     default: commit
   agents-dir:
-    description: Source-of-truth directory name; the registry is read from <agents-dir>/external_skills.json.
+    description: Source-of-truth directory name; external registries are read from this directory.
     default: .agents
   output-dir:
     description: Directory holding generated provider trees, relative to the repository root; empty writes them at the root.
@@ -35,7 +35,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Decide external-skill refresh
+    - name: Decide external-source refresh
       id: refresh
       shell: bash
       env:
@@ -56,7 +56,7 @@ runs:
           fi
           if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
              && git diff --name-only "$before" "$CURRENT_SHA" \
-                  | grep -qx "$AGENTS_DIR/external_skills.json"; then
+                  | grep -Eq "^$AGENTS_DIR/external_(skills|resources)\.json$"; then
             enabled=true
           fi
         fi
@@ -93,6 +93,13 @@ runs:
         AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
         AGENTS_DIR: ${{ inputs.agents-dir }}
       run: python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+
+    - name: Vendor external resources
+      if: ${{ steps.refresh.outputs.enabled == 'true' }}
+      shell: bash
+      env:
+        AGENTS_DIR: ${{ inputs.agents-dir }}
+      run: python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash
@@ -168,6 +175,9 @@ runs:
 
           if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_skills.json"; then
             python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR"
+          fi
+          if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_resources.json"; then
+            python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR"
           fi
           python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR"
 

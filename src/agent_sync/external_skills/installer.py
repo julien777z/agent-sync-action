@@ -26,7 +26,6 @@ TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
         "Makefile",
     }
 )
-LEGAL_FILE_PREFIXES: Final[tuple[str, ...]] = ("LICENSE", "COPYING", "NOTICE")
 
 
 def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
@@ -114,16 +113,3 @@ def supplement_root_assets(destination: Path, source_root: Path) -> None:
             shutil.copytree(entry, target, dirs_exist_ok=True)
         else:
             shutil.copy2(entry, target)
-
-
-def copy_legal_files(destination: Path, source_root: Path) -> None:
-    """Copy repository-root legal files into the installed skill."""
-
-    legal_files = [
-        entry
-        for entry in sorted(source_root.iterdir())
-        if entry.is_file() and entry.name.upper().startswith(LEGAL_FILE_PREFIXES)
-    ]
-
-    for legal_file in legal_files:
-        shutil.copy2(legal_file, destination / legal_file.name)

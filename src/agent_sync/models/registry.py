@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agent_sync.utils import SAFE_SLUG_PATTERN
+from agent_sync.utils import escapes_base_directory
 
 logger = logging.getLogger(__name__)
 
@@ -104,3 +105,54 @@ class ExternalSkillResult(BaseModel):
 
     skill: ExternalSkill
     changed: bool
+
+
+class ExternalResource(BaseModel):
+    """A directory of reference files to vendor without treating it as a skill."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str
+    repo: str
+    source_path: str
+    update_on_sync: bool
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Require a safe local directory name."""
+
+        if not SAFE_SLUG_PATTERN.fullmatch(value):
+            raise ValueError(f"Invalid resource name '{value}'")
+
+        return value
+
+    @field_validator("source_path")
+    @classmethod
+    def validate_source_path(cls, value: str) -> str:
+        """Keep the selected directory inside the upstream repository."""
+
+        if not value or escapes_base_directory(Path(value)):
+            raise ValueError("Resource source_path must be a relative repository path")
+
+        return value
+
+
+class ResourcesRegistry(BaseModel):
+    """The .agents/external_resources.json registry."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    version: int = 1
+    resources: list[ExternalResource] = Field(default_factory=list[ExternalResource])
+
+    @model_validator(mode="after")
+    def validate_unique_names(self) -> "ResourcesRegistry":
+        """Reject entries that would overwrite the same resource directory."""
+
+        names = [resource.name for resource in self.resources]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"External resource names must be unique: {', '.join(duplicates)}")
+
+        return self

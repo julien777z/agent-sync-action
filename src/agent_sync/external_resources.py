@@ -1,0 +1,92 @@
+import json
+import logging
+import os
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Final
+
+from agent_sync import external_sources
+from agent_sync.models.registry import ExternalResource, ResourcesRegistry
+from agent_sync.utils import load_json_model, trees_differ
+from agent_sync.workspace import Workspace
+
+logger = logging.getLogger(__name__)
+
+EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
+SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
+
+
+def sync_external_resources(workspace: Workspace, dry_run: bool) -> None:
+    """Update registered reference directories from immutable upstream snapshots."""
+
+    registry_path = workspace.agents_dir / EXTERNAL_RESOURCES_FILENAME
+    registry = load_json_model(registry_path, ResourcesRegistry)
+    if registry is None:
+        logger.info("No external-resource registry at %s; nothing to update.", registry_path)
+        return
+
+    for resource in registry.resources:
+        if resource.update_on_sync:
+            changed = update_external_resource(workspace, resource, dry_run)
+            status = "would update" if dry_run and changed else "updated" if changed else "unchanged"
+            logger.info("  %s (%s): %s", resource.name, resource.repo, status)
+
+
+def update_external_resource(workspace: Workspace, resource: ExternalResource, dry_run: bool) -> bool:
+    """Replace one managed directory while preserving upstream file contents."""
+
+    destination = workspace.agents_dir / "resources" / resource.name
+    marker = {"repo": resource.repo, "source_path": resource.source_path}
+    marker_text = json.dumps(marker, indent=2) + "\n"
+
+    if destination.is_symlink():
+        raise RuntimeError(f"Resource directory is a link: {destination}")
+    if destination.exists():
+        marker_path = destination / SOURCE_MARKER
+        if not marker_path.is_file() or marker_path.read_text(encoding="utf-8") != marker_text:
+            raise RuntimeError(f"Resource directory is not managed by {resource.repo}: {destination}")
+
+    with tempfile.TemporaryDirectory(prefix="agent-sync-resource-") as temporary_directory:
+        working_directory = Path(temporary_directory)
+        revision = external_sources.resolve_revision(resource.repo)
+        source_root = external_sources.download_snapshot(
+            resource.repo, revision, working_directory / "source"
+        )
+        source = source_root / resource.source_path
+        if source.is_symlink() or not source.is_dir():
+            raise RuntimeError(
+                f"Resource source directory does not exist: {resource.repo}/{resource.source_path}"
+            )
+        if any(path.is_symlink() for path in source.rglob("*")):
+            raise RuntimeError(f"Resource source contains a link: {resource.repo}/{resource.source_path}")
+        if (source / SOURCE_MARKER).exists():
+            raise RuntimeError(
+                f"Resource source uses reserved marker name: {resource.repo}/{resource.source_path}"
+            )
+
+        staged = working_directory / "resource"
+        shutil.copytree(source, staged)
+        external_sources.copy_legal_files(staged, source_root)
+        (staged / SOURCE_MARKER).write_text(marker_text, encoding="utf-8")
+        changed = trees_differ(staged, destination)
+
+        if changed and not dry_run:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(
+                prefix=".agent-sync-resource-", dir=destination.parent
+            ) as stage_root:
+                stage = Path(stage_root)
+                replacement = stage / "resource"
+                previous = stage / "previous"
+                shutil.copytree(staged, replacement)
+                if destination.exists():
+                    os.replace(destination, previous)
+                try:
+                    os.replace(replacement, destination)
+                except OSError:
+                    if previous.exists():
+                        os.replace(previous, destination)
+                    raise
+
+    return changed

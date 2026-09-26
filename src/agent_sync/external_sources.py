@@ -1,12 +1,15 @@
 import io
 import logging
 import re
+import shutil
 import subprocess
 import tarfile
 import urllib.request
 from pathlib import Path
+from typing import Final
 
 logger = logging.getLogger(__name__)
+LEGAL_FILE_PREFIXES: Final[tuple[str, ...]] = ("LICENSE", "COPYING", "NOTICE")
 
 
 def resolve_revision(repository: str) -> str:
@@ -43,3 +46,11 @@ def download_snapshot(repository: str, revision: str, destination: Path) -> Path
         raise RuntimeError(f"Unexpected tarball layout for {repository}: {[path.name for path in roots]}")
 
     return roots[0]
+
+
+def copy_legal_files(destination: Path, source_root: Path) -> None:
+    """Copy repository-root legal files beside vendored content."""
+
+    for entry in sorted(source_root.iterdir()):
+        if entry.is_file() and entry.name.upper().startswith(LEGAL_FILE_PREFIXES):
+            shutil.copy2(entry, destination / entry.name)

@@ -33,7 +33,7 @@ class TestAction:
                 "default": "${{ github.token }}",
             },
             "refresh-external-skills": {
-                "description": "Force vendoring external skills from the registry before mirroring.",
+                "description": "Force vendoring external skills and resources from their registries before mirroring.",
                 "default": "false",
             },
             "skills-cli-version": {
@@ -46,8 +46,7 @@ class TestAction:
             },
             "agents-dir": {
                 "description": (
-                    "Source-of-truth directory name; the registry is read from "
-                    "<agents-dir>/external_skills.json."
+                    "Source-of-truth directory name; external registries are read from this directory."
                 ),
                 "default": ".agents",
             },

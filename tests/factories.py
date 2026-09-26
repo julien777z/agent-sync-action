@@ -4,10 +4,11 @@ import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
-from agent_sync.external_skills import github, installer
+from agent_sync import external_sources
+from agent_sync.external_skills import installer
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.models.registry import ExternalResource, ExternalSkill, ResourcesRegistry, SkillsRegistry
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
@@ -51,8 +52,8 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
         installed.mkdir(parents=True)
         (installed / "SKILL.md").write_text(upstream_document)
 
-    monkeypatch.setattr(github, "resolve_revision", fake_resolve)
-    monkeypatch.setattr(github, "download_snapshot", fake_download)
+    monkeypatch.setattr(external_sources, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(external_sources, "download_snapshot", fake_download)
     monkeypatch.setattr(installer, "install_skill", fake_install)
 
 
@@ -104,6 +105,31 @@ class SkillsRegistryFactory(ModelFactory[SkillsRegistry]):
         return []
 
 
+class ExternalResourceFactory(ModelFactory[ExternalResource]):
+    """Build valid external-reference registrations."""
+
+    __model__ = ExternalResource
+
+    name = "sample-reference"
+    repo = "example/reference"
+    source_path = "guides"
+    update_on_sync = True
+
+
+class ResourcesRegistryFactory(ModelFactory[ResourcesRegistry]):
+    """Build deterministic external-reference registries."""
+
+    __model__ = ResourcesRegistry
+
+    version = 1
+
+    @classmethod
+    def resources(cls) -> list[ExternalResource]:
+        """Default to an empty external-resource registry."""
+
+        return []
+
+
 def materialize_skill(
     path: Path,
     front_matter: SkillFrontMatter,
@@ -137,6 +163,12 @@ def materialize_rule(
 
 def materialize_registry(path: Path, registry: SkillsRegistry) -> None:
     """Write one external-skill registry into canonical sources."""
+
+    path.write_text(registry.model_dump_json(), encoding="utf-8")
+
+
+def materialize_resource_registry(path: Path, registry: ResourcesRegistry) -> None:
+    """Write one external-resource registry into canonical sources."""
 
     path.write_text(registry.model_dump_json(), encoding="utf-8")
 
