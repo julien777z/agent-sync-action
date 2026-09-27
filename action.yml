@@ -158,7 +158,7 @@ runs:
           if ! gh pr view "$branch" >/dev/null 2>&1; then
             gh pr create --base "$REF_NAME" --head "$branch" \
               --title "chore: agent sync" \
-              --body "Automated Agent Sync update (provider mirroring and resource vendoring)."
+              --body "Automated provider mirroring and resource vendoring update."
           fi
         else
           git commit -m "chore: run agent sync"
