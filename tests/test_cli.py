@@ -8,32 +8,31 @@ from agent_sync.external_skills import sync
 from agent_sync.workspace import Workspace
 
 
-def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run the package script with its real command-line boundary."""
-
-    return subprocess.run(
-        [sys.executable, "-m", "agent_sync", *arguments],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
 class TestCli:
     """Test that the unified CLI exposes both explicit pipeline operations."""
+
+    def run_cli(self, arguments: list[str]) -> subprocess.CompletedProcess[str]:
+        """Run the package script with its real command-line boundary."""
+
+        return subprocess.run(
+            [sys.executable, "-m", "agent_sync", *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
     def test_mirror_command_returns_clean_after_generation(self, workspace: Workspace) -> None:
         """Test that the mirror command runs and reaches an idempotent workspace."""
 
         arguments = ["mirror-providers", "--root", str(workspace.root)]
 
-        assert run_cli(arguments).returncode == 0
-        assert run_cli([*arguments, "--dry-run"]).returncode == 0
+        assert self.run_cli(arguments).returncode == 0
+        assert self.run_cli([*arguments, "--dry-run"]).returncode == 0
 
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 
-        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--dry-run"])
+        result = self.run_cli(["vendor-skills", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 0
 
@@ -69,7 +68,7 @@ class TestCli:
         """Test that the CLI maps detected differences to exit code one."""
 
         (workspace.agents_dir / "project.md").write_text("# Project\n")
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
+        result = self.run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 1
 
@@ -79,14 +78,16 @@ class TestCli:
     ) -> None:
         """Test that a rejected output directory is reported with exit code two."""
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--output-dir", "../escape"])
+        result = self.run_cli(
+            ["mirror-providers", "--root", str(workspace.root), "--output-dir", "../escape"]
+        )
 
         assert result.returncode == 2
 
     def test_vendor_command_rejects_an_output_directory(self, workspace: Workspace) -> None:
         """Test that the command writing no provider trees does not accept their location."""
 
-        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--output-dir", "generated"])
+        result = self.run_cli(["vendor-skills", "--root", str(workspace.root), "--output-dir", "generated"])
 
         assert result.returncode == 2
 
@@ -96,12 +97,12 @@ class TestCli:
         workspace.settings_dir.mkdir()
         (workspace.settings_dir / "claude.json").write_text("{invalid")
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root)])
+        result = self.run_cli(["mirror-providers", "--root", str(workspace.root)])
 
         assert result.returncode == 2
 
     def test_removed_instruction_generation_flag_is_rejected(self, workspace: Workspace) -> None:
         """Test that the removed CLI option cannot silently change generation."""
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--no-generate-agents-md"])
+        result = self.run_cli(["mirror-providers", "--root", str(workspace.root), "--no-generate-agents-md"])
         assert result.returncode == 2
