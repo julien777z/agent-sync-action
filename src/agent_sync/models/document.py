@@ -4,9 +4,14 @@ from pydantic import (
     ConfigDict,
     Field,
     JsonValue,
+    RootModel,
     field_validator,
     model_validator,
 )
+
+
+class FrontMatterValues(RootModel[dict[str, JsonValue]]):
+    """Validate recursive YAML values supported by front matter."""
 
 
 class SkillFrontMatter(BaseModel):

@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
 from agent_sync.external_resources.sync import sync_external_resources
-from agent_sync.models.cli import CliArguments
 from agent_sync.models.workspace import Workspace
 from agent_sync.reconciliation import mirror_providers
 
@@ -45,6 +44,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
+    parser.set_defaults(output_dir=None)
 
     mirror_parser = commands.add_parser(
         "mirror-providers",
@@ -72,7 +72,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 if __name__ == "__main__":
     parser = create_parser()
-    parsed = CliArguments.model_validate(vars(parser.parse_args()))
+    parsed = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     try:
@@ -83,12 +83,11 @@ if __name__ == "__main__":
             output_dirname=parsed.output_dir or config.output_dir,
         )
 
-        match parsed.command:
-            case "mirror-providers":
-                differences_found = mirror_providers(workspace, parsed.dry_run)
-            case "vendor-resources":
-                sync_external_resources(workspace, parsed.dry_run, config)
-                differences_found = False
+        if parsed.command == "mirror-providers":
+            differences_found = mirror_providers(workspace, parsed.dry_run)
+        else:
+            sync_external_resources(workspace, parsed.dry_run, config)
+            differences_found = False
 
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError, ValidationError) as exc:
