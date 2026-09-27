@@ -13,6 +13,12 @@ GENERATED_FILE_NOTICE: Final[str] = (
 )
 
 
+def has_generated_notice(content: str) -> bool:
+    """Identify an Agent Sync document by its exact header notice."""
+
+    return GENERATED_FILE_NOTICE in content.splitlines()[:5]
+
+
 def generate_agents(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
     """Generate one provider's agent files with resolved models."""
 

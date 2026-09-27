@@ -245,7 +245,7 @@ class TestReconciliation:
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         directory = workspace.root / ".claude/rules"
         directory.parent.mkdir(parents=True)
@@ -260,7 +260,7 @@ class TestReconciliation:
         assert mirror_providers(workspace, dry_run=False) is False
         assert directory.is_dir()
         assert not directory.is_symlink()
-        assert (directory / "sample.md").is_symlink()
+        assert (directory / "sample.md").is_file()
 
     def test_provider_root_symlinks_are_replaced_without_touching_their_target(
         self,
@@ -270,7 +270,7 @@ class TestReconciliation:
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         external = workspace.root / "external"
         external.mkdir()
@@ -283,18 +283,18 @@ class TestReconciliation:
         assert mirror_providers(workspace, dry_run=False) is False
         assert provider_root.is_dir()
         assert not provider_root.is_symlink()
-        assert (provider_root / "rules/sample.md").is_symlink()
+        assert (provider_root / "rules/sample.md").is_file()
         assert sentinel.read_text() == "preserve\n"
 
-    def test_parent_blocker_recreates_an_otherwise_matching_link(
+    def test_parent_blocker_recreates_a_rule_mirror(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that deleting a blocked provider root still recreates its links."""
+        """Test that deleting a blocked provider root still recreates its rule links."""
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         external = workspace.root / "external"
         external_rules = external / "rules"
@@ -304,6 +304,7 @@ class TestReconciliation:
         provider_root.symlink_to(external, target_is_directory=True)
 
         assert mirror_providers(workspace, dry_run=False) is False
+        assert (provider_root / "rules/sample.md").is_file()
         assert (provider_root / "rules/sample.md").is_symlink()
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
@@ -324,24 +325,25 @@ class TestReconciliation:
 
         assert set(stale_settings) <= set(plan.stale_paths)
 
-    def test_removed_sources_prune_dangling_provider_links(
+    def test_removed_sources_prune_provider_mirrors(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that a removed canonical source prunes its generated links."""
+        """Test that a removed canonical source prunes its generated files."""
 
         rules_dir = workspace.agents_dir / "rules"
         rules_dir.mkdir()
         source = rules_dir / "sample.md"
-        source.write_text("# Sample\n")
+        source.write_text("---\nalwaysApply: false\n---\n\n# Sample\n")
 
         assert mirror_providers(workspace, dry_run=False) is False
+        assert (workspace.root / ".claude/rules/sample.md").is_file()
 
         source.unlink()
 
         assert mirror_providers(workspace, dry_run=False) is False
-        assert not (workspace.root / ".claude/rules/sample.md").is_symlink()
-        assert not (workspace.root / ".cursor/rules/sample.mdc").is_symlink()
+        assert not (workspace.root / ".claude/rules/sample.md").exists()
+        assert not (workspace.root / ".cursor/rules/sample.mdc").exists()
 
     def test_executable_mode_is_reconciled(self, workspace: Workspace) -> None:
         """Test that generated executable intent participates in comparison."""
