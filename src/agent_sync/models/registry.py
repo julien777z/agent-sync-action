@@ -77,7 +77,7 @@ class ExternalSkill(BaseModel):
 
 
 class ExternalDirectory(BaseModel):
-    """A directory of reference files to vendor without treating it as a skill."""
+    """Represent a reference directory to vendor without treating it as a skill."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -116,7 +116,7 @@ class DirectorySourceMarker(TypedDict):
 
 
 class ResourcesRegistry(BaseModel):
-    """The .agents/external_resources.json registry."""
+    """Represent the external resource registry."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 

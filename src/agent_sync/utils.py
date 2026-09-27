@@ -4,13 +4,14 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from pydantic import BaseModel, ValidationError
 
 from agent_sync.errors import AgentSyncError
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+type TreeEntry = tuple[Literal["file", "directory", "link", "other"], bytes]
 
 
 def ensure_trailing_newline(text: str) -> str:
@@ -89,14 +90,22 @@ def replace_tree(source: Path, destination: Path, current: Path | None) -> None:
             raise
 
 
-def snapshot_tree(directory: Path) -> dict[str, bytes]:
-    """Read every file in a directory tree into a comparable snapshot."""
+def snapshot_tree(directory: Path) -> dict[str, TreeEntry]:
+    """Read every tree entry without following links into a comparable snapshot."""
 
     if not directory.is_dir():
         return {}
 
-    return {
-        str(path.relative_to(directory)): path.read_bytes()
-        for path in sorted(directory.rglob("*"))
-        if path.is_file()
-    }
+    entries: dict[str, TreeEntry] = {}
+    for path in sorted(directory.rglob("*")):
+        relative_path = str(path.relative_to(directory))
+        if path.is_symlink():
+            entries[relative_path] = ("link", os.fsencode(os.readlink(path)))
+        elif path.is_file():
+            entries[relative_path] = ("file", path.read_bytes())
+        elif path.is_dir():
+            entries[relative_path] = ("directory", b"")
+        else:
+            entries[relative_path] = ("other", b"")
+
+    return entries

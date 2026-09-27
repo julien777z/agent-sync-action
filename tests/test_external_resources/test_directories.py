@@ -77,18 +77,18 @@ class TestExternalResources:
         sync_external_resources(workspace, dry_run=True)
         assert calls == [("skill", True), ("directory", True)]
 
-    def test_invalid_kind_and_missing_kind_fail(self) -> None:
+    @pytest.mark.parametrize("kind", ["unknown", None], ids=["invalid", "missing"])
+    def test_invalid_kind_and_missing_kind_fail(self, kind: str | None) -> None:
         """Test that every resource selects a supported vendoring behavior."""
 
-        for value in ("unknown", None):
-            with pytest.raises(ValidationError):
-                ResourcesRegistry.model_validate(
-                    {
-                        "resources": [
-                            {"kind": value, "name": "sample", "repo": "example/repo", "update_on_sync": True}
-                        ]
-                    }
-                )
+        resource = ExternalResourceFactory.build().model_dump()
+        if kind is None:
+            del resource["kind"]
+        else:
+            resource["kind"] = kind
+
+        with pytest.raises(ValidationError):
+            ResourcesRegistry.model_validate({"resources": [resource]})
 
     def test_vendors_original_directory_and_removes_stale_files(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
@@ -116,6 +116,23 @@ class TestExternalResources:
         assert (destination / "stale.md").exists()
         sync_external_resources(workspace, dry_run=False)
         assert not (destination / "stale.md").exists()
+        assert not update_external_directory(workspace, resource, dry_run=False)
+
+    def test_removes_stale_link(self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that refresh removes a stale link when upstream files are unchanged."""
+
+        resource = ExternalResourceFactory.build(name="stale-link-reference", repo="example/stale-link")
+        stub_external_directory_upstream(monkeypatch, resource, {"guide.md": "upstream"})
+        destination = workspace.agents_dir / "resources" / resource.name
+        assert update_external_directory(workspace, resource, dry_run=False)
+
+        stale_link = destination / "stale-link"
+        stale_link.symlink_to("missing")
+        assert stale_link.is_symlink()
+
+        assert update_external_directory(workspace, resource, dry_run=False)
+        assert not stale_link.exists()
+        assert not stale_link.is_symlink()
         assert not update_external_directory(workspace, resource, dry_run=False)
 
     def test_refuses_unmanaged_destination(self, workspace: Workspace) -> None:
