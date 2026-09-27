@@ -55,9 +55,7 @@ def update_external_resource(workspace: Workspace, resource: ExternalResource, d
     with tempfile.TemporaryDirectory(prefix="agent-sync-resource-") as temporary_directory:
         working_directory = Path(temporary_directory)
         revision = resolve_revision(resource.repo)
-        source_root = download_snapshot(
-            resource.repo, revision, working_directory / "source"
-        )
+        source_root = download_snapshot(resource.repo, revision, working_directory / "source")
         source = source_root / resource.source_path
         if source.is_symlink() or not source.is_dir():
             raise RuntimeError(
