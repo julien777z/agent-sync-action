@@ -7,7 +7,7 @@ from agent_sync.generation.artifact import generate_agents, generate_hooks, gene
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.generation.rule import (
     generate_codex_rules,
-    generate_rule_links,
+    generate_rule_mirrors,
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import generate_claude_settings, generate_codex_settings
@@ -55,8 +55,8 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="rules",
         owned_files={},
         handlers={
-            Provider.CLAUDE: generate_rule_links,
-            Provider.CURSOR: generate_rule_links,
+            Provider.CLAUDE: generate_rule_mirrors,
+            Provider.CURSOR: generate_rule_mirrors,
             Provider.CODEX: generate_codex_rules,
         },
     ),
@@ -91,13 +91,15 @@ def generate_manifest(
     context = load_generation_context(workspace, source_config)
     shared_outputs = generate_shared_rule_outputs(context)
 
-    if workspace.generate_agents_md:
-        instructions = next(
+    instructions = next(
+        (
             output
             for output in shared_outputs
             if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
-        )
-
+        ),
+        None,
+    )
+    if instructions is not None:
         context = context.model_copy(update={"instructions": instructions.content})
 
     provider_outputs = [

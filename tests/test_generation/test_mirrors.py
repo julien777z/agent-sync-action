@@ -12,17 +12,17 @@ from tests.factories import (
 
 
 class TestMirrorIntegration:
-    """Test that complete mirroring converges on committed relative links."""
+    """Test that complete mirroring converges on provider outputs."""
 
     def test_fresh_mirror_is_idempotent(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that mirroring writes relative links and reaches a clean dry run."""
+        """Test that mirroring writes rules and skill links, then reaches a clean dry run."""
 
         materialize_rule(
             workspace.agents_dir / "rules/python.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
 
         skill_front_matter = SkillFrontMatterFactory.build(name="review")
@@ -33,8 +33,50 @@ class TestMirrorIntegration:
 
         assert mirror_providers(workspace, dry_run=False) is False
 
-        assert os.readlink(workspace.root / ".claude/rules/python.md") == ("../../.agents/rules/python.md")
+        assert (workspace.root / ".claude/rules/python.md").is_symlink()
+        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
+        """Leave repository formatting in the source while adding only the missing scope."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir()
+        original = (
+            '---\ndescription: "Python guidance"\nalwaysApply: false\nglobs:\n'
+            '    - "**/*.py"\n---\n\n# Python\n\nUse typed values.\n'
+        )
+        source.write_text(original)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert source.read_text() == original
+        claude = workspace.root / ".claude/rules/python.md"
+        cursor = workspace.root / ".cursor/rules/python.mdc"
+        assert claude.is_file() and not claude.is_symlink()
+        assert "paths:\n- '**/*.py'" in claude.read_text()
+        assert "globs:" not in claude.read_text()
+        assert "Use typed values." in claude.read_text()
+        assert cursor.is_symlink()
+        assert cursor.resolve() == source
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_existing_files_become_links_when_both_scopes_are_authored(self, workspace: Workspace) -> None:
+        """Test that adding the second scope replaces a generated file with a link."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir()
+        source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        assert mirror_providers(workspace, dry_run=False) is False
+        claude = workspace.root / ".claude/rules/python.md"
+        assert claude.is_file() and not claude.is_symlink()
+
+        source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        original = source.read_bytes()
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert claude.is_symlink() and claude.resolve() == source
+        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
+        assert source.read_bytes() == original
         assert mirror_providers(workspace, dry_run=True) is False
 
     def test_output_directory_holds_every_generated_provider_tree(
@@ -49,7 +91,7 @@ class TestMirrorIntegration:
         )
         materialize_rule(
             relocated_workspace.agents_dir / "rules/python.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         materialize_rule(
             relocated_workspace.agents_dir / "rules/typescript.md",
@@ -76,6 +118,9 @@ class TestMirrorIntegration:
 
         assert (output_root / ".claude/skills/review").is_symlink()
         assert (output_root / ".claude/rules/python.md").is_symlink()
+        assert (output_root / ".claude/rules/python.md").resolve() == (
+            relocated_workspace.agents_dir / "rules/python.md"
+        )
         assert (output_root / ".codex/rules/typescript.rules").is_file()
         assert (output_root / ".claude/agents/review.md").is_file()
         assert (output_root / ".claude/hooks/check").is_file()

@@ -8,7 +8,7 @@ directory.
 - Mirrors skills, rules, agents, hooks, and settings to Claude, Cursor, and Codex.
 - Supports the common skill and rule options, including explicit invocation and file scoping, in each provider's own format.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
-- Optionally generates `AGENTS.md` from your rules.
+- Generates `AGENTS.md` from root guidance, always-on rules, and pointers to scoped rules.
 - Validates your configuration, then rewrites generated files so they always match `.agents/`.
 - Writes generated files at the repository root or under a directory you choose.
 - Supports direct commits, pull requests, and read-only dry runs.
@@ -72,7 +72,9 @@ jobs:
 | `agents/` | Agent definitions mirrored to supported providers. |
 | `hooks/` | Hook scripts mirrored with their executable state. |
 | `models/` | Per-agent provider model overrides. |
-| `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
+| `global.md` | Optional guidance placed first in `AGENTS.md`. |
+| `project.md` | Optional project guidance placed after always-on rules in `AGENTS.md`. |
+| `rules/` | Rules placed in `AGENTS.md` when always-on, or mirrored to Claude and Cursor when scoped. |
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories mirrored to each provider, grouped in folders when you want them sorted. |
 | `external_skills.json` | Registry of external skills that Agent Sync can update. |
@@ -95,7 +97,6 @@ grouping folder cannot namespace two skills apart.
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
 | `output-dir` | *(root)* | Directory holding the generated provider trees. |
-| `generate-agents-md` | `true` | Generate root instructions and size Codex document capacity to fit them. Set `false` to leave `AGENTS.md` unmanaged. |
 | `dry-run` | `false` | Report differences without writing or committing; mirror drift fails the run, external-skill differences are informational. |
 
 ## Options
@@ -108,30 +109,38 @@ accepts, so you never write a per-provider block.
 
 The generated `.claude/`, `.cursor/`, and `.codex/` trees land at the repository root, where each
 provider looks. Point `output-dir` at a directory to gather them below it instead. `AGENTS.md`
-stays at the repository root when generation is enabled, and the workflow commits it alongside `.agents/`.
+stays at the repository root, and the workflow commits it alongside `.agents/`.
 
 ### Root Instructions
 
-Set `generate-agents-md: false` to sync provider configuration while managing root instructions
-yourself. Agent Sync leaves any existing `AGENTS.md` untouched, excludes it from staging, and
-preserves an explicitly configured `project_doc_max_bytes`. Omit that setting to use Codex's default
-capacity. Rules, skills, agents, hooks, and other provider settings continue to sync.
-
-```yaml
-- uses: julien777z/agent-sync-action@v0
-  with:
-    generate-agents-md: false
-```
+Agent Sync strips front matter from optional `.agents/global.md` and `.agents/project.md` and
+generates `AGENTS.md` in this order: global guidance, `alwaysApply: true` rule bodies, project
+guidance, then concise pointers to `alwaysApply: false` rules. Scoped rule bodies appear only in
+the Claude and Cursor mirrors. Each pointer includes the rule description, canonical path, and
+file patterns. A scoped rule without file patterns is pointed to by topic; Claude loads a rule
+without `paths` unconditionally. Codex document capacity is sized to the generated file. If there
+are no instruction sources, Agent Sync removes a prior `AGENTS.md` only when its generated marker
+proves ownership.
+Agent Sync does not inspect or manage `CLAUDE.md`; a repository retaining one must arrange for
+Claude to read `AGENTS.md` independently.
 
 ### Rule Scope
 
 A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
-it only while matching files are in play.
+its Claude and Cursor mirrors only while matching files are in play. Cursor reads `globs`; Claude
+reads `paths`. When both keys are present, they must describe the same patterns, and both mirrors
+are symlinks to the canonical rule. If only one key is present, that provider gets a symlink and
+Agent Sync generates a file for the other provider with only its scope key. Without either key, both
+mirrors are symlinks and Claude loads the rule unconditionally. See the
+[Claude rules](https://code.claude.com/docs/en/memory) and
+[Cursor rules](https://docs.cursor.com/context/rules) documentation for project rule symlinks and
+scope keys.
 
 ```markdown
 ---
 description: Python conventions.
 globs: "**/*.py"
+paths: "**/*.py"
 alwaysApply: false
 ---
 ```
@@ -210,11 +219,10 @@ Installed skills record their source URL and keep the upstream license files fro
 poetry install --extras dev
 poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync mirror-providers --root .
+poetry run pytest -q
 ```
 
-Both commands take `--agents-dir` and `--dry-run`. `mirror-providers` also takes `--output-dir` and
-`--no-generate-agents-md`. Set `AGENT_SYNC_GENERATE_AGENTS_MD=false` for the equivalent environment
-option; explicit `--generate-agents-md` or `--no-generate-agents-md` flags take precedence.
+Both commands take `--agents-dir` and `--dry-run`. `mirror-providers` also takes `--output-dir`.
 
 ## Versioning
 

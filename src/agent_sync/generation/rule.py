@@ -37,65 +37,88 @@ def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
 
 
 def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOutput]:
-    """Generate normalized rule sources and root instructions."""
+    """Generate root instructions without changing canonical rules."""
 
-    outputs: list[GeneratedOutput] = [
-        GeneratedFile(
-            target_path=source.path,
-            content=normalize_rule(source.front_matter, source.body),
-            artifact=ArtifactKind.RULE,
-            source_path=source.path,
-        )
+    sections = [
+        render_instruction_section(source.path.relative_to(context.workspace.root), source.body)
         for source in context.rules
-        if source.body
+        if source.body and source.front_matter.always_apply
     ]
+    pointers = [
+        render_rule_pointer(source.path.relative_to(context.workspace.root), source.front_matter)
+        for source in context.rules
+        if source.body and not source.front_matter.always_apply
+    ]
+    scoped_rules = "## Scoped rules\n\n" + "\n".join(pointers) if pointers else ""
+    content = render_instructions(
+        [
+            part
+            for part in (context.global_instructions, *sections, context.project_instructions, scoped_rules)
+            if part
+        ],
+        context.workspace.agents_dir.relative_to(context.workspace.root).as_posix(),
+    )
+    if not content:
+        return []
 
-    if not context.workspace.generate_agents_md:
-        return outputs
-
-    outputs.append(
+    return [
         GeneratedFile(
             target_path=context.workspace.root / "AGENTS.md",
-            content=render_instructions(
-                [
-                    render_instruction_section(
-                        source.path,
-                        source.front_matter,
-                        source.body,
-                    )
-                    for source in context.rules
-                    if source.body
-                ]
-            ),
+            content=content,
             artifact=ArtifactKind.INSTRUCTIONS,
             source_path=context.workspace.agents_dir / "rules",
         )
-    )
-
-    return outputs
+    ]
 
 
-def generate_rule_links(
+def generate_rule_mirrors(
     context: GenerationContext,
     provider: Provider,
 ) -> list[GeneratedOutput]:
-    """Generate one provider's rule links."""
+    """Link scoped rules when their provider metadata is already canonical."""
 
-    return [
-        GeneratedLink(
-            target_path=(
-                provider.root(context.workspace.output_root)
-                / "rules"
-                / f"{source.slug}{provider.rule_extension}"
-            ),
-            link_target=source.path,
-            artifact=ArtifactKind.RULE,
-            source_path=source.path,
-            provider=provider,
+    scope_key = "paths" if provider is Provider.CLAUDE else "globs"
+    other_scope_key = "globs" if provider is Provider.CLAUDE else "paths"
+    outputs: list[GeneratedOutput] = []
+    for source in context.rules:
+        if not source.body or source.front_matter.always_apply:
+            continue
+
+        target = (
+            provider.root(context.workspace.output_root) / "rules" / f"{source.slug}{provider.rule_extension}"
         )
-        for source in context.rules
-        if source.body
-    ]
+        scope = getattr(source.front_matter, scope_key)
+        if scope is not None or (source.front_matter.globs is None and source.front_matter.paths is None):
+            outputs.append(
+                GeneratedLink(
+                    target_path=target,
+                    link_target=source.path,
+                    artifact=ArtifactKind.RULE,
+                    source_path=source.path,
+                    provider=provider,
+                )
+            )
+            continue
+
+        outputs.append(
+            GeneratedFile(
+                target_path=target,
+                content=normalize_rule(
+                    source.front_matter.model_copy(
+                        update={
+                            scope_key: source.front_matter.scope_patterns,
+                            other_scope_key: None,
+                        }
+                    ),
+                    f"<!-- {GENERATED_FILE_NOTICE} -->\n\n{source.body}",
+                ),
+                artifact=ArtifactKind.RULE,
+                source_path=source.path,
+                provider=provider,
+            )
+        )
+
+    return outputs
 
 
 def generate_codex_rules(
@@ -111,7 +134,7 @@ def generate_codex_rules(
             target_path=root / "rules" / f"{source.slug}.rules",
             content=ensure_trailing_newline(
                 f"# {GENERATED_FILE_NOTICE}\n"
-                f"# Source: .agents/rules/{source.path.name}\n"
+                f"# Source: {source.path.relative_to(context.workspace.root).as_posix()}\n"
                 f"{source.front_matter.starlark.strip()}"
             ),
             artifact=ArtifactKind.RULE,
@@ -123,33 +146,32 @@ def generate_codex_rules(
     ]
 
 
-def render_instruction_section(
-    path: Path,
-    front_matter: RuleFrontMatter,
-    body: str,
-) -> str:
+def render_instruction_section(path: Path, body: str) -> str:
     """Render one canonical rule inside the generated root instructions."""
 
-    scope = ""
+    return f"<!-- Source: {path.as_posix()} -->\n\n{body}"
+
+
+def render_rule_pointer(path: Path, front_matter: RuleFrontMatter) -> str:
+    """Tell Codex when to read one scoped canonical rule."""
+
+    source = f"`{path.as_posix()}`"
+    description = front_matter.description or path.stem.replace("-", " ")
     patterns = front_matter.scope_patterns
-
     if patterns:
-        scope = "> Applies only to files matching: " + ", ".join(f"`{pattern}`" for pattern in patterns)
-    elif not front_matter.always_apply:
-        scope = "> Apply this rule only when it is explicitly relevant to the current task."
-
-    return "\n\n".join(part for part in (f"<!-- Source: .agents/rules/{path.name} -->", scope, body) if part)
+        scope = ", ".join(f"`{pattern}`" for pattern in patterns)
+        return f"- Read {source} for files matching {scope}: {description}"
+    return f"- Read {source} when its topic is relevant: {description}"
 
 
-def render_instructions(sections: list[str]) -> str:
+def render_instructions(sections: list[str], agents_dirname: str) -> str:
     """Render the root instruction document from canonical rule sections."""
 
-    header = (
-        "# AGENTS.md\n\n"
-        f"{GENERATED_FILE_NOTICE}\n\n"
-        "The canonical project rules live in `.agents/rules/`.\n"
-    )
+    if not sections:
+        return ""
 
-    content = header if not sections else header + "\n" + "\n\n".join(sections)
+    header = f"# AGENTS.md\n\n{GENERATED_FILE_NOTICE}\n\nCanonical guidance lives in `{agents_dirname}/`.\n"
+
+    content = header + "\n" + "\n\n".join(sections)
 
     return ensure_trailing_newline(content)

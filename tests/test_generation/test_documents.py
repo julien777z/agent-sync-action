@@ -3,9 +3,10 @@ import pytest
 from agent_sync.generation.artifact import generate_agents, generate_hooks
 from agent_sync.generation.rule import (
     generate_codex_rules,
-    generate_rule_links,
+    generate_rule_mirrors,
     generate_shared_rule_outputs,
 )
+from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
 from agent_sync.workspace import Workspace
 from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
@@ -45,30 +46,31 @@ class TestDocumentGeneration:
             for content in files.values()
         )
 
-    def test_rules_normalize_sources_and_generate_links(
+    def test_unscoped_rules_link_provider_mirrors_without_changing_sources(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that one normalized rule owns both provider links."""
+        """Test that unscoped provider mirrors point to canonical text."""
 
         source = workspace.agents_dir / "rules/python.md"
-        materialize_rule(source, RuleFrontMatterFactory.build(name="removed"))
+        materialize_rule(source, RuleFrontMatterFactory.build(name="removed", always_apply=False))
+        original = source.read_text()
         context = load_context(workspace)
         outputs = [
             *generate_shared_rule_outputs(context),
-            *generate_rule_links(context, Provider.CLAUDE),
-            *generate_rule_links(context, Provider.CURSOR),
+            *generate_rule_mirrors(context, Provider.CLAUDE),
+            *generate_rule_mirrors(context, Provider.CURSOR),
         ]
-        source_output = next(
-            output for output in outputs if isinstance(output, GeneratedFile) and output.target_path == source
-        )
+        mirrors = [
+            output
+            for output in outputs
+            if isinstance(output, GeneratedLink) and output.artifact is ArtifactKind.RULE
+        ]
 
-        links = [output for output in outputs if isinstance(output, GeneratedLink)]
-
-        assert source_output.content.startswith("---\ndescription: A rule.\nalwaysApply: true\n---\n")
-        assert "name:" not in source_output.content
-        assert {link.link_target for link in links} == {source}
-        assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
+        assert source.read_text() == original
+        assert len(mirrors) == 2
+        assert {mirror.target_path.suffix for mirror in mirrors} == {".md", ".mdc"}
+        assert all(mirror.link_target == source for mirror in mirrors)
 
     def test_codex_rules_render_starlark_without_markdown_body(
         self,
@@ -97,31 +99,65 @@ class TestDocumentGeneration:
         assert 'allow_rule(prefix_rule = ["git", "status"])' in outputs[0].content
         shared_outputs = generate_shared_rule_outputs(context)
 
-        assert len(shared_outputs) == 1
-        assert shared_outputs[0].artifact is ArtifactKind.INSTRUCTIONS
-        assert not generate_rule_links(context, Provider.CLAUDE)
-        assert not generate_rule_links(context, Provider.CURSOR)
+        assert not shared_outputs
+        assert not generate_rule_mirrors(context, Provider.CLAUDE)
+        assert not generate_rule_mirrors(context, Provider.CURSOR)
 
-    @pytest.mark.parametrize("authored_key", ["globs", "paths"])
-    def test_rules_mirror_one_authored_scope_across_provider_keys(
+    @pytest.mark.parametrize(
+        ("authored_key", "linked_provider", "generated_provider", "missing_key"),
+        [
+            ("globs", Provider.CURSOR, Provider.CLAUDE, "paths"),
+            ("paths", Provider.CLAUDE, Provider.CURSOR, "globs"),
+        ],
+    )
+    def test_rules_generate_only_the_missing_provider_scope(
         self,
         workspace: Workspace,
         authored_key: str,
+        linked_provider: Provider,
+        generated_provider: Provider,
+        missing_key: str,
     ) -> None:
-        """Test that a scope authored under either key is emitted under both."""
+        """Test that one missing scope key requires one generated file."""
 
         source = workspace.agents_dir / "rules/python.md"
         source.parent.mkdir(parents=True)
-        source.write_text(f'---\n{authored_key}: "**/*.py"\n---\n\n# Rule\n')
+        source.write_text(f'---\n{authored_key}: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
 
         context = load_context(workspace)
-        outputs = generate_shared_rule_outputs(context)
-        normalized = next(
-            output for output in outputs if isinstance(output, GeneratedFile) and output.target_path == source
-        )
+        linked = generate_rule_mirrors(context, linked_provider)
+        generated = generate_rule_mirrors(context, generated_provider)
 
-        assert "globs: '**/*.py'\n" in normalized.content
-        assert "paths: '**/*.py'\n" in normalized.content
+        assert len(linked) == len(generated) == 1
+        assert isinstance(linked[0], GeneratedLink)
+        assert linked[0].link_target == source
+        assert isinstance(generated[0], GeneratedFile)
+        assert f"{missing_key}:\n- '**/*.py'\n" in generated[0].content
+        assert f"{authored_key}:" not in generated[0].content
+
+    def test_matching_scope_keys_link_both_mirrors(self, workspace: Workspace) -> None:
+        """Test that fully authored scopes need no generated rule body."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir(parents=True)
+        source.write_text('---\nglobs: "**/*.py"\npaths: ["**/*.py"]\nalwaysApply: false\n---\n\n# Rule\n')
+
+        context = load_context(workspace)
+        for provider in (Provider.CLAUDE, Provider.CURSOR):
+            mirrors = generate_rule_mirrors(context, provider)
+            assert len(mirrors) == 1
+            assert isinstance(mirrors[0], GeneratedLink)
+            assert mirrors[0].link_target == source
+
+    def test_mismatched_scope_keys_are_rejected(self, workspace: Workspace) -> None:
+        """Test that providers cannot silently use different file scopes."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir(parents=True)
+        source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.ts"\nalwaysApply: false\n---\n\n# Rule\n')
+
+        with pytest.raises(AgentSyncError, match="globs and paths must describe the same patterns"):
+            load_context(workspace)
 
     def test_rules_scope_annotation_reads_a_paths_only_rule(
         self,
@@ -140,7 +176,9 @@ class TestDocumentGeneration:
             if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
         )
 
-        assert "> Applies only to files matching: `**/*.py`, `**/*.pyi`" in instructions.content
+        assert (
+            "Read `.agents/rules/python.md` for files matching `**/*.py`, `**/*.pyi`" in instructions.content
+        )
 
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""

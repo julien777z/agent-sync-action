@@ -71,6 +71,8 @@ class GenerationContext(BaseModel):
     skills: tuple[SkillSource, ...]
     agents: tuple[AgentSource, ...]
     rules: tuple[RuleSource, ...]
+    global_instructions: str = ""
+    project_instructions: str = ""
     hooks: tuple[HookSource, ...]
     instructions: str = ""
 
@@ -87,8 +89,24 @@ def load_generation_context(
         skills=tuple(load_skills(workspace)),
         agents=tuple(load_agents(workspace)),
         rules=tuple(load_rules(workspace)),
+        global_instructions=load_root_instructions(workspace, "global.md"),
+        project_instructions=load_root_instructions(workspace, "project.md"),
         hooks=tuple(load_hooks(workspace)),
     )
+
+
+def load_root_instructions(workspace: Workspace, filename: str) -> str:
+    """Read optional root guidance without its front matter."""
+
+    path = workspace.agents_dir / filename
+    content = workspace.read_text(path)
+
+    if content is None:
+        return ""
+
+    _, body = parse_markdown(content, AgentFrontMatter, str(path))
+
+    return body
 
 
 def load_skills(workspace: Workspace) -> list[SkillSource]:

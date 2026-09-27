@@ -73,6 +73,7 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
 
     description = "A rule."
     globs = None
+    paths = None
     always_apply = True
     starlark = None
 
@@ -155,7 +156,7 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
 
     materialize_rule(
         workspace.agents_dir / "rules/sample.md",
-        RuleFrontMatterFactory.build(name="sample"),
+        RuleFrontMatterFactory.build(name="sample", always_apply=False),
     )
 
     hook = workspace.agents_dir / "hooks/setup.sh"
