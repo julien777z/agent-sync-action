@@ -1,8 +1,9 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
-from pydantic import BaseModel
 
 from agent_sync.document import render_front_matter
 from agent_sync.external_resources import installer, skills
@@ -12,7 +13,7 @@ from agent_sync.models.registry import ExternalDirectory, ExternalSkill, Resourc
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
-ROOT_LEVEL_SKILL = ExternalSkill(
+ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
     kind="skill",
     name="local-skill",
     repo="example/repository",
@@ -150,10 +151,21 @@ def materialize_rule(
     path.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
 
 
-def materialize_registry(path: Path, registry: BaseModel) -> None:
+def materialize_registry(path: Path, registry: ResourcesRegistry) -> None:
     """Write one external registry into canonical sources."""
 
     path.write_text(registry.model_dump_json(), encoding="utf-8")
+
+
+def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run the package script with its real command-line boundary."""
+
+    return subprocess.run(
+        [sys.executable, "-m", "agent_sync", *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def materialize_tree(base: Path, files: dict[str, str]) -> None:

@@ -130,7 +130,6 @@ runs:
           esac
           for path in "${paths[@]}"; do
             if [ -z "$path" ]; then continue; fi
-            # A path git still tracks is staged even once a run has deleted it.
             if [ -e "$path" ] || [ -n "$(git ls-files -- "$path")" ]; then
               git add -A -- "$path"
             fi

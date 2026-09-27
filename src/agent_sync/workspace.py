@@ -10,7 +10,7 @@ from agent_sync.config import ACTION_CONFIG
 from agent_sync.errors import AgentSyncError
 from agent_sync.utils import escapes_base_directory
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 SOURCE_DIRECTORY_NAMES: Final[frozenset[str]] = frozenset(
     {"skills", "agents", "rules", "hooks", "settings", "models", "resources"}

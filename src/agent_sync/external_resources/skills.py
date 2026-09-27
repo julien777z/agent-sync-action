@@ -11,7 +11,7 @@ from agent_sync.skills import locate_skill_by_name
 from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def update_external_skill(

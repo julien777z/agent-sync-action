@@ -7,7 +7,7 @@ from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
 from agent_sync.utils import load_json_model
 from agent_sync.workspace import Workspace
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 

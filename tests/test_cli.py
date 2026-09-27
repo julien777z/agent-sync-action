@@ -1,23 +1,11 @@
 import runpy
-import subprocess
 import sys
 
 import pytest
 
 from agent_sync.external_resources import sync
 from agent_sync.workspace import Workspace
-from tests.factories import materialize_every_source_kind
-
-
-def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run the package script with its real command-line boundary."""
-
-    return subprocess.run(
-        [sys.executable, "-m", "agent_sync", *arguments],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+from tests.factories import materialize_every_source_kind, run_cli
 
 
 class TestCli:

@@ -1,5 +1,4 @@
 import json
-import logging
 import shutil
 import tempfile
 from pathlib import Path
@@ -9,8 +8,6 @@ from agent_sync.external_resources.github import copy_legal_files, download_snap
 from agent_sync.models.registry import ExternalDirectory
 from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import Workspace
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
 
