@@ -1,5 +1,4 @@
 import io
-import logging
 import re
 import shutil
 import subprocess
@@ -8,7 +7,6 @@ import urllib.request
 from pathlib import Path
 from typing import Final
 
-logger = logging.getLogger(__name__)
 LEGAL_FILE_PREFIXES: Final[tuple[str, ...]] = ("LICENSE", "COPYING", "NOTICE")
 
 

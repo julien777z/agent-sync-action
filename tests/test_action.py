@@ -6,12 +6,6 @@ import pytest
 import yaml
 
 
-def selects_a_fixed_flag(line: str) -> bool:
-    """Report whether a line's expression can only ever expand to a fixed flag."""
-
-    return "--dry-run" in line
-
-
 class TestAction:
     """Test that the reusable action and repository workflow keep their contract."""
 
@@ -101,7 +95,7 @@ class TestAction:
             line
             for step in steps
             for line in step.get("run", "").splitlines()
-            if "${{" in line and not selects_a_fixed_flag(line)
+            if "${{" in line and "--dry-run" not in line
         ]
 
         assert not interpolations

@@ -1,17 +1,16 @@
 import logging
-import os
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Final
 
-from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync import external_sources
+from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_skills import installer
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
 from agent_sync.skills import locate_skill_by_name
-from agent_sync.utils import load_json_model, trees_differ
+from agent_sync.utils import load_json_model, replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -121,22 +120,7 @@ def update_external_skill(
             if current is not None and current != destination and current in destination.parents:
                 raise RuntimeError(f"Skill destination is inside its existing directory: {destination}")
 
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(
-                prefix=".agent-sync-skill-", dir=destination.parent
-            ) as stage_root:
-                stage = Path(stage_root)
-                staged_skill = stage / "skill"
-                old_skill = stage / "old"
-                shutil.copytree(installed, staged_skill)
-                if current is not None:
-                    os.replace(current, old_skill)
-                try:
-                    os.replace(staged_skill, destination)
-                except OSError:
-                    if current is not None:
-                        os.replace(old_skill, current)
-                    raise
+            replace_tree(installed, destination, current)
 
             if current is not None and current != destination:
                 folder = current.parent

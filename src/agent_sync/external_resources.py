@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -8,10 +7,10 @@ from typing import Final
 
 from agent_sync import external_sources
 from agent_sync.models.registry import ExternalResource, ResourcesRegistry
-from agent_sync.utils import load_json_model, trees_differ
+from agent_sync.utils import load_json_model, replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
@@ -72,21 +71,6 @@ def update_external_resource(workspace: Workspace, resource: ExternalResource, d
         changed = trees_differ(staged, destination)
 
         if changed and not dry_run:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(
-                prefix=".agent-sync-resource-", dir=destination.parent
-            ) as stage_root:
-                stage = Path(stage_root)
-                replacement = stage / "resource"
-                previous = stage / "previous"
-                shutil.copytree(staged, replacement)
-                if destination.exists():
-                    os.replace(destination, previous)
-                try:
-                    os.replace(replacement, destination)
-                except OSError:
-                    if previous.exists():
-                        os.replace(previous, destination)
-                    raise
+            replace_tree(staged, destination, destination if destination.exists() else None)
 
     return changed

@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
+from pydantic import BaseModel
 
-from agent_sync.document import render_front_matter
 from agent_sync import external_sources
+from agent_sync.document import render_front_matter
 from agent_sync.external_skills import installer
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
@@ -161,14 +162,8 @@ def materialize_rule(
     path.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
 
 
-def materialize_registry(path: Path, registry: SkillsRegistry) -> None:
-    """Write one external-skill registry into canonical sources."""
-
-    path.write_text(registry.model_dump_json(), encoding="utf-8")
-
-
-def materialize_resource_registry(path: Path, registry: ResourcesRegistry) -> None:
-    """Write one external-resource registry into canonical sources."""
+def materialize_registry(path: Path, registry: BaseModel) -> None:
+    """Write one external registry into canonical sources."""
 
     path.write_text(registry.model_dump_json(), encoding="utf-8")
 

@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.external_resources import SOURCE_MARKER, sync_external_resources
 from agent_sync import external_sources
+from agent_sync.external_resources import SOURCE_MARKER, sync_external_resources
 from agent_sync.models.registry import ResourcesRegistry
 from agent_sync.workspace import Workspace
-from tests.factories import ExternalResourceFactory, ResourcesRegistryFactory, materialize_resource_registry
+from tests.factories import ExternalResourceFactory, ResourcesRegistryFactory, materialize_registry
 
 
 class TestExternalResources:
@@ -37,7 +37,7 @@ class TestExternalResources:
         """Refresh a managed collection without changing its upstream files."""
 
         resource = ExternalResourceFactory.build()
-        materialize_resource_registry(
+        materialize_registry(
             workspace.agents_dir / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[resource]),
         )
@@ -79,7 +79,7 @@ class TestExternalResources:
         """Preserve an existing directory that Agent Sync does not own."""
 
         resource = ExternalResourceFactory.build()
-        materialize_resource_registry(
+        materialize_registry(
             workspace.agents_dir / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[resource]),
         )

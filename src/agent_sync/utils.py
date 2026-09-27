@@ -1,6 +1,9 @@
 import json
 import logging
+import os
 import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Final
 
@@ -68,6 +71,25 @@ def trees_differ(source: Path, destination: Path) -> bool:
     """Report whether two directory trees contain different files."""
 
     return snapshot_tree(source) != snapshot_tree(destination)
+
+
+def replace_tree(source: Path, destination: Path, current: Path | None) -> None:
+    """Replace a directory from a sibling staging area, restoring the original on failure."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".agent-sync-stage-", dir=destination.parent) as stage_root:
+        stage = Path(stage_root)
+        replacement = stage / "replacement"
+        previous = stage / "previous"
+        shutil.copytree(source, replacement)
+        if current is not None:
+            os.replace(current, previous)
+        try:
+            os.replace(replacement, destination)
+        except OSError:
+            if current is not None:
+                os.replace(previous, current)
+            raise
 
 
 def snapshot_tree(directory: Path) -> dict[str, bytes]:

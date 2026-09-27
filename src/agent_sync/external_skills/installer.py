@@ -1,4 +1,3 @@
-import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,7 +8,6 @@ from agent_sync.document import parse_markdown
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
 
-logger = logging.getLogger(__name__)
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
