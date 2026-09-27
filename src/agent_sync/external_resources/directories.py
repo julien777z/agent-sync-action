@@ -29,7 +29,11 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
         raise RuntimeError(f"Resource directory is a link: {destination}")
     if destination.exists():
         marker_path = destination / SOURCE_MARKER
-        if not marker_path.is_file() or marker_path.read_text(encoding="utf-8") != marker_text:
+        if (
+            marker_path.is_symlink()
+            or not marker_path.is_file()
+            or marker_path.read_text(encoding="utf-8") != marker_text
+        ):
             raise RuntimeError(f"Resource directory is not managed by {resource.repo}: {destination}")
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-resource-") as temporary_directory:

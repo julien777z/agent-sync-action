@@ -6,7 +6,7 @@ import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
-from agent_sync.external_resources import installer, skills
+from agent_sync.external_resources import directories, installer, skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
@@ -57,6 +57,32 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
     monkeypatch.setattr(skills, "download_snapshot", fake_download)
     monkeypatch.setattr(installer, "install_skill", fake_install)
+
+
+def stub_external_directory_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    resource: ExternalDirectory,
+    files: dict[str, str],
+    root_license: str | None = None,
+) -> None:
+    """Serve a synthetic upstream reference directory from an immutable snapshot."""
+
+    def fake_resolve(repository: str) -> str:
+        """Return a stable synthetic revision."""
+
+        return "a" * 40
+
+    def fake_download(repository: str, revision: str, destination: Path) -> Path:
+        """Materialize the selected directory in a synthetic snapshot."""
+
+        root = destination / "repository"
+        materialize_tree(root / resource.source_path, files)
+        if root_license is not None:
+            (root / "LICENSE").write_text(root_license, encoding="utf-8")
+        return root
+
+    monkeypatch.setattr(directories, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(directories, "download_snapshot", fake_download)
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):

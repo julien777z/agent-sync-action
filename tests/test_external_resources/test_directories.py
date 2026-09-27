@@ -1,19 +1,27 @@
+import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.external_resources import directories, sync
+from agent_sync.external_resources import sync
 from agent_sync.external_resources.directories import SOURCE_MARKER
 from agent_sync.external_resources.directories import update_external_directory
 from agent_sync.external_resources.sync import sync_external_resources
-from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
+from agent_sync.models.registry import (
+    DirectorySourceMarker,
+    ExternalDirectory,
+    ExternalSkill,
+    ResourcesRegistry,
+)
 from agent_sync.workspace import Workspace
 from tests.factories import (
     ExternalResourceFactory,
     ExternalSkillFactory,
     ResourcesRegistryFactory,
     materialize_registry,
+    materialize_tree,
+    stub_external_directory_upstream,
 )
 
 
@@ -94,24 +102,7 @@ class TestExternalResources:
         )
         source_files = {"guide.md": "# Guide\n", "nested/example.txt": "example\n"}
 
-        def fake_resolve(repository: str) -> str:
-            """Return a stable synthetic revision."""
-
-            return "a" * 40
-
-        def fake_download(repository: str, revision: str, destination: Path) -> Path:
-            """Materialize the selected directory in a synthetic snapshot."""
-
-            root = destination / "repository"
-            for relative, content in source_files.items():
-                target = root / resource.source_path / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(content, encoding="utf-8")
-            (root / "LICENSE").write_text("Sample license\n", encoding="utf-8")
-            return root
-
-        monkeypatch.setattr(directories, "resolve_revision", fake_resolve)
-        monkeypatch.setattr(directories, "download_snapshot", fake_download)
+        stub_external_directory_upstream(monkeypatch, resource, source_files, root_license="Sample license\n")
 
         destination = workspace.agents_dir / "resources" / resource.name
         sync_external_resources(workspace, dry_run=False)
@@ -143,6 +134,34 @@ class TestExternalResources:
             sync_external_resources(workspace, dry_run=False)
 
         assert (destination / "notes.md").read_text() == "local"
+
+    def test_refuses_linked_source_marker(
+        self, workspace: Workspace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that a linked ownership marker cannot claim a local directory."""
+
+        resource = ExternalResourceFactory.build(name="linked-source-reference", repo="example/linked-source")
+        destination = workspace.agents_dir / "resources" / resource.name
+        destination.mkdir(parents=True)
+        local_note = destination / "notes.md"
+        materialize_tree(destination, {"notes.md": "local"})
+        marker_content = (
+            json.dumps(DirectorySourceMarker(repo=resource.repo, source_path=resource.source_path), indent=2)
+            + "\n"
+        )
+        outside_marker = tmp_path / "matching-source.json"
+        outside_marker.write_text(marker_content, encoding="utf-8")
+        marker = destination / SOURCE_MARKER
+        marker.symlink_to(outside_marker)
+
+        stub_external_directory_upstream(monkeypatch, resource, {"guide.md": "upstream"})
+
+        with pytest.raises(RuntimeError, match="not managed"):
+            update_external_directory(workspace, resource, dry_run=False)
+
+        assert local_note.read_text(encoding="utf-8") == "local"
+        assert marker.is_symlink()
+        assert outside_marker.read_text(encoding="utf-8") == marker_content
 
     def test_refuses_linked_resource_parent(self, workspace: Workspace, tmp_path: Path) -> None:
         """Test that resource writes cannot follow a linked parent outside the workspace."""
