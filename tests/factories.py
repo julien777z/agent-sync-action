@@ -73,6 +73,7 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
 
     description = "A rule."
     globs = None
+    paths = None
     always_apply = True
     starlark = None
 

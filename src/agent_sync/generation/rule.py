@@ -9,6 +9,7 @@ from agent_sync.models.document import RuleFrontMatter
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
+    GeneratedLink,
     GeneratedOutput,
     Provider,
 )
@@ -74,26 +75,44 @@ def generate_rule_mirrors(
     context: GenerationContext,
     provider: Provider,
 ) -> list[GeneratedOutput]:
-    """Write scoped rule content into one provider's mirrors."""
+    """Link scoped rules when their provider metadata is already canonical."""
 
-    return [
-        GeneratedFile(
-            target_path=(
-                provider.root(context.workspace.output_root)
-                / "rules"
-                / f"{source.slug}{provider.rule_extension}"
-            ),
-            content=normalize_rule(
-                source.front_matter,
-                f"<!-- {GENERATED_FILE_NOTICE} -->\n\n{source.body}",
-            ),
-            artifact=ArtifactKind.RULE,
-            source_path=source.path,
-            provider=provider,
+    scope_key = "paths" if provider is Provider.CLAUDE else "globs"
+    outputs: list[GeneratedOutput] = []
+    for source in context.rules:
+        if not source.body or source.front_matter.always_apply:
+            continue
+
+        target = (
+            provider.root(context.workspace.output_root) / "rules" / f"{source.slug}{provider.rule_extension}"
         )
-        for source in context.rules
-        if source.body and not source.front_matter.always_apply
-    ]
+        scope = getattr(source.front_matter, scope_key)
+        if scope is not None or (source.front_matter.globs is None and source.front_matter.paths is None):
+            outputs.append(
+                GeneratedLink(
+                    target_path=target,
+                    link_target=source.path,
+                    artifact=ArtifactKind.RULE,
+                    source_path=source.path,
+                    provider=provider,
+                )
+            )
+            continue
+
+        outputs.append(
+            GeneratedFile(
+                target_path=target,
+                content=normalize_rule(
+                    source.front_matter.model_copy(update={scope_key: source.front_matter.scope_patterns}),
+                    f"<!-- {GENERATED_FILE_NOTICE} -->\n\n{source.body}",
+                ),
+                artifact=ArtifactKind.RULE,
+                source_path=source.path,
+                provider=provider,
+            )
+        )
+
+    return outputs
 
 
 def generate_codex_rules(

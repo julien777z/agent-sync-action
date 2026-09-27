@@ -33,13 +33,13 @@ class TestMirrorIntegration:
 
         assert mirror_providers(workspace, dry_run=False) is False
 
-        assert (workspace.root / ".claude/rules/python.md").is_file()
-        assert not (workspace.root / ".claude/rules/python.md").is_symlink()
+        assert (workspace.root / ".claude/rules/python.md").is_symlink()
+        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
         assert mirror_providers(workspace, dry_run=True) is False
 
     def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
-        """Leave repository formatting in the source while rendering both provider scopes."""
+        """Leave repository formatting in the source while adding only the missing scope."""
 
         source = workspace.agents_dir / "rules/python.md"
         source.parent.mkdir()
@@ -51,12 +51,32 @@ class TestMirrorIntegration:
 
         assert mirror_providers(workspace, dry_run=False) is False
         assert source.read_text() == original
-        for path in (workspace.root / ".claude/rules/python.md", workspace.root / ".cursor/rules/python.mdc"):
-            assert path.is_file()
-            assert not path.is_symlink()
-            assert "globs:\n- '**/*.py'" in path.read_text()
-            assert "paths:\n- '**/*.py'" in path.read_text()
-            assert "Use typed values." in path.read_text()
+        claude = workspace.root / ".claude/rules/python.md"
+        cursor = workspace.root / ".cursor/rules/python.mdc"
+        assert claude.is_file() and not claude.is_symlink()
+        assert "globs:\n- '**/*.py'" in claude.read_text()
+        assert "paths:\n- '**/*.py'" in claude.read_text()
+        assert "Use typed values." in claude.read_text()
+        assert cursor.is_symlink()
+        assert cursor.resolve() == source
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_existing_files_become_links_when_both_scopes_are_authored(self, workspace: Workspace) -> None:
+        """Test that adding the second scope replaces a generated file with a link."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir()
+        source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        assert mirror_providers(workspace, dry_run=False) is False
+        claude = workspace.root / ".claude/rules/python.md"
+        assert claude.is_file() and not claude.is_symlink()
+
+        source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        original = source.read_bytes()
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert claude.is_symlink() and claude.resolve() == source
+        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
+        assert source.read_bytes() == original
         assert mirror_providers(workspace, dry_run=True) is False
 
     def test_output_directory_holds_every_generated_provider_tree(
@@ -97,7 +117,10 @@ class TestMirrorIntegration:
         output_root = relocated_workspace.output_root
 
         assert (output_root / ".claude/skills/review").is_symlink()
-        assert (output_root / ".claude/rules/python.md").is_file()
+        assert (output_root / ".claude/rules/python.md").is_symlink()
+        assert (output_root / ".claude/rules/python.md").resolve() == (
+            relocated_workspace.agents_dir / "rules/python.md"
+        )
         assert (output_root / ".codex/rules/typescript.rules").is_file()
         assert (output_root / ".claude/agents/review.md").is_file()
         assert (output_root / ".claude/hooks/check").is_file()

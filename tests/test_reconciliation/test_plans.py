@@ -290,7 +290,7 @@ class TestReconciliation:
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that deleting a blocked provider root still recreates its rule files."""
+        """Test that deleting a blocked provider root still recreates its rule links."""
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
@@ -305,7 +305,7 @@ class TestReconciliation:
 
         assert mirror_providers(workspace, dry_run=False) is False
         assert (provider_root / "rules/sample.md").is_file()
-        assert not (provider_root / "rules/sample.md").is_symlink()
+        assert (provider_root / "rules/sample.md").is_symlink()
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that provider settings cannot outlive their source configuration."""

@@ -117,8 +117,8 @@ Agent Sync strips front matter from optional `.agents/global.md` and `.agents/pr
 generates `AGENTS.md` in this order: global guidance, `alwaysApply: true` rule bodies, project
 guidance, then concise pointers to `alwaysApply: false` rules. Scoped rule bodies appear only in
 the Claude and Cursor mirrors. Each pointer includes the rule description, canonical path, and
-globs. A scoped rule without globs is pointed to by topic; Claude may load its mirror without
-path gating. Codex document capacity is sized to the generated file. If there are no instruction
+file patterns. A scoped rule without file patterns is pointed to by topic; Claude loads a rule
+without `paths` unconditionally. Codex document capacity is sized to the generated file. If there are no instruction
 sources, Agent Sync removes a prior `AGENTS.md` only when its generated marker proves ownership.
 Agent Sync does not inspect or manage `CLAUDE.md`; a repository retaining one must arrange for
 Claude to read `AGENTS.md` independently.
@@ -126,13 +126,20 @@ Claude to read `AGENTS.md` independently.
 ### Rule Scope
 
 A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
-its Claude and Cursor mirrors only while matching files are in play. Agent Sync preserves the
-canonical rule's formatting and writes both `globs` and `paths` in the generated mirrors.
+its Claude and Cursor mirrors only while matching files are in play. Cursor reads `globs`; Claude
+reads `paths`. When both keys are present, they must describe the same patterns, and both mirrors
+are symlinks to the canonical rule. If only one key is present, that provider gets a symlink and
+Agent Sync generates a file for the other provider with the missing key. Without either key, both
+mirrors are symlinks and Claude loads the rule unconditionally. See the
+[Claude rules](https://code.claude.com/docs/en/memory) and
+[Cursor rules](https://docs.cursor.com/context/rules) documentation for project rule symlinks and
+scope keys.
 
 ```markdown
 ---
 description: Python conventions.
 globs: "**/*.py"
+paths: "**/*.py"
 alwaysApply: false
 ---
 ```
