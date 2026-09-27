@@ -126,7 +126,8 @@ Claude to read `AGENTS.md` independently.
 ### Rule Scope
 
 A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
-its Claude and Cursor mirrors only while matching files are in play.
+its Claude and Cursor mirrors only while matching files are in play. Agent Sync preserves the
+canonical rule's formatting and writes both `globs` and `paths` in the generated mirrors.
 
 ```markdown
 ---

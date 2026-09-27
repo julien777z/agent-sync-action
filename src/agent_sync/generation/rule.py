@@ -9,7 +9,6 @@ from agent_sync.models.document import RuleFrontMatter
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
-    GeneratedLink,
     GeneratedOutput,
     Provider,
 )
@@ -37,18 +36,7 @@ def normalize_rule(front_matter: RuleFrontMatter, body: str) -> str:
 
 
 def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOutput]:
-    """Generate normalized rule sources and root instructions."""
-
-    outputs: list[GeneratedOutput] = [
-        GeneratedFile(
-            target_path=source.path,
-            content=normalize_rule(source.front_matter, source.body),
-            artifact=ArtifactKind.RULE,
-            source_path=source.path,
-        )
-        for source in context.rules
-        if source.body
-    ]
+    """Generate root instructions without changing canonical rules."""
 
     sections = [
         render_instruction_section(source.path.relative_to(context.workspace.root), source.body)
@@ -70,34 +58,35 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
         context.workspace.agents_dir.relative_to(context.workspace.root).as_posix(),
     )
     if not content:
-        return outputs
+        return []
 
-    outputs.append(
+    return [
         GeneratedFile(
             target_path=context.workspace.root / "AGENTS.md",
             content=content,
             artifact=ArtifactKind.INSTRUCTIONS,
             source_path=context.workspace.agents_dir / "rules",
         )
-    )
-
-    return outputs
+    ]
 
 
-def generate_rule_links(
+def generate_rule_mirrors(
     context: GenerationContext,
     provider: Provider,
 ) -> list[GeneratedOutput]:
-    """Generate one provider's rule links."""
+    """Write scoped rule content into one provider's mirrors."""
 
     return [
-        GeneratedLink(
+        GeneratedFile(
             target_path=(
                 provider.root(context.workspace.output_root)
                 / "rules"
                 / f"{source.slug}{provider.rule_extension}"
             ),
-            link_target=source.path,
+            content=normalize_rule(
+                source.front_matter,
+                f"<!-- {GENERATED_FILE_NOTICE} -->\n\n{source.body}",
+            ),
             artifact=ArtifactKind.RULE,
             source_path=source.path,
             provider=provider,

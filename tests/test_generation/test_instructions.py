@@ -42,8 +42,9 @@ class TestInstructions:
         assert "Scoped text." not in content
         assert "Topic text." not in content
         assert "Read `.agents/rules/topic.md` when its topic is relevant: working on deployments" in content
-        assert (workspace.output_root / ".claude/rules/scoped.md").is_symlink()
-        assert (workspace.output_root / ".cursor/rules/topic.mdc").is_symlink()
+        assert (workspace.output_root / ".claude/rules/scoped.md").is_file()
+        assert not (workspace.output_root / ".claude/rules/scoped.md").is_symlink()
+        assert (workspace.output_root / ".cursor/rules/topic.mdc").is_file()
         assert not (workspace.output_root / ".claude/rules/always.md").exists()
         assert (workspace.root / "CLAUDE.md").read_text() == "Claude instructions.\n"
         config = tomllib.loads((workspace.output_root / ".codex/config.toml").read_text())
@@ -71,7 +72,7 @@ class TestInstructions:
         content = (workspace.root / "AGENTS.md").read_text()
         assert ("Sample body." in content) is always_apply
         assert ("Read `.agents/rules/sample.md`" in content) is not always_apply
-        assert (workspace.root / ".claude/rules/sample.md").is_symlink() is not always_apply
+        assert (workspace.root / ".claude/rules/sample.md").is_file() is not always_apply
 
     def test_no_source_removes_only_generated_instructions(self, workspace: Workspace) -> None:
         """Remove a stale generated file while preserving user-owned guidance."""

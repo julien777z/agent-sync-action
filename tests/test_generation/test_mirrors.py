@@ -12,13 +12,13 @@ from tests.factories import (
 
 
 class TestMirrorIntegration:
-    """Test that complete mirroring converges on committed relative links."""
+    """Test that complete mirroring converges on provider outputs."""
 
     def test_fresh_mirror_is_idempotent(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that mirroring writes relative links and reaches a clean dry run."""
+        """Test that mirroring writes rules and skill links, then reaches a clean dry run."""
 
         materialize_rule(
             workspace.agents_dir / "rules/python.md",
@@ -33,8 +33,30 @@ class TestMirrorIntegration:
 
         assert mirror_providers(workspace, dry_run=False) is False
 
-        assert os.readlink(workspace.root / ".claude/rules/python.md") == ("../../.agents/rules/python.md")
+        assert (workspace.root / ".claude/rules/python.md").is_file()
+        assert not (workspace.root / ".claude/rules/python.md").is_symlink()
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
+        """Leave repository formatting in the source while rendering both provider scopes."""
+
+        source = workspace.agents_dir / "rules/python.md"
+        source.parent.mkdir()
+        original = (
+            '---\ndescription: "Python guidance"\nalwaysApply: false\nglobs:\n'
+            '    - "**/*.py"\n---\n\n# Python\n\nUse typed values.\n'
+        )
+        source.write_text(original)
+
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert source.read_text() == original
+        for path in (workspace.root / ".claude/rules/python.md", workspace.root / ".cursor/rules/python.mdc"):
+            assert path.is_file()
+            assert not path.is_symlink()
+            assert "globs:\n- '**/*.py'" in path.read_text()
+            assert "paths:\n- '**/*.py'" in path.read_text()
+            assert "Use typed values." in path.read_text()
         assert mirror_providers(workspace, dry_run=True) is False
 
     def test_output_directory_holds_every_generated_provider_tree(
@@ -75,7 +97,7 @@ class TestMirrorIntegration:
         output_root = relocated_workspace.output_root
 
         assert (output_root / ".claude/skills/review").is_symlink()
-        assert (output_root / ".claude/rules/python.md").is_symlink()
+        assert (output_root / ".claude/rules/python.md").is_file()
         assert (output_root / ".codex/rules/typescript.rules").is_file()
         assert (output_root / ".claude/agents/review.md").is_file()
         assert (output_root / ".claude/hooks/check").is_file()
