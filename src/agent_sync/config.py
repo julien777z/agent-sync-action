@@ -22,7 +22,6 @@ class ActionConfig(BaseSettings):
     root: Path | None = None
     agents_dir: str = ".agents"
     output_dir: str = ""
-    generate_agents_md: bool = True
 
 
 ACTION_CONFIG = ActionConfig()
