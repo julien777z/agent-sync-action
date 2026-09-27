@@ -21,6 +21,22 @@ class TestCli:
         assert run_cli(arguments).returncode == 0
         assert run_cli([*arguments, "--dry-run"]).returncode == 0
 
+    def test_cli_output_directory_overrides_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
+    ) -> None:
+        """Test that the CLI selects its output directory before the environment default."""
+
+        monkeypatch.setenv("AGENT_SYNC_OUTPUT_DIR", ".generated")
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "codex.json").write_text('{"model":"example"}')
+        command = ["mirror-providers", "--root", str(workspace.root)]
+
+        assert run_cli(command).returncode == 0
+        assert (workspace.root / ".generated/.codex/config.toml").exists()
+
+        assert run_cli([*command, "--output-dir", "chosen"]).returncode == 0
+        assert (workspace.root / "chosen/.codex/config.toml").exists()
+
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 

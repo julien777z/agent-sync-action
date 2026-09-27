@@ -1,21 +1,9 @@
 from pathlib import Path
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agent_sync.utils import escapes_base_directory
-
-
-class CliArguments(BaseModel):
-    """Validate parsed command-line arguments before dispatch."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    command: Literal["mirror-providers", "vendor-resources"]
-    root: str | None
-    agents_dir: str | None
-    output_dir: str | None = None
-    dry_run: bool
 
 
 class Workspace(BaseModel):

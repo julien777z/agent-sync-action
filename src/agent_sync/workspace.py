@@ -2,28 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
-from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.workspace import Workspace
-
-
-def resolve_workspace(
-    root: str | None,
-    agents_dirname: str | None,
-    output_dirname: str | None,
-    config: ActionConfig,
-) -> Workspace:
-    """Resolve CLI options, environment values, and defaults into a workspace."""
-
-    resolved_root = root or config.root or Path.cwd()
-    resolved_agents_dirname = agents_dirname or config.agents_dir
-    resolved_output_dirname = output_dirname or config.output_dir
-
-    return Workspace(
-        root=Path(resolved_root).resolve(),
-        agents_dirname=resolved_agents_dirname,
-        output_dirname=resolved_output_dirname,
-    )
 
 
 def agents_dir(workspace: Workspace) -> Path:

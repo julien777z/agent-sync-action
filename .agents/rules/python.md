@@ -155,7 +155,7 @@ config = third_party_package.Config(
 
 ## Configuration
 
-- Define each configuration owner's settings in one descriptively named `BaseSettings` class such as `ActionConfig` in its `config.py`. A repository may have distinct application, worker, or script configuration owners; do not combine unrelated settings merely to produce one repository-wide class. Keep each config module declarative: instantiate its settings once at that owner's composition boundary, then pass or import that validated object wherever settings are needed.
+- Define each configuration owner's settings in one descriptively named `BaseSettings` class such as `ToolSettings` in its `config.py`. A repository may have distinct application, worker, or script configuration owners; do not combine unrelated settings merely to produce one repository-wide class. Keep each config module declarative: instantiate its settings once at that owner's composition boundary, then pass or import that validated object wherever settings are needed.
 - Put environment-backed, deployment-tunable, or intentionally overridable values in that settings class. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
 - Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
 - Use `TypedDict` only for static structured data that is not configuration.
@@ -164,7 +164,7 @@ config = third_party_package.Config(
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ActionConfig(BaseSettings):
+class ToolSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APPLICATION_", frozen=True)
 
     tool_cli_version: str = "1.2.3"
@@ -172,7 +172,7 @@ class ActionConfig(BaseSettings):
 
 
 # application.py or another composition boundary
-ACTION_CONFIG = ActionConfig()
+TOOL_SETTINGS = ToolSettings()
 ```
 
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
