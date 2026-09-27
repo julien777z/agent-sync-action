@@ -91,15 +91,13 @@ def generate_manifest(
     context = load_generation_context(workspace, source_config)
     shared_outputs = generate_shared_rule_outputs(context)
 
-    instructions = next(
-        (
+    if workspace.generate_agents_md:
+        instructions = next(
             output
             for output in shared_outputs
             if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
-        ),
-        None,
-    )
-    if instructions is not None:
+        )
+
         context = context.model_copy(update={"instructions": instructions.content})
 
     provider_outputs = [

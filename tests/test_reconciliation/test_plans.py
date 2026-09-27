@@ -245,7 +245,7 @@ class TestReconciliation:
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed", always_apply=False),
+            RuleFrontMatterFactory.build(name="removed"),
         )
         directory = workspace.root / ".claude/rules"
         directory.parent.mkdir(parents=True)
@@ -270,7 +270,7 @@ class TestReconciliation:
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed", always_apply=False),
+            RuleFrontMatterFactory.build(name="removed"),
         )
         external = workspace.root / "external"
         external.mkdir()
@@ -294,7 +294,7 @@ class TestReconciliation:
 
         materialize_rule(
             workspace.agents_dir / "rules/sample.md",
-            RuleFrontMatterFactory.build(name="removed", always_apply=False),
+            RuleFrontMatterFactory.build(name="removed"),
         )
         external = workspace.root / "external"
         external_rules = external / "rules"

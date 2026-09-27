@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Final
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.generation.artifact import has_generated_notice
 from agent_sync.generation.registry import (
     ARTIFACT_REGISTRY,
     generate_manifest,
@@ -138,15 +137,6 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     expected = {output.target_path for output in manifest.outputs}
     stale: set[Path] = find_abandoned_outputs(workspace, manifest)
-
-    instructions = workspace.root / "AGENTS.md"
-    if (
-        instructions not in expected
-        and not instructions.is_symlink()
-        and (content := workspace.read_text(instructions))
-    ):
-        if has_generated_notice(content):
-            stale.add(instructions)
 
     stale.update(
         blocker
