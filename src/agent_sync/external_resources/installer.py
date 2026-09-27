@@ -71,7 +71,9 @@ def locate_skill_directory(
         for path in search_root.rglob("SKILL.md")
         if excluded_root is None or excluded_root not in path.parents
     )
+
     canonical_document = search_root / ".agents" / "skills" / name / "SKILL.md"
+
     if canonical_document in documents:
         return canonical_document.parent
 

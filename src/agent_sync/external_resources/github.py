@@ -50,9 +50,14 @@ def copy_legal_files(destination: Path, source_root: Path) -> None:
     """Copy repository-root legal files beside vendored content."""
 
     for entry in sorted(source_root.iterdir()):
-        if entry.is_file() and entry.name.upper().startswith(LEGAL_FILE_PREFIXES):
-            if (destination / entry.name).exists():
-                if (destination / entry.name).read_bytes() != entry.read_bytes():
-                    raise RuntimeError(f"Conflicting legal file in {destination}: {entry.name}")
-                continue
-            shutil.copy2(entry, destination / entry.name)
+        if not entry.is_file() or not entry.name.upper().startswith(LEGAL_FILE_PREFIXES):
+            continue
+
+        target = destination / entry.name
+
+        if not target.exists():
+            shutil.copy2(entry, target)
+            continue
+
+        if target.read_bytes() != entry.read_bytes():
+            raise RuntimeError(f"Conflicting legal file in {destination}: {entry.name}")
