@@ -6,6 +6,7 @@ import pytest
 
 from agent_sync.external_skills import sync
 from agent_sync.workspace import Workspace
+from tests.factories import materialize_every_source_kind
 
 
 def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
@@ -68,7 +69,6 @@ class TestCli:
     ) -> None:
         """Test that the CLI maps detected differences to exit code one."""
 
-        (workspace.agents_dir / "project.md").write_text("# Project\n")
         result = run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 1
@@ -100,8 +100,33 @@ class TestCli:
 
         assert result.returncode == 2
 
-    def test_removed_instruction_generation_flag_is_rejected(self, workspace: Workspace) -> None:
-        """Test that the removed CLI option cannot silently change generation."""
+    @pytest.mark.parametrize(
+        ("environment_value", "flags", "expected_generation"),
+        [
+            ("true", ["--no-generate-agents-md"], False),
+            ("false", [], False),
+            ("TRUE", [], True),
+            ("false", ["--generate-agents-md"], True),
+        ],
+        ids=["cli-disables", "environment-disables", "environment-enables-uppercase", "cli-enables"],
+    )
+    def test_instruction_generation_setting(
+        self,
+        workspace: Workspace,
+        monkeypatch: pytest.MonkeyPatch,
+        environment_value: str,
+        flags: list[str],
+        expected_generation: bool,
+    ) -> None:
+        """Test that CLI flags override the environment while other mirrors still converge."""
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--no-generate-agents-md"])
-        assert result.returncode == 2
+        monkeypatch.setenv("AGENT_SYNC_GENERATE_AGENTS_MD", environment_value)
+        materialize_every_source_kind(workspace)
+        arguments = ["mirror-providers", "--root", str(workspace.root), *flags]
+
+        assert run_cli(arguments).returncode == 0
+        assert (workspace.root / "AGENTS.md").exists() is expected_generation
+        assert (workspace.root / ".codex/skills/sample/SKILL.md").is_file()
+        assert (workspace.root / ".claude/rules/sample.md").is_file()
+        assert (workspace.root / ".cursor/hooks/setup.sh").is_file()
+        assert run_cli([*arguments, "--dry-run"]).returncode == 0

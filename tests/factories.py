@@ -155,7 +155,7 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
 
     materialize_rule(
         workspace.agents_dir / "rules/sample.md",
-        RuleFrontMatterFactory.build(name="sample", always_apply=False),
+        RuleFrontMatterFactory.build(name="sample"),
     )
 
     hook = workspace.agents_dir / "hooks/setup.sh"

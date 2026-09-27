@@ -25,6 +25,7 @@ class Workspace(BaseModel):
     root: Path = Field(default_factory=Path.cwd)
     agents_dirname: str = ".agents"
     output_dirname: str = ""
+    generate_agents_md: bool = True
 
     @field_validator("output_dirname")
     @classmethod
@@ -81,6 +82,7 @@ class Workspace(BaseModel):
         root: str | None,
         agents_dirname: str | None,
         output_dirname: str | None,
+        generate_agents_md: bool | None = None,
     ) -> Self:
         """Resolve CLI options, environment values, and defaults into a workspace."""
 
@@ -92,6 +94,9 @@ class Workspace(BaseModel):
             root=Path(resolved_root).resolve(),
             agents_dirname=resolved_agents_dirname,
             output_dirname=resolved_output_dirname,
+            generate_agents_md=(
+                ACTION_CONFIG.generate_agents_md if generate_agents_md is None else generate_agents_md
+            ),
         )
 
     def read_text(self, path: Path) -> str | None:

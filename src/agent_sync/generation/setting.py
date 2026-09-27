@@ -51,13 +51,11 @@ def generate_codex_settings(
     settings = context.source_config.settings.get(provider)
 
     if not isinstance(settings, CodexSettings):
-        if not context.instructions:
-            return []
-        settings = CodexSettings()
+        return []
 
     synchronized = settings
 
-    if context.instructions:
+    if context.workspace.generate_agents_md:
         synchronized = settings.model_copy(
             update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
         )
@@ -65,6 +63,13 @@ def generate_codex_settings(
     source_path = context.workspace.settings_dir / "codex.json"
 
     return [
+        GeneratedFile(
+            target_path=source_path,
+            content=ensure_trailing_newline(synchronized.model_dump_json(indent=2, exclude_none=True)),
+            artifact=ArtifactKind.SETTING,
+            source_path=source_path,
+            provider=provider,
+        ),
         GeneratedFile(
             target_path=provider.root(context.workspace.output_root) / "config.toml",
             content=render_codex_settings(synchronized),

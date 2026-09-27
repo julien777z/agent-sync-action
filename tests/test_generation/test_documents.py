@@ -52,7 +52,7 @@ class TestDocumentGeneration:
         """Test that one normalized rule owns both provider links."""
 
         source = workspace.agents_dir / "rules/python.md"
-        materialize_rule(source, RuleFrontMatterFactory.build(name="removed", always_apply=False))
+        materialize_rule(source, RuleFrontMatterFactory.build(name="removed"))
         context = load_context(workspace)
         outputs = [
             *generate_shared_rule_outputs(context),
@@ -65,7 +65,7 @@ class TestDocumentGeneration:
 
         links = [output for output in outputs if isinstance(output, GeneratedLink)]
 
-        assert source_output.content.startswith("---\ndescription: A rule.\nalwaysApply: false\n---\n")
+        assert source_output.content.startswith("---\ndescription: A rule.\nalwaysApply: true\n---\n")
         assert "name:" not in source_output.content
         assert {link.link_target for link in links} == {source}
         assert {link.target_path.suffix for link in links} == {".md", ".mdc"}
@@ -97,7 +97,8 @@ class TestDocumentGeneration:
         assert 'allow_rule(prefix_rule = ["git", "status"])' in outputs[0].content
         shared_outputs = generate_shared_rule_outputs(context)
 
-        assert not shared_outputs
+        assert len(shared_outputs) == 1
+        assert shared_outputs[0].artifact is ArtifactKind.INSTRUCTIONS
         assert not generate_rule_links(context, Provider.CLAUDE)
         assert not generate_rule_links(context, Provider.CURSOR)
 
@@ -139,9 +140,7 @@ class TestDocumentGeneration:
             if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.INSTRUCTIONS
         )
 
-        assert (
-            "Read `.agents/rules/python.md` for files matching `**/*.py`, `**/*.pyi`" in instructions.content
-        )
+        assert "> Applies only to files matching: `**/*.py`, `**/*.pyi`" in instructions.content
 
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""
