@@ -22,7 +22,7 @@ class TestMirrorIntegration:
 
         materialize_rule(
             workspace.agents_dir / "rules/python.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
 
         skill_front_matter = SkillFrontMatterFactory.build(name="review")
@@ -49,7 +49,7 @@ class TestMirrorIntegration:
         )
         materialize_rule(
             relocated_workspace.agents_dir / "rules/python.md",
-            RuleFrontMatterFactory.build(name="removed"),
+            RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         materialize_rule(
             relocated_workspace.agents_dir / "rules/typescript.md",
