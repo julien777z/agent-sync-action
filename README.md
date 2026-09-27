@@ -118,8 +118,9 @@ generates `AGENTS.md` in this order: global guidance, `alwaysApply: true` rule b
 guidance, then concise pointers to `alwaysApply: false` rules. Scoped rule bodies appear only in
 the Claude and Cursor mirrors. Each pointer includes the rule description, canonical path, and
 file patterns. A scoped rule without file patterns is pointed to by topic; Claude loads a rule
-without `paths` unconditionally. Codex document capacity is sized to the generated file. If there are no instruction
-sources, Agent Sync removes a prior `AGENTS.md` only when its generated marker proves ownership.
+without `paths` unconditionally. Codex document capacity is sized to the generated file. If there
+are no instruction sources, Agent Sync removes a prior `AGENTS.md` only when its generated marker
+proves ownership.
 Agent Sync does not inspect or manage `CLAUDE.md`; a repository retaining one must arrange for
 Claude to read `AGENTS.md` independently.
 
