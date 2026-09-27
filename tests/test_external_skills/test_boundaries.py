@@ -4,10 +4,9 @@ from pathlib import Path
 import pytest
 
 from agent_sync.config import ACTION_CONFIG, ActionConfig
-from agent_sync import external_sources
 from agent_sync.external_skills import installer
 from agent_sync.external_skills import sync
-from agent_sync.external_sources import copy_legal_files
+from agent_sync.external_sources import copy_legal_files, resolve_revision
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.workspace import Workspace
 from tests.factories import (
@@ -72,9 +71,9 @@ class TestExternalSkillBoundaries:
 
             return subprocess.CompletedProcess(command, 0, f"{revision}\tHEAD\n", "")
 
-        monkeypatch.setattr(external_sources.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
 
-        assert external_sources.resolve_revision("example/repository") == revision
+        assert resolve_revision("example/repository") == revision
 
     def test_invalid_revision_output_fails(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that unusable remote output fails before sources can be mixed."""
@@ -90,10 +89,10 @@ class TestExternalSkillBoundaries:
 
             return subprocess.CompletedProcess(command, 0, "not-a-sha\tHEAD\n", "")
 
-        monkeypatch.setattr(external_sources.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
 
         with pytest.raises(RuntimeError, match="git ls-remote"):
-            external_sources.resolve_revision("example/repository")
+            resolve_revision("example/repository")
 
     def test_installer_uses_downloaded_snapshot(
         self,
