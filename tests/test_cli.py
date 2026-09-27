@@ -38,6 +38,20 @@ class TestCli:
 
         assert result.returncode == 0
 
+    def test_old_vendor_command_has_no_compatibility_alias(self, workspace: Workspace) -> None:
+        """Require consumers to use the unified public command."""
+
+        result = run_cli(["vendor-skills", "--root", str(workspace.root)])
+
+        assert result.returncode == 2
+
+    def test_old_registry_is_not_loaded(self, workspace: Workspace) -> None:
+        """An obsolete registry cannot silently activate a second vendoring path."""
+
+        (workspace.agents_dir / "external_skills.json").write_text("{invalid")
+
+        assert run_cli(["vendor-resources", "--root", str(workspace.root)]).returncode == 0
+
     def test_vendor_dry_run_updates_are_informational(
         self,
         monkeypatch: pytest.MonkeyPatch,

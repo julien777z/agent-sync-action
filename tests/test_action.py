@@ -125,6 +125,9 @@ class TestAction:
 
         assert "python -m agent_sync mirror-providers" in action_text
         assert "python -m agent_sync vendor-resources" in action_text
+        assert "python -m agent_sync vendor-skills" not in action_text
+        assert "external_skills.json" not in action_text
+        assert "refresh-external-skills" not in action_text
         assert "AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}" in action_text
         assert "PYTHONPATH=" not in action_text
         assert "requirements.txt" not in action_text
