@@ -5,8 +5,15 @@ import pytest
 
 from agent_sync.external_resources import sync
 from agent_sync.models.registry import ExternalSkill
+from agent_sync.reconciliation import mirror_providers
 from agent_sync.workspace import Workspace
-from tests.factories import ExternalSkillFactory, ResourcesRegistryFactory, materialize_registry
+from tests.factories import (
+    ExternalSkillFactory,
+    ResourcesRegistryFactory,
+    ROOT_LEVEL_SKILL,
+    materialize_registry,
+    stub_root_level_upstream,
+)
 
 
 class TestExternalSkillService:
@@ -16,6 +23,24 @@ class TestExternalSkillService:
         """Test that an absent optional registry is a successful no-op."""
 
         assert sync.sync_external_resources(workspace, dry_run=True) is None
+
+    def test_vendored_skill_reaches_provider_mirrors(
+        self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mirror an installed external skill to every supported provider."""
+
+        stub_root_level_upstream(monkeypatch)
+        materialize_registry(
+            workspace.agents_dir / "external_resources.json",
+            ResourcesRegistryFactory.build(resources=[ROOT_LEVEL_SKILL]),
+        )
+        sync.sync_external_resources(workspace, dry_run=False)
+        assert mirror_providers(workspace, dry_run=False) is False
+
+        for provider in (".claude", ".cursor", ".codex"):
+            document = workspace.output_root / provider / "skills/local-skill/SKILL.md"
+            assert document.is_file()
+            assert "name: local-skill" in document.read_text()
 
     def test_dry_run_reports_changes(
         self,
