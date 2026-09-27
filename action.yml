@@ -10,8 +10,8 @@ inputs:
   github-token:
     description: Token used to commit and push changes (or open a pull request).
     default: ${{ github.token }}
-  refresh-external-skills:
-    description: Force vendoring external skills and resources from their registries before mirroring.
+  refresh-external-resources:
+    description: Force vendoring external skills and resources from the registry before mirroring.
     default: "false"
   skills-cli-version:
     description: Version of the skills CLI used to update external skills.
@@ -20,7 +20,7 @@ inputs:
     description: How to persist changes — commit (push to the branch) or pull-request.
     default: commit
   agents-dir:
-    description: Source-of-truth directory name; external registries are read from this directory.
+    description: Source-of-truth directory name; the external registry is read from this directory.
     default: .agents
   output-dir:
     description: Directory holding generated provider trees, relative to the repository root; empty writes them at the root.
@@ -35,11 +35,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Decide external-source refresh
+    - name: Decide external-resource refresh
       id: refresh
       shell: bash
       env:
-        REFRESH: ${{ inputs.refresh-external-skills }}
+        REFRESH: ${{ inputs.refresh-external-resources }}
         EVENT_NAME: ${{ github.event_name }}
         BEFORE: ${{ github.event.before }}
         CURRENT_SHA: ${{ github.sha }}
@@ -56,7 +56,7 @@ runs:
           fi
           if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
              && git diff --name-only "$before" "$CURRENT_SHA" \
-                  | grep -Fqx -e "$AGENTS_DIR/external_skills.json" -e "$AGENTS_DIR/external_resources.json"; then
+                  | grep -Fqx -e "$AGENTS_DIR/external_resources.json"; then
             enabled=true
           fi
         fi
@@ -86,18 +86,11 @@ runs:
       shell: bash
       run: python -m pip install --disable-pip-version-check "$GITHUB_ACTION_PATH"
 
-    - name: Vendor external skills
-      if: ${{ steps.refresh.outputs.enabled == 'true' }}
-      shell: bash
-      env:
-        AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
-        AGENTS_DIR: ${{ inputs.agents-dir }}
-      run: python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
-
     - name: Vendor external resources
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
       env:
+        AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
         AGENTS_DIR: ${{ inputs.agents-dir }}
       run: python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
@@ -166,16 +159,13 @@ runs:
           if ! gh pr view "$branch" >/dev/null 2>&1; then
             gh pr create --base "$REF_NAME" --head "$branch" \
               --title "chore: agent sync" \
-              --body "Automated Agent Sync update (provider mirroring and skill vendoring)."
+              --body "Automated Agent Sync update (provider mirroring and resource vendoring)."
           fi
         else
           git commit -m "chore: run agent sync"
           pre_rebase_head="$(git rev-parse HEAD)"
           git pull --rebase origin "$REF_NAME"
 
-          if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_skills.json"; then
-            python -m agent_sync vendor-skills --root . --agents-dir "$AGENTS_DIR"
-          fi
           if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_resources.json"; then
             python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR"
           fi

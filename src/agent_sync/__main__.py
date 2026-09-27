@@ -5,8 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from agent_sync.errors import AgentSyncError
-from agent_sync.external_resources import sync_external_resources
-from agent_sync.external_skills.sync import sync_external_skills
+from agent_sync.external_resources.sync import sync_external_resources
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.workspace import Workspace
 
@@ -18,7 +17,7 @@ class CliArguments(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    command: Literal["mirror-providers", "vendor-skills", "vendor-resources"]
+    command: Literal["mirror-providers", "vendor-resources"]
     root: str | None
     agents_dir: str | None
     output_dir: str | None = None
@@ -80,15 +79,9 @@ def create_parser() -> argparse.ArgumentParser:
         help="Manage AGENTS.md and its Codex document capacity (default: $AGENT_SYNC_GENERATE_AGENTS_MD or true).",
     )
 
-    vendor_parser = commands.add_parser(
-        "vendor-skills",
-        help="Vendor registered external skills into canonical sources.",
-    )
-    add_workspace_arguments(vendor_parser)
-
     resource_parser = commands.add_parser(
         "vendor-resources",
-        help="Vendor registered external reference directories into canonical sources.",
+        help="Vendor registered external skills and reference directories into canonical sources.",
     )
     add_workspace_arguments(resource_parser)
 
@@ -108,9 +101,6 @@ if __name__ == "__main__":
         match parsed.command:
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
-            case "vendor-skills":
-                sync_external_skills(workspace, parsed.dry_run)
-                differences_found = False
             case "vendor-resources":
                 sync_external_resources(workspace, parsed.dry_run)
                 differences_found = False

@@ -3,11 +3,17 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync import external_resources
-from agent_sync.external_resources import SOURCE_MARKER, sync_external_resources
-from agent_sync.models.registry import ResourcesRegistry
+from agent_sync.external_resources import directories, sync
+from agent_sync.external_resources.directories import SOURCE_MARKER
+from agent_sync.external_resources.sync import sync_external_resources
+from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.workspace import Workspace
-from tests.factories import ExternalResourceFactory, ResourcesRegistryFactory, materialize_registry
+from tests.factories import (
+    ExternalResourceFactory,
+    ExternalSkillFactory,
+    ResourcesRegistryFactory,
+    materialize_registry,
+)
 
 
 class TestExternalResources:
@@ -30,6 +36,50 @@ class TestExternalResources:
                     ExternalResourceFactory.build(repo="example/other-reference"),
                 ]
             )
+
+    def test_mixed_registry_dispatches_each_kind_once(
+        self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Route skills and directories from one registry to their existing destinations."""
+
+        skill = ExternalSkillFactory.build()
+        directory = ExternalResourceFactory.build()
+        materialize_registry(
+            workspace.agents_dir / "external_resources.json",
+            ResourcesRegistry(resources=[skill, directory]),
+        )
+        calls: list[tuple[str, bool]] = []
+
+        def update_skill(
+            resolved_workspace: Workspace, entry: ExternalSkill, skills_dir: Path, dry_run: bool
+        ) -> bool:
+            assert resolved_workspace == workspace
+            assert skills_dir == workspace.agents_dir / "skills"
+            calls.append((entry.kind, dry_run))
+            return True
+
+        def update_directory(resolved_workspace: Workspace, entry: ExternalDirectory, dry_run: bool) -> bool:
+            assert resolved_workspace == workspace
+            calls.append((entry.kind, dry_run))
+            return True
+
+        monkeypatch.setattr(sync, "update_external_skill", update_skill)
+        monkeypatch.setattr(sync, "update_external_directory", update_directory)
+        sync_external_resources(workspace, dry_run=True)
+        assert calls == [("skill", True), ("directory", True)]
+
+    def test_invalid_kind_and_missing_kind_fail(self) -> None:
+        """Require every resource to choose one supported vendoring behavior."""
+
+        for value in ("unknown", None):
+            with pytest.raises(ValidationError):
+                ResourcesRegistry.model_validate(
+                    {
+                        "resources": [
+                            {"kind": value, "name": "sample", "repo": "example/repo", "update_on_sync": True}
+                        ]
+                    }
+                )
 
     def test_vendors_original_directory_and_removes_stale_files(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
@@ -59,8 +109,8 @@ class TestExternalResources:
             (root / "LICENSE").write_text("Sample license\n", encoding="utf-8")
             return root
 
-        monkeypatch.setattr(external_resources, "resolve_revision", fake_resolve)
-        monkeypatch.setattr(external_resources, "download_snapshot", fake_download)
+        monkeypatch.setattr(directories, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(directories, "download_snapshot", fake_download)
 
         destination = workspace.agents_dir / "resources" / resource.name
         sync_external_resources(workspace, dry_run=False)

@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from agent_sync.config import ACTION_CONFIG, ActionConfig
-from agent_sync.external_skills import installer
-from agent_sync.external_skills import sync
-from agent_sync.external_sources import copy_legal_files, resolve_revision
+from agent_sync.external_resources import installer
+from agent_sync.external_resources import skills as sync
+from agent_sync.external_resources.github import copy_legal_files, resolve_revision
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.workspace import Workspace
 from tests.factories import (
@@ -119,6 +119,7 @@ class TestExternalSkillBoundaries:
 
         monkeypatch.setattr(installer.subprocess, "run", fake_run)
         skill = ExternalSkill(
+            kind="skill",
             name="sample",
             repo="example/repository",
             update_on_sync=True,
@@ -170,6 +171,7 @@ class TestExternalSkillBoundaries:
         revision = "c" * 40
         observed: list[tuple[str, str]] = []
         skill = ExternalSkill(
+            kind="skill",
             name="sample",
             repo="example/repository",
             update_on_sync=True,
@@ -250,6 +252,7 @@ class TestExternalSkillBoundaries:
             "# React\n"
         )
         skill = ExternalSkill(
+            kind="skill",
             name="react-best-practices",
             repo="vercel-labs/agent-skills",
             skill="vercel-react-best-practices",
@@ -281,6 +284,7 @@ class TestExternalSkillBoundaries:
         other_asset = provider_file.parent / "guide.md"
         other_asset.write_text("Skill reference.\n")
         skill = ExternalSkill(
+            kind="skill",
             name="original",
             skill_name_override="renamed-skill",
             repo="example/repository",

@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julien777z/agent-sync-action@v0
         with:
-          refresh-external-skills: true
+          refresh-external-resources: true
 ```
 
 ## Layout
@@ -75,8 +75,7 @@ jobs:
 | `rules/` | Project instructions used to generate provider rules and `AGENTS.md`. |
 | `settings/` | Provider settings and default model configuration. |
 | `skills/` | Skill directories mirrored to each provider, grouped in folders when you want them sorted. |
-| `external_skills.json` | Registry of external skills that Agent Sync can update. |
-| `external_resources.json` | Registry of external reference directories that Agent Sync can update. |
+| `external_resources.json` | Registry of external skills and reference directories that Agent Sync can update. |
 | `resources/` | Vendored reference directories, preserved as files rather than mirrored as skills. |
 
 Only the directories and files your repository uses are required.
@@ -88,6 +87,7 @@ Register a reference collection with a directory path inside its upstream reposi
   "version": 1,
   "resources": [
     {
+      "kind": "directory",
       "name": "design-reference",
       "repo": "example/design-reference",
       "source_path": "guides",
@@ -112,7 +112,7 @@ grouping folder cannot namespace two skills apart.
 | Input | Default | Purpose |
 |---|---|---|
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
-| `refresh-external-skills` | `false` | Update registered external skills and resources before mirroring. |
+| `refresh-external-resources` | `false` | Update registered external skills and resources before mirroring. |
 | `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |
@@ -175,7 +175,7 @@ disable-model-invocation: true
 ## External Skills
 
 To add an external skill, find it on [skills.sh](https://www.skills.sh/), then add it to
-`.agents/external_skills.json`. Use its source repository and upstream slug, choose the local skill
+`.agents/external_resources.json`. Use its source repository and upstream slug, choose the local skill
 directory name you want, and set `update_on_sync` to keep it current.
 
 For example, this installs the
@@ -185,8 +185,9 @@ For example, this installs the
 ```json
 {
   "version": 1,
-  "skills": [
+  "resources": [
     {
+      "kind": "skill",
       "name": "react-best-practices",
       "repo": "vercel-labs/agent-skills",
       "skill": "vercel-react-best-practices",
@@ -206,8 +207,8 @@ For example, this installs the
   The upstream skill still comes from `skill` (or `name` when `skill` is omitted). A refresh
   moves an existing vendored skill from `name` to `skill_name_override`.
 - `update_on_sync`: required. Set this to `true` to install the skill whenever external
-  skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
-  after a push changes `.agents/external_skills.json`.
+  resources refresh: when `refresh-external-resources` is `true`, on a scheduled workflow run, or
+  after a push changes `.agents/external_resources.json`.
 
 ### Category Folders
 
@@ -216,6 +217,7 @@ same skill as `.agents/skills/frontend/react-best-practices`:
 
 ```json
 {
+  "kind": "skill",
   "name": "react-best-practices",
   "repo": "vercel-labs/agent-skills",
   "skill": "vercel-react-best-practices",
@@ -230,7 +232,6 @@ Installed skills record their source URL and keep the upstream license files fro
 
 ```bash
 poetry install --extras dev
-poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync vendor-resources --root .
 poetry run python -m agent_sync mirror-providers --root .
 ```

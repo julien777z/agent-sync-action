@@ -5,34 +5,17 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
-from agent_sync.external_sources import copy_legal_files, download_snapshot, resolve_revision
-from agent_sync.models.registry import ExternalResource, ResourcesRegistry
-from agent_sync.utils import load_json_model, replace_tree, trees_differ
+from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
+from agent_sync.models.registry import ExternalDirectory
+from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
 
 
-def sync_external_resources(workspace: Workspace, dry_run: bool) -> None:
-    """Update registered reference directories from immutable upstream snapshots."""
-
-    registry_path = workspace.agents_dir / EXTERNAL_RESOURCES_FILENAME
-    registry = load_json_model(registry_path, ResourcesRegistry)
-    if registry is None:
-        logger.info("No external-resource registry at %s; nothing to update.", registry_path)
-        return
-
-    for resource in registry.resources:
-        if resource.update_on_sync:
-            changed = update_external_resource(workspace, resource, dry_run)
-            status = "would update" if dry_run and changed else "updated" if changed else "unchanged"
-            logger.info("  %s (%s): %s", resource.name, resource.repo, status)
-
-
-def update_external_resource(workspace: Workspace, resource: ExternalResource, dry_run: bool) -> bool:
+def update_external_directory(workspace: Workspace, resource: ExternalDirectory, dry_run: bool) -> bool:
     """Replace one managed directory while preserving upstream file contents."""
 
     destination = workspace.agents_dir / "resources" / resource.name

@@ -26,8 +26,8 @@ class TestAction:
                 "description": "Token used to commit and push changes (or open a pull request).",
                 "default": "${{ github.token }}",
             },
-            "refresh-external-skills": {
-                "description": "Force vendoring external skills and resources from their registries before mirroring.",
+            "refresh-external-resources": {
+                "description": "Force vendoring external skills and resources from the registry before mirroring.",
                 "default": "false",
             },
             "skills-cli-version": {
@@ -40,7 +40,7 @@ class TestAction:
             },
             "agents-dir": {
                 "description": (
-                    "Source-of-truth directory name; external registries are read from this directory."
+                    "Source-of-truth directory name; the external registry is read from this directory."
                 ),
                 "default": ".agents",
             },
@@ -124,7 +124,7 @@ class TestAction:
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
         assert "python -m agent_sync mirror-providers" in action_text
-        assert "python -m agent_sync vendor-skills" in action_text
+        assert "python -m agent_sync vendor-resources" in action_text
         assert "AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}" in action_text
         assert "PYTHONPATH=" not in action_text
         assert "requirements.txt" not in action_text
@@ -136,7 +136,7 @@ class TestAction:
 
         assert "poetry run python -m agent_sync mirror-providers --root ." in workflow_text
         assert "uses: ./" in workflow_text
-        assert 'refresh-external-skills: "true"' in workflow_text
+        assert 'refresh-external-resources: "true"' in workflow_text
 
     def test_sets_up_node_when_vendoring_may_run(self) -> None:
         """Test that Node setup covers initial and post-rebase vendoring."""

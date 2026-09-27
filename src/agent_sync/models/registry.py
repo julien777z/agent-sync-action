@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -14,6 +15,7 @@ class ExternalSkill(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    kind: Literal["skill"]
     name: str
     repo: str
     skill: str | None = None
@@ -77,41 +79,12 @@ class ExternalSkill(BaseModel):
         return self.skill or self.name
 
 
-class SkillsRegistry(BaseModel):
-    """The .agents/external_skills.json external-skill registry."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    version: int = 1
-    skills: list[ExternalSkill] = Field(default_factory=list[ExternalSkill])
-
-    @model_validator(mode="after")
-    def validate_unique_names(self) -> "SkillsRegistry":
-        """Reject entries that would write to the same local skill directory."""
-
-        names = [skill.local_name for skill in self.skills]
-        duplicates = sorted({name for name in names if names.count(name) > 1})
-
-        if duplicates:
-            raise ValueError(f"External skill names must be unique: {', '.join(duplicates)}")
-
-        return self
-
-
-class ExternalSkillResult(BaseModel):
-    """The outcome of updating one external skill in .agents/skills/."""
-
-    model_config = ConfigDict(frozen=True)
-
-    skill: ExternalSkill
-    changed: bool
-
-
-class ExternalResource(BaseModel):
+class ExternalDirectory(BaseModel):
     """A directory of reference files to vendor without treating it as a skill."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    kind: Literal["directory"]
     name: str
     repo: str
     source_path: str
@@ -144,14 +117,22 @@ class ResourcesRegistry(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     version: int = 1
-    resources: list[ExternalResource] = Field(default_factory=list[ExternalResource])
+    resources: list[ExternalSkill | ExternalDirectory] = Field(
+        default_factory=list[ExternalSkill | ExternalDirectory]
+    )
 
     @model_validator(mode="after")
-    def validate_unique_names(self) -> "ResourcesRegistry":
-        """Reject entries that would overwrite the same resource directory."""
+    def validate_unique_names(self) -> Self:
+        """Reject duplicate entry names and skill destinations."""
 
         names = [resource.name for resource in self.resources]
         duplicates = sorted({name for name in names if names.count(name) > 1})
+        skill_names = [
+            resource.local_name for resource in self.resources if isinstance(resource, ExternalSkill)
+        ]
+        duplicate_skills = sorted({name for name in skill_names if skill_names.count(name) > 1})
+        if duplicate_skills:
+            raise ValueError(f"External skill names must be unique: {', '.join(duplicate_skills)}")
         if duplicates:
             raise ValueError(f"External resource names must be unique: {', '.join(duplicates)}")
 

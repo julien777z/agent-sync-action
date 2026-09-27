@@ -5,15 +5,15 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from agent_sync.document import render_front_matter
-from agent_sync.external_skills import installer
-from agent_sync.external_skills import sync
+from agent_sync.external_resources import installer, skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
-from agent_sync.models.registry import ExternalResource, ExternalSkill, ResourcesRegistry, SkillsRegistry
+from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
 from agent_sync.workspace import Workspace
 
 ROOT_LEVEL_SKILL = ExternalSkill(
+    kind="skill",
     name="local-skill",
     repo="example/repository",
     skill="upstream-skill",
@@ -53,8 +53,8 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
         installed.mkdir(parents=True)
         (installed / "SKILL.md").write_text(upstream_document)
 
-    monkeypatch.setattr(sync, "resolve_revision", fake_resolve)
-    monkeypatch.setattr(sync, "download_snapshot", fake_download)
+    monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(skills, "download_snapshot", fake_download)
     monkeypatch.setattr(installer, "install_skill", fake_install)
 
 
@@ -84,6 +84,7 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
 
     __model__ = ExternalSkill
 
+    kind = "skill"
     name = "sample"
     repo = "example/repository"
     skill = None
@@ -92,25 +93,12 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
     update_on_sync = True
 
 
-class SkillsRegistryFactory(ModelFactory[SkillsRegistry]):
-    """Build deterministic external-skill registries."""
-
-    __model__ = SkillsRegistry
-
-    version = 1
-
-    @classmethod
-    def skills(cls) -> list[ExternalSkill]:
-        """Default to an empty external-skill registry."""
-
-        return []
-
-
-class ExternalResourceFactory(ModelFactory[ExternalResource]):
+class ExternalResourceFactory(ModelFactory[ExternalDirectory]):
     """Build valid external-reference registrations."""
 
-    __model__ = ExternalResource
+    __model__ = ExternalDirectory
 
+    kind = "directory"
     name = "sample-reference"
     repo = "example/reference"
     source_path = "guides"
@@ -125,7 +113,7 @@ class ResourcesRegistryFactory(ModelFactory[ResourcesRegistry]):
     version = 1
 
     @classmethod
-    def resources(cls) -> list[ExternalResource]:
+    def resources(cls) -> list[ExternalSkill | ExternalDirectory]:
         """Default to an empty external-resource registry."""
 
         return []

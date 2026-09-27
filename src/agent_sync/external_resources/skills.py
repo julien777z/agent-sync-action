@@ -1,50 +1,17 @@
 import logging
 import tempfile
 from pathlib import Path
-from typing import Final
 
 from agent_sync.document import parse_markdown, render_front_matter
-from agent_sync.external_sources import copy_legal_files, download_snapshot, resolve_revision
-from agent_sync.external_skills import installer
+from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
+from agent_sync.external_resources import installer
 from agent_sync.models.document import SkillFrontMatter
-from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
+from agent_sync.models.registry import ExternalSkill
 from agent_sync.skills import locate_skill_by_name
-from agent_sync.utils import load_json_model, replace_tree, trees_differ
+from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
 logger = logging.getLogger(__name__)
-
-EXTERNAL_SKILLS_FILENAME: Final[str] = "external_skills.json"
-
-
-def sync_external_skills(workspace: Workspace, dry_run: bool) -> None:
-    """Update external skills or report pending updates."""
-
-    registry_path = workspace.agents_dir / EXTERNAL_SKILLS_FILENAME
-    registry = load_json_model(registry_path, SkillsRegistry)
-
-    if registry is None:
-        logger.info("No external-skill registry at %s; nothing to update.", registry_path)
-
-        return
-
-    updatable_skills = [skill for skill in registry.skills if skill.update_on_sync]
-
-    if not updatable_skills:
-        logger.info("No external skills are enabled for sync; nothing to update.")
-
-        return
-
-    skills_dir = workspace.agents_dir / "skills"
-    results = [
-        ExternalSkillResult(
-            skill=skill,
-            changed=update_external_skill(workspace, skill, skills_dir, dry_run),
-        )
-        for skill in updatable_skills
-    ]
-
-    report_results(results, dry_run)
 
 
 def update_external_skill(
@@ -161,19 +128,3 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
         forbidden_metadata.unlink()
         if not any(provider_metadata.iterdir()):
             provider_metadata.rmdir()
-
-
-def report_results(results: list[ExternalSkillResult], dry_run: bool) -> None:
-    """Log the result of each external skill update."""
-
-    for result in results:
-        if result.changed:
-            status = "would update" if dry_run else "updated"
-        else:
-            status = "unchanged"
-
-        logger.info("  %s (%s): %s", result.skill.local_name, result.skill.repo, status)
-
-    changed_count = sum(result.changed for result in results)
-    verb = "would change" if dry_run else "changed"
-    logger.info("%d of %d external skill(s) %s.", changed_count, len(results), verb)

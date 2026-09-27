@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from agent_sync.external_skills import sync
+from agent_sync.external_resources import sync
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.workspace import Workspace
-from tests.factories import ExternalSkillFactory, SkillsRegistryFactory, materialize_registry
+from tests.factories import ExternalSkillFactory, ResourcesRegistryFactory, materialize_registry
 
 
 class TestExternalSkillService:
@@ -15,7 +15,7 @@ class TestExternalSkillService:
     def test_missing_registry_is_clean(self, workspace: Workspace) -> None:
         """Test that an absent optional registry is a successful no-op."""
 
-        assert sync.sync_external_skills(workspace, dry_run=True) is None
+        assert sync.sync_external_resources(workspace, dry_run=True) is None
 
     def test_dry_run_reports_changes(
         self,
@@ -28,8 +28,8 @@ class TestExternalSkillService:
         caplog.set_level(logging.INFO)
 
         materialize_registry(
-            workspace.agents_dir / "external_skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build()]),
+            workspace.agents_dir / "external_resources.json",
+            ResourcesRegistryFactory.build(resources=[ExternalSkillFactory.build()]),
         )
 
         def fake_update_external_skill(
@@ -48,7 +48,7 @@ class TestExternalSkillService:
             fake_update_external_skill,
         )
 
-        assert sync.sync_external_skills(workspace, dry_run=True) is None
+        assert sync.sync_external_resources(workspace, dry_run=True) is None
         assert "sample (example/repository): would update" in caplog.text
 
     def test_disabled_update_on_sync_skips_vendoring(
@@ -59,8 +59,8 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace.agents_dir / "external_skills.json",
-            SkillsRegistryFactory.build(skills=[ExternalSkillFactory.build(update_on_sync=False)]),
+            workspace.agents_dir / "external_resources.json",
+            ResourcesRegistryFactory.build(resources=[ExternalSkillFactory.build(update_on_sync=False)]),
         )
 
         local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
@@ -79,5 +79,5 @@ class TestExternalSkillService:
 
         monkeypatch.setattr(sync, "update_external_skill", fail_update)
 
-        assert sync.sync_external_skills(workspace, dry_run=False) is None
+        assert sync.sync_external_resources(workspace, dry_run=False) is None
         assert local_skill.read_text() == "local\n"

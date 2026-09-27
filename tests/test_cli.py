@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from agent_sync.external_skills import sync
+from agent_sync.external_resources import sync
 from agent_sync.workspace import Workspace
 from tests.factories import materialize_every_source_kind
 
@@ -34,7 +34,7 @@ class TestCli:
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 
-        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--dry-run"])
+        result = run_cli(["vendor-resources", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 0
 
@@ -45,17 +45,17 @@ class TestCli:
     ) -> None:
         """Test that pending external updates do not fail a dry run."""
 
-        def fake_sync_external_skills(resolved_workspace: Workspace, dry_run: bool) -> None:
+        def fake_sync_external_resources(resolved_workspace: Workspace, dry_run: bool) -> None:
             """Represent a successful dry run with pending updates."""
 
             assert resolved_workspace == workspace
             assert dry_run
 
-        monkeypatch.setattr(sync, "sync_external_skills", fake_sync_external_skills)
+        monkeypatch.setattr(sync, "sync_external_resources", fake_sync_external_resources)
         monkeypatch.setattr(
             sys,
             "argv",
-            ["agent-sync", "vendor-skills", "--root", str(workspace.root), "--dry-run"],
+            ["agent-sync", "vendor-resources", "--root", str(workspace.root), "--dry-run"],
         )
 
         with pytest.raises(SystemExit) as exit_result:
@@ -86,7 +86,7 @@ class TestCli:
     def test_vendor_command_rejects_an_output_directory(self, workspace: Workspace) -> None:
         """Test that the command writing no provider trees does not accept their location."""
 
-        result = run_cli(["vendor-skills", "--root", str(workspace.root), "--output-dir", "generated"])
+        result = run_cli(["vendor-resources", "--root", str(workspace.root), "--output-dir", "generated"])
 
         assert result.returncode == 2
 

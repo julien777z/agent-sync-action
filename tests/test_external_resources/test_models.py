@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
 
 
 class TestExternalSkillModel:
@@ -13,6 +13,7 @@ class TestExternalSkillModel:
         """Test that an omitted upstream selector uses the registry name."""
 
         skill = ExternalSkill(
+            kind="skill",
             name="sample-skill",
             repo="example/sample-skill",
             update_on_sync=True,
@@ -25,7 +26,7 @@ class TestExternalSkillModel:
         """Test that unsafe external skill names are rejected."""
 
         with pytest.raises(ValidationError):
-            ExternalSkill(name=name, repo="example/sample", update_on_sync=True)
+            ExternalSkill(kind="skill", name=name, repo="example/sample", update_on_sync=True)
 
     @pytest.mark.parametrize("skill", ["Bad Name", "UPPER", "../escape"])
     def test_invalid_upstream_skill_names_fail(self, skill: str) -> None:
@@ -33,6 +34,7 @@ class TestExternalSkillModel:
 
         with pytest.raises(ValidationError):
             ExternalSkill(
+                kind="skill",
                 name="sample",
                 repo="example/sample",
                 skill=skill,
@@ -46,7 +48,9 @@ class TestExternalSkillModel:
     def test_category_places_the_skill(self, category: str | None, expected: Path) -> None:
         """Test that the declared folder becomes the skill's path under the skills directory."""
 
-        skill = ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
+        skill = ExternalSkill(
+            kind="skill", name="sample", repo="example/sample", category=category, update_on_sync=True
+        )
 
         assert skill.relative_path == expected
 
@@ -57,7 +61,9 @@ class TestExternalSkillModel:
         """Test that unsafe or malformed grouping folders are rejected."""
 
         with pytest.raises(ValidationError):
-            ExternalSkill(name="sample", repo="example/sample", category=category, update_on_sync=True)
+            ExternalSkill(
+                kind="skill", name="sample", repo="example/sample", category=category, update_on_sync=True
+            )
 
     def test_old_folder_key_is_rejected(self) -> None:
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
@@ -80,6 +86,7 @@ class TestExternalSkillModel:
     def test_invalid_skill_name_overrides_fail(self, skill_name_override: str) -> None:
         with pytest.raises(ValidationError):
             ExternalSkill(
+                kind="skill",
                 name="sample",
                 repo="example/sample",
                 skill_name_override=skill_name_override,
@@ -96,14 +103,16 @@ class TestExternalSkillModel:
         """Test that entries cannot silently overwrite one local skill directory."""
 
         with pytest.raises(ValidationError, match="names must be unique"):
-            SkillsRegistry(
-                skills=[
+            ResourcesRegistry(
+                resources=[
                     ExternalSkill(
+                        kind="skill",
                         name="sample",
                         repo="example/first",
                         update_on_sync=True,
                     ),
                     ExternalSkill(
+                        kind="skill",
                         name="sample",
                         repo="example/second",
                         update_on_sync=True,
@@ -113,6 +122,7 @@ class TestExternalSkillModel:
 
     def test_override_name_sets_local_path_without_changing_upstream_selector(self) -> None:
         skill = ExternalSkill(
+            kind="skill",
             name="no-ai-slop",
             repo="example/writing",
             skill_name_override="no-text-ai-slop",
@@ -126,11 +136,15 @@ class TestExternalSkillModel:
 
     def test_duplicate_override_names_fail(self) -> None:
         with pytest.raises(ValidationError, match="names must be unique"):
-            SkillsRegistry(
-                skills=[
+            ResourcesRegistry(
+                resources=[
                     ExternalSkill(
-                        name="original", repo="example/one", skill_name_override="shared", update_on_sync=True
+                        kind="skill",
+                        name="original",
+                        repo="example/one",
+                        skill_name_override="shared",
+                        update_on_sync=True,
                     ),
-                    ExternalSkill(name="shared", repo="example/two", update_on_sync=True),
+                    ExternalSkill(kind="skill", name="shared", repo="example/two", update_on_sync=True),
                 ]
             )
