@@ -3,7 +3,7 @@ from typing import Final
 
 from agent_sync.document import FrontMatterValues, render_front_matter
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
-from agent_sync.generation.context import GenerationContext
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.document import RuleFrontMatter
 from agent_sync.models.output import (
     ArtifactKind,

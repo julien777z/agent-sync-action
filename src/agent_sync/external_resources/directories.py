@@ -7,7 +7,7 @@ from typing import Final
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.models.registry import DirectorySourceMarker, ExternalDirectory
 from agent_sync.utils import replace_tree, trees_differ
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
 

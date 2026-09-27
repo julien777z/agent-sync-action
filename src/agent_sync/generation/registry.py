@@ -1,9 +1,7 @@
-from collections.abc import Callable
-from typing import Final, TypedDict
+from typing import Final
 
-from agent_sync.config import SourceConfig
 from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
-from agent_sync.generation.context import GenerationContext, load_generation_context
+from agent_sync.generation.context import load_generation_context
 from agent_sync.generation.rule import (
     generate_codex_rules,
     generate_rule_mirrors,
@@ -13,22 +11,12 @@ from agent_sync.generation.setting import generate_claude_settings, generate_cod
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
-    GeneratedOutput,
     Manifest,
     Provider,
 )
-from agent_sync.workspace import Workspace
-
-type GenerationHandler = Callable[[GenerationContext, Provider], list[GeneratedOutput]]
-
-
-class ArtifactRegistration(TypedDict):
-    """Describe generation and ownership for one artifact kind."""
-
-    owned_directory: str | None
-    owned_files: dict[Provider, tuple[str, ...]]
-    handlers: dict[Provider, GenerationHandler]
-
+from agent_sync.models.generation import ArtifactRegistration
+from agent_sync.models.settings import SourceConfig
+from agent_sync.models.workspace import Workspace
 
 ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
     ArtifactKind.SKILL: ArtifactRegistration(

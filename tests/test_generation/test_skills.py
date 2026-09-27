@@ -3,7 +3,7 @@ import pytest
 from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import generate_skills
 from agent_sync.models.output import GeneratedLink, Provider
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import SkillFrontMatterFactory, load_context, materialize_skill
 
 

@@ -1,11 +1,9 @@
 import json
-import tomllib
 
-from agent_sync.config import CodexSettings, PlatformSettings
-from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
-from agent_sync.generation.context import GenerationContext
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
+from agent_sync.models.settings import CodexSettings, PlatformSettings
 from agent_sync.utils import ensure_trailing_newline
 
 
@@ -64,38 +62,9 @@ def generate_codex_settings(
     return [
         GeneratedFile(
             target_path=provider.root(context.workspace.output_root) / "config.toml",
-            content=render_codex_settings(synchronized),
+            content=synchronized.render_toml(GENERATED_FILE_NOTICE),
             artifact=ArtifactKind.SETTING,
             source_path=source_path,
             provider=provider,
         ),
     ]
-
-
-def render_codex_settings(settings: CodexSettings) -> str:
-    """Render the complete generated Codex TOML file."""
-
-    lines = [f"# {GENERATED_FILE_NOTICE}"]
-
-    if settings.model:
-        lines.append(f"model = {json.dumps(settings.model, ensure_ascii=False)}")
-
-    if settings.project_doc_max_bytes is not None:
-        lines.append(f"project_doc_max_bytes = {settings.project_doc_max_bytes}")
-
-    if settings.features:
-        lines.append("")
-        lines.append("[features]")
-        lines.extend(
-            f"{json.dumps(name, ensure_ascii=False)} = {json.dumps(enabled)}"
-            for name, enabled in settings.features.items()
-        )
-
-    rendered = ensure_trailing_newline("\n".join(lines))
-
-    try:
-        tomllib.loads(rendered)
-    except tomllib.TOMLDecodeError as exc:
-        raise AgentSyncError(f"Generated .codex/config.toml is invalid TOML: {exc}") from exc
-
-    return rendered

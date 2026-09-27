@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
-from agent_sync.config import SourceConfig
 from agent_sync.document import parse_markdown
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.document import (
@@ -10,68 +9,17 @@ from agent_sync.models.document import (
     RuleFrontMatter,
     SkillFrontMatter,
 )
+from agent_sync.models.generation import (
+    AgentSource,
+    GenerationContext,
+    HookSource,
+    RuleSource,
+    SkillSource,
+)
+from agent_sync.models.settings import SourceConfig
+from agent_sync.models.workspace import Workspace
 from agent_sync.skills import discover_skill_directories
 from agent_sync.utils import validate_slug
-from agent_sync.workspace import Workspace
-
-
-class SkillSource(BaseModel):
-    """Hold one validated skill source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    directory: Path
-    front_matter: SkillFrontMatter
-
-
-class AgentSource(BaseModel):
-    """Hold one parsed agent source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    front_matter: AgentFrontMatter
-    body: str
-
-
-class RuleSource(BaseModel):
-    """Hold one parsed rule source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    front_matter: RuleFrontMatter
-    body: str
-
-
-class HookSource(BaseModel):
-    """Hold one hook source and its executable intent."""
-
-    model_config = ConfigDict(frozen=True)
-
-    path: Path
-    content: str
-    executable: bool
-
-
-class GenerationContext(BaseModel):
-    """Hold all immutable inputs for one generation run."""
-
-    model_config = ConfigDict(frozen=True)
-
-    workspace: Workspace
-    source_config: SourceConfig
-    skills: tuple[SkillSource, ...]
-    agents: tuple[AgentSource, ...]
-    rules: tuple[RuleSource, ...]
-    global_instructions: str = ""
-    project_instructions: str = ""
-    hooks: tuple[HookSource, ...]
-    instructions: str = ""
 
 
 def load_generation_context(

@@ -2,7 +2,7 @@ import os
 
 
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import (
     RuleFrontMatterFactory,
     SkillFrontMatterFactory,

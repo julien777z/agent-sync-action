@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
 from agent_sync.external_resources.directories import SOURCE_MARKER
 from agent_sync.external_resources.directories import update_external_directory
@@ -14,7 +15,7 @@ from agent_sync.models.registry import (
     ExternalSkill,
     ResourcesRegistry,
 )
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import (
     ExternalResourceFactory,
     ExternalSkillFactory,
@@ -60,7 +61,11 @@ class TestExternalResources:
         calls: list[tuple[str, bool]] = []
 
         def update_skill(
-            resolved_workspace: Workspace, entry: ExternalSkill, skills_dir: Path, dry_run: bool
+            resolved_workspace: Workspace,
+            entry: ExternalSkill,
+            skills_dir: Path,
+            dry_run: bool,
+            config: ActionConfig,
         ) -> bool:
             assert resolved_workspace == workspace
             assert skills_dir == workspace.agents_dir / "skills"
@@ -74,7 +79,7 @@ class TestExternalResources:
 
         monkeypatch.setattr(sync, "update_external_skill", update_skill)
         monkeypatch.setattr(sync, "update_external_directory", update_directory)
-        sync_external_resources(workspace, dry_run=True)
+        sync_external_resources(workspace, dry_run=True, config=ActionConfig())
         assert calls == [("skill", True), ("directory", True)]
 
     @pytest.mark.parametrize("kind", ["unknown", None], ids=["invalid", "missing"])
@@ -105,16 +110,16 @@ class TestExternalResources:
         stub_external_directory_upstream(monkeypatch, resource, source_files, root_license="Sample license\n")
 
         destination = workspace.agents_dir / "resources" / resource.name
-        sync_external_resources(workspace, dry_run=False)
+        sync_external_resources(workspace, dry_run=False, config=ActionConfig())
         assert (destination / "guide.md").read_text() == source_files["guide.md"]
         assert (destination / "nested/example.txt").read_text() == source_files["nested/example.txt"]
         assert (destination / SOURCE_MARKER).is_file()
         assert (destination / "LICENSE").read_text() == "Sample license\n"
 
         (destination / "stale.md").write_text("stale", encoding="utf-8")
-        sync_external_resources(workspace, dry_run=True)
+        sync_external_resources(workspace, dry_run=True, config=ActionConfig())
         assert (destination / "stale.md").exists()
-        sync_external_resources(workspace, dry_run=False)
+        sync_external_resources(workspace, dry_run=False, config=ActionConfig())
         assert not (destination / "stale.md").exists()
         assert not update_external_directory(workspace, resource, dry_run=False)
 
@@ -148,7 +153,7 @@ class TestExternalResources:
         (destination / "notes.md").write_text("local", encoding="utf-8")
 
         with pytest.raises(RuntimeError, match="not managed"):
-            sync_external_resources(workspace, dry_run=False)
+            sync_external_resources(workspace, dry_run=False, config=ActionConfig())
 
         assert (destination / "notes.md").read_text() == "local"
 
@@ -216,6 +221,6 @@ class TestExternalResources:
         (workspace.agents_dir / "resources").symlink_to(outside, target_is_directory=True)
 
         with pytest.raises(RuntimeError, match="unsafe parent"):
-            sync_external_resources(workspace, dry_run=False)
+            sync_external_resources(workspace, dry_run=False, config=ActionConfig())
 
         assert not any(outside.iterdir())

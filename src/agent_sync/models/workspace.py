@@ -1,17 +1,29 @@
 import os
 import shutil
 from pathlib import Path
-from typing import Final, Self
+from typing import Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from agent_sync.config import ACTION_CONFIG
+from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
 from agent_sync.utils import escapes_base_directory
 
 SOURCE_DIRECTORY_NAMES: Final[frozenset[str]] = frozenset(
     {"skills", "agents", "rules", "hooks", "settings", "models", "resources"}
 )
+
+
+class CliArguments(BaseModel):
+    """Validate parsed command-line arguments before dispatch."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    command: Literal["mirror-providers", "vendor-resources"]
+    root: str | None
+    agents_dir: str | None
+    output_dir: str | None = None
+    dry_run: bool
 
 
 class Workspace(BaseModel):
@@ -78,12 +90,13 @@ class Workspace(BaseModel):
         root: str | None,
         agents_dirname: str | None,
         output_dirname: str | None,
+        config: ActionConfig,
     ) -> Self:
         """Resolve CLI options, environment values, and defaults into a workspace."""
 
-        resolved_root = root or ACTION_CONFIG.root or Path.cwd()
-        resolved_agents_dirname = agents_dirname or ACTION_CONFIG.agents_dir
-        resolved_output_dirname = output_dirname or ACTION_CONFIG.output_dir
+        resolved_root = root or config.root or Path.cwd()
+        resolved_agents_dirname = agents_dirname or config.agents_dir
+        resolved_output_dirname = output_dirname or config.output_dir
 
         return cls(
             root=Path(resolved_root).resolve(),

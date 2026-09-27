@@ -12,7 +12,7 @@ from agent_sync.models.output import (
 )
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import (
     RuleFrontMatterFactory,
     materialize_every_source_kind,

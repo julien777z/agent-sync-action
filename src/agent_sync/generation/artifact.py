@@ -1,7 +1,7 @@
 from typing import Final
 
 from agent_sync.document import render_front_matter
-from agent_sync.generation.context import GenerationContext
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput
 from agent_sync.models.output import Provider
 from agent_sync.source import resolve_agent_model

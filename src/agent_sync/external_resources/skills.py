@@ -2,6 +2,7 @@ import logging
 import tempfile
 from pathlib import Path
 
+from agent_sync.config import ActionConfig
 from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.external_resources.installer import (
@@ -13,7 +14,7 @@ from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.skills import locate_skill_by_name
 from agent_sync.utils import replace_tree, trees_differ
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ def update_external_skill(
     skill: ExternalSkill,
     skills_dir: Path,
     dry_run: bool,
+    config: ActionConfig,
 ) -> bool:
     """Update one external skill from a single immutable source snapshot."""
 
@@ -37,7 +39,7 @@ def update_external_skill(
             working_directory / "source",
         )
 
-        install_skill(skill, working_directory, source_root)
+        install_skill(skill, working_directory, source_root, config)
         installed = locate_skill_directory(
             working_directory,
             skill.upstream_skill,

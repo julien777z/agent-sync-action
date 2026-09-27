@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 
 class TestWorkspace:
@@ -37,7 +37,7 @@ class TestWorkspace:
     def test_resolve_accepts_an_explicit_output_directory(self, tmp_path: Path) -> None:
         """Test that the resolved workspace carries the requested output directory."""
 
-        workspace = Workspace.resolve(str(tmp_path), None, ".agents/.auto_generated")
+        workspace = Workspace.resolve(str(tmp_path), None, ".agents/.auto_generated", config=ActionConfig())
 
         assert workspace.output_dirname == ".agents/.auto_generated"
 
@@ -48,14 +48,12 @@ class TestWorkspace:
     ) -> None:
         """Test that an absent or empty output directory takes the configured one."""
 
-        monkeypatch.setattr(
-            "agent_sync.workspace.ACTION_CONFIG",
-            ActionConfig(output_dir=".generated"),
-        )
+        monkeypatch.setenv("AGENT_SYNC_OUTPUT_DIR", ".generated")
+        config = ActionConfig()
 
-        assert Workspace.resolve(str(tmp_path), None, None).output_dirname == ".generated"
-        assert Workspace.resolve(str(tmp_path), None, "").output_dirname == ".generated"
-        assert Workspace.resolve(str(tmp_path), None, "chosen").output_dirname == "chosen"
+        assert Workspace.resolve(str(tmp_path), None, None, config).output_dirname == ".generated"
+        assert Workspace.resolve(str(tmp_path), None, "", config).output_dirname == ".generated"
+        assert Workspace.resolve(str(tmp_path), None, "chosen", config).output_dirname == "chosen"
 
     def test_reads_current_disk_state(self, workspace: Workspace) -> None:
         """Test that workspace reads never return stale cached content."""

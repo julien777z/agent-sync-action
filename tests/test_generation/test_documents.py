@@ -8,7 +8,7 @@ from agent_sync.generation.rule import (
 )
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
 
 

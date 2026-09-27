@@ -1,27 +1,15 @@
 import argparse
 import logging
-from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
 
+from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
 from agent_sync.external_resources.sync import sync_external_resources
+from agent_sync.models.workspace import CliArguments, Workspace
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
 
-logger = logging.getLogger(__name__)
-
-
-class CliArguments(BaseModel):
-    """Validate parsed command-line arguments before dispatch."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    command: Literal["mirror-providers", "vendor-resources"]
-    root: str | None
-    agents_dir: str | None
-    output_dir: str | None = None
-    dry_run: bool
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
@@ -86,13 +74,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     try:
-        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir)
+        config = ActionConfig()
+        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir, config)
 
         match parsed.command:
             case "mirror-providers":
                 differences_found = mirror_providers(workspace, parsed.dry_run)
             case "vendor-resources":
-                sync_external_resources(workspace, parsed.dry_run)
+                sync_external_resources(workspace, parsed.dry_run, config)
                 differences_found = False
 
         exit_code = 1 if differences_found else 0

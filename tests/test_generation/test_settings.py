@@ -5,7 +5,7 @@ import tomllib
 from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.output import GeneratedFile, Provider
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
 
 

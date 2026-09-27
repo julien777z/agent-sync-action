@@ -20,9 +20,9 @@ from agent_sync.models.output import (
     ReconciliationPlan,
 )
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 MAX_DIFF_LINES: Final[int] = 20
 

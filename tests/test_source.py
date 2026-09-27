@@ -3,7 +3,7 @@ import pytest
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 
 class TestCanonicalSources:

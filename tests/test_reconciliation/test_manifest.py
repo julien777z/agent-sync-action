@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent_sync.models.output import ArtifactKind, GeneratedFile, Manifest
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 
 class TestManifest:

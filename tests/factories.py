@@ -5,13 +5,15 @@ from pathlib import Path
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
+from agent_sync.config import ActionConfig
 from agent_sync.document import render_front_matter
 from agent_sync.external_resources import directories, skills
-from agent_sync.generation.context import GenerationContext, load_generation_context
+from agent_sync.generation.context import load_generation_context
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
     kind="skill",
@@ -47,7 +49,12 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
 
         return source_root
 
-    def fake_install(installed_skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+    def fake_install(
+        installed_skill: ExternalSkill,
+        working_directory: Path,
+        source_root: Path,
+        config: ActionConfig,
+    ) -> None:
         """Create the installed skill in the staging directory."""
 
         installed = working_directory / ".staging/skills" / installed_skill.name

@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 
 from agent_sync.generation.artifact import has_generated_notice
+from agent_sync.models.output import Provider
 
 
 def stage_generated_paths(agents_dir: str, output_dir: str) -> None:
@@ -10,11 +11,12 @@ def stage_generated_paths(agents_dir: str, output_dir: str) -> None:
 
     relocated = output_dir not in ("", ".")
     output_root = Path(output_dir) if relocated else Path(".")
-    paths = [*(output_root / provider for provider in (".claude", ".cursor", ".codex")), Path(agents_dir)]
+    provider_directories = tuple(provider.directory for provider in Provider)
+    paths = [*(output_root / directory for directory in provider_directories), Path(agents_dir)]
 
     if relocated:
         deleted = subprocess.run(
-            ["git", "ls-files", "--deleted", "-z", "--", ".claude", ".cursor", ".codex"],
+            ["git", "ls-files", "--deleted", "-z", "--", *provider_directories],
             capture_output=True,
             check=True,
         )

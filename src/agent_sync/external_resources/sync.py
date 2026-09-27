@@ -1,18 +1,19 @@
 import logging
 from typing import Final
 
+from agent_sync.config import ActionConfig
 from agent_sync.external_resources.directories import update_external_directory
 from agent_sync.external_resources.skills import update_external_skill
 from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
 from agent_sync.utils import load_json_model
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 
 
-def sync_external_resources(workspace: Workspace, dry_run: bool) -> None:
+def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionConfig) -> None:
     """Update all registered external resources from their upstream sources."""
 
     registry_path = workspace.agents_dir / EXTERNAL_RESOURCES_FILENAME
@@ -26,7 +27,9 @@ def sync_external_resources(workspace: Workspace, dry_run: bool) -> None:
             continue
 
         if isinstance(resource, ExternalSkill):
-            changed = update_external_skill(workspace, resource, workspace.agents_dir / "skills", dry_run)
+            changed = update_external_skill(
+                workspace, resource, workspace.agents_dir / "skills", dry_run, config
+            )
             name = resource.local_name
         else:
             changed = update_external_directory(workspace, resource, dry_run)

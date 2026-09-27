@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
-from agent_sync.config import ACTION_CONFIG
+from agent_sync.config import ActionConfig
 from agent_sync.document import parse_markdown
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
@@ -25,13 +25,15 @@ TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
 )
 
 
-def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+def install_skill(
+    skill: ExternalSkill, working_directory: Path, source_root: Path, config: ActionConfig
+) -> None:
     """Install one skill from a downloaded repository snapshot."""
 
     command = [
         "npx",
         "--yes",
-        f"skills@{ACTION_CONFIG.skills_cli_version}",
+        f"skills@{config.skills_cli_version}",
         "add",
         str(source_root),
         "--skill",

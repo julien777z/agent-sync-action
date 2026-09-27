@@ -1,4 +1,4 @@
-from agent_sync.config import (
+from agent_sync.models.settings import (
     AgentModelOverride,
     CodexSettings,
     PlatformSettings,
@@ -7,7 +7,7 @@ from agent_sync.config import (
 from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
 from agent_sync.utils import load_json_model, validate_slug
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 
 def load_source_config(workspace: Workspace) -> SourceConfig:

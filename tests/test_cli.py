@@ -3,8 +3,9 @@ import sys
 
 import pytest
 
+from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import run_cli
 
 
@@ -47,7 +48,9 @@ class TestCli:
     ) -> None:
         """Test that pending external updates do not fail a dry run."""
 
-        def fake_sync_external_resources(resolved_workspace: Workspace, dry_run: bool) -> None:
+        def fake_sync_external_resources(
+            resolved_workspace: Workspace, dry_run: bool, config: ActionConfig
+        ) -> None:
             """Represent a successful dry run with pending updates."""
 
             assert resolved_workspace == workspace

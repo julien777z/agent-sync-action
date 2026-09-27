@@ -3,13 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from agent_sync.config import ACTION_CONFIG, ActionConfig
+from agent_sync.config import ActionConfig
 from agent_sync.external_resources import installer
 from agent_sync.external_resources import skills
 from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
 from agent_sync.external_resources.github import copy_legal_files, resolve_revision
 from agent_sync.models.registry import ExternalSkill
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 from tests.factories import (
     ExternalSkillFactory,
     SkillFrontMatterFactory,
@@ -126,10 +126,11 @@ class TestExternalSkillBoundaries:
             update_on_sync=True,
         )
 
-        installer.install_skill(skill, tmp_path, source_root)
+        config = ActionConfig(skills_cli_version="0.0.0")
+        installer.install_skill(skill, tmp_path, source_root, config=config)
 
         assert str(source_root) in captured
-        assert f"skills@{ACTION_CONFIG.skills_cli_version}" in captured
+        assert "skills@0.0.0" in captured
         assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
 
     def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
@@ -217,6 +218,7 @@ class TestExternalSkillBoundaries:
             installed_skill: ExternalSkill,
             working_directory: Path,
             source_root: Path,
+            config: ActionConfig,
         ) -> None:
             """Create one synthetic installed skill."""
 
@@ -243,6 +245,7 @@ class TestExternalSkillBoundaries:
             skill,
             workspace.agents_dir / "skills",
             dry_run=True,
+            config=ActionConfig(),
         )
 
         assert observed[0] == ("snapshot", revision)
@@ -326,6 +329,7 @@ class TestExternalSkillBoundaries:
             ROOT_LEVEL_SKILL,
             workspace.agents_dir / "skills",
             dry_run=False,
+            config=ActionConfig(),
         )
         assert (workspace.agents_dir / "skills/local-skill/SKILL.md").read_text() == (
             "---\n"
@@ -347,7 +351,9 @@ class TestExternalSkillBoundaries:
         stub_root_level_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review/style"})
 
-        assert update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
+        assert update_external_skill(
+            workspace, skill, workspace.agents_dir / "skills", dry_run=False, config=ActionConfig()
+        )
         assert "Content." in (workspace.agents_dir / "skills/review/style/local-skill/SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
 
@@ -373,7 +379,7 @@ class TestExternalSkillBoundaries:
             update={"category": "review", "skill_name_override": "renamed-skill"}
         )
 
-        assert update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
         renamed = skills_dir / "review/renamed-skill/SKILL.md"
         assert "name: renamed-skill\n" in renamed.read_text()
         assert not previous.exists()
@@ -397,7 +403,9 @@ class TestExternalSkillBoundaries:
             body="Old.",
         )
 
-        assert update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
+        assert update_external_skill(
+            workspace, skill, workspace.agents_dir / "skills", dry_run=False, config=ActionConfig()
+        )
         assert "Content." in (grouped / "SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
 
@@ -426,7 +434,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="destination already exists"):
-            update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert current.read_text() == original
         assert marker.read_text() == "keep\n"
@@ -446,7 +454,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="not managed"):
-            update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert current.read_text() == original
         assert not (skills_dir / "review" / ROOT_LEVEL_SKILL.local_name).exists()
@@ -474,7 +482,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="not a managed installation"):
-            update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert link.is_symlink()
         assert source.exists()
@@ -507,7 +515,7 @@ class TestExternalSkillBoundaries:
             "  source: https://github.com/example/repository\n---\n\nContent.\n"
         )
 
-        assert update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
         assert "Content." in (skills_dir / expected / "SKILL.md").read_text()
         assert list(skills_dir.rglob("SKILL.md")) == [skills_dir / expected / "SKILL.md"]
         assert all(any(path.iterdir()) for path in skills_dir.rglob("*") if path.is_dir())
@@ -534,7 +542,9 @@ class TestExternalSkillBoundaries:
                 ),
             )
 
-        assert update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        assert update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
+        )
         assert (skills_dir / "local-skill/SKILL.md").exists()
         assert not (skills_dir / "review/local-skill").exists()
         assert (skills_dir / "review/neighbour/SKILL.md").exists()
@@ -556,7 +566,7 @@ class TestExternalSkillBoundaries:
         )
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
-        assert update_external_skill(workspace, skill, skills_dir, dry_run=True)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=True, config=ActionConfig())
         assert (stray / "SKILL.md").exists()
         assert not (skills_dir / "review").exists()
 
@@ -595,6 +605,7 @@ class TestExternalSkillBoundaries:
             installed_skill: ExternalSkill,
             working_directory: Path,
             source_root: Path,
+            config: ActionConfig,
         ) -> None:
             """Create a synthetic installed skill."""
 
@@ -609,5 +620,6 @@ class TestExternalSkillBoundaries:
             skill,
             workspace.agents_dir / "skills",
             dry_run=False,
+            config=ActionConfig(),
         )
         assert (workspace.agents_dir / "skills/sample/LICENSE").read_text() == "License text.\n"

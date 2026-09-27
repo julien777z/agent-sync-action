@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_sync.workspace import Workspace
+from agent_sync.models.workspace import Workspace
 
 
 def create_workspace(root: Path, output_dirname: str = "") -> Workspace:
