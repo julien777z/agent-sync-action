@@ -1,12 +1,8 @@
-import logging
-
 import yaml
 from pydantic import BaseModel, JsonValue, RootModel, ValidationError
 
 from agent_sync.errors import AgentSyncError
 from agent_sync.utils import ensure_trailing_newline
-
-logger = logging.getLogger(__name__)
 
 
 class FrontMatterValues(RootModel[dict[str, JsonValue]]):

@@ -4,7 +4,11 @@ from pathlib import Path
 
 from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
-from agent_sync.external_resources import installer
+from agent_sync.external_resources.installer import (
+    install_skill,
+    locate_skill_directory,
+    supplement_root_assets,
+)
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.skills import locate_skill_by_name
@@ -33,16 +37,16 @@ def update_external_skill(
             working_directory / "source",
         )
 
-        installer.install_skill(skill, working_directory, source_root)
-        installed = installer.locate_skill_directory(
+        install_skill(skill, working_directory, source_root)
+        installed = locate_skill_directory(
             working_directory,
             skill.upstream_skill,
             excluded_root=source_root,
         )
-        source_skill = installer.locate_skill_directory(source_root, skill.upstream_skill)
+        source_skill = locate_skill_directory(source_root, skill.upstream_skill)
 
         if source_skill == source_root:
-            installer.supplement_root_assets(installed, source_root)
+            supplement_root_assets(installed, source_root)
 
         copy_legal_files(installed, source_root)
 

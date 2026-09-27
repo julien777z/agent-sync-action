@@ -1,5 +1,3 @@
-import logging
-
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -9,8 +7,6 @@ from pydantic import (
     computed_field,
     field_validator,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class SkillFrontMatter(BaseModel):

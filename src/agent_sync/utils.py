@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 import shutil
@@ -10,8 +9,6 @@ from typing import Final
 from pydantic import BaseModel, ValidationError
 
 from agent_sync.errors import AgentSyncError
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 

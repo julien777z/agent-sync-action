@@ -1,5 +1,4 @@
 import json
-import logging
 import tomllib
 
 from agent_sync.config import CodexSettings, PlatformSettings
@@ -8,8 +7,6 @@ from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.generation.context import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.utils import ensure_trailing_newline
-
-logger = logging.getLogger(__name__)
 
 
 def generate_claude_settings(

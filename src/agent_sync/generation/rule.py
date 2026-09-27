@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from typing import Final
 
@@ -14,8 +13,6 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.utils import ensure_trailing_newline, serialized_field_names
-
-logger = logging.getLogger(__name__)
 
 DISCARDED_RULE_KEYS: Final[frozenset[str]] = frozenset({"name"})
 

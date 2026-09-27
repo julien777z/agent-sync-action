@@ -6,7 +6,7 @@ import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
 from agent_sync.document import render_front_matter
-from agent_sync.external_resources import directories, installer, skills
+from agent_sync.external_resources import directories, skills
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
@@ -56,7 +56,7 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
     monkeypatch.setattr(skills, "download_snapshot", fake_download)
-    monkeypatch.setattr(installer, "install_skill", fake_install)
+    monkeypatch.setattr(skills, "install_skill", fake_install)
 
 
 def stub_external_directory_upstream(

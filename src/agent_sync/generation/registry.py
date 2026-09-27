@@ -1,5 +1,4 @@
 from collections.abc import Callable
-import logging
 from typing import Final, TypedDict
 
 from agent_sync.config import SourceConfig
@@ -19,8 +18,6 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.workspace import Workspace
-
-logger = logging.getLogger(__name__)
 
 type GenerationHandler = Callable[[GenerationContext, Provider], list[GeneratedOutput]]
 
