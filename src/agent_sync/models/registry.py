@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -109,6 +109,13 @@ class ExternalDirectory(BaseModel):
             raise ValueError("Resource source_path must be a relative repository path")
 
         return value
+
+
+class DirectorySourceMarker(TypedDict):
+    """Identify the upstream directory that owns one vendored reference collection."""
+
+    repo: str
+    source_path: str
 
 
 class ResourcesRegistry(BaseModel):

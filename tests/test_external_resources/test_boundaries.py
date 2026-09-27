@@ -149,7 +149,7 @@ class TestExternalSkillBoundaries:
         assert installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root) == installed
 
     def test_source_discovery_prefers_canonical_skill_over_provider_copies(self, tmp_path: Path) -> None:
-        """Choose the upstream canonical copy when a repository ships provider mirrors."""
+        """Test that source discovery selects the canonical copy over provider mirrors."""
 
         for prefix in (".agents", ".claude", ".cursor", "plugin"):
             directory = tmp_path / prefix / "skills/impeccable"
@@ -355,6 +355,8 @@ class TestExternalSkillBoundaries:
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
+        """Test that an override renames an existing managed skill."""
+
         stub_root_level_upstream(monkeypatch)
         skills_dir = workspace.agents_dir / "skills"
         previous = skills_dir / "review/local-skill"
@@ -403,7 +405,7 @@ class TestExternalSkillBoundaries:
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
-        """Reject a move into an occupied destination without removing either directory."""
+        """Test that an occupied destination preserves both skill directories."""
 
         stub_root_level_upstream(monkeypatch)
         skills_dir = workspace.agents_dir / "skills"

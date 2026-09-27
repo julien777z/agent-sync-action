@@ -18,17 +18,17 @@ from tests.factories import (
 
 
 class TestExternalResources:
-    """Test resource registry validation and directory updates."""
+    """Test that resource registry validation and directory updates work."""
 
     @pytest.mark.parametrize("source_path", ["/absolute", "../escape", "guides/../../escape", ""])
     def test_resource_source_path_stays_in_repository(self, source_path: str) -> None:
-        """Reject paths that can escape the upstream snapshot."""
+        """Test that paths cannot escape the upstream snapshot."""
 
         with pytest.raises(ValidationError):
             ExternalResourceFactory.build(source_path=source_path)
 
     def test_duplicate_resource_names_fail(self) -> None:
-        """Reject registrations that target the same directory."""
+        """Test that registrations cannot target the same directory."""
 
         with pytest.raises(ValidationError, match="names must be unique"):
             ResourcesRegistry(
@@ -41,7 +41,7 @@ class TestExternalResources:
     def test_mixed_registry_dispatches_each_kind_once(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Route skills and directories from one registry to their existing destinations."""
+        """Test that one registry routes skills and directories to their destinations."""
 
         skill = ExternalSkillFactory.build()
         directory = ExternalResourceFactory.build()
@@ -70,7 +70,7 @@ class TestExternalResources:
         assert calls == [("skill", True), ("directory", True)]
 
     def test_invalid_kind_and_missing_kind_fail(self) -> None:
-        """Require every resource to choose one supported vendoring behavior."""
+        """Test that every resource selects a supported vendoring behavior."""
 
         for value in ("unknown", None):
             with pytest.raises(ValidationError):
@@ -85,7 +85,7 @@ class TestExternalResources:
     def test_vendors_original_directory_and_removes_stale_files(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Refresh a managed collection without changing its upstream files."""
+        """Test that refresh preserves upstream files and removes stale local files."""
 
         resource = ExternalResourceFactory.build()
         materialize_registry(
@@ -128,7 +128,7 @@ class TestExternalResources:
         assert not update_external_directory(workspace, resource, dry_run=False)
 
     def test_refuses_unmanaged_destination(self, workspace: Workspace) -> None:
-        """Preserve an existing directory that Agent Sync does not own."""
+        """Test that an unmanaged directory is preserved."""
 
         resource = ExternalResourceFactory.build()
         materialize_registry(

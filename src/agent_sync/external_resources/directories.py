@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Final
 
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
-from agent_sync.models.registry import ExternalDirectory
+from agent_sync.models.registry import DirectorySourceMarker, ExternalDirectory
 from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import Workspace
 
@@ -22,7 +22,7 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
         or workspace.find_parent_blockers(destination)
     ):
         raise RuntimeError(f"Resource directory has an unsafe parent: {destination}")
-    marker = {"repo": resource.repo, "source_path": resource.source_path}
+    marker = DirectorySourceMarker(repo=resource.repo, source_path=resource.source_path)
     marker_text = json.dumps(marker, indent=2) + "\n"
 
     if destination.is_symlink():

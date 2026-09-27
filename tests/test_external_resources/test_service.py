@@ -27,7 +27,7 @@ class TestExternalSkillService:
     def test_vendored_skill_reaches_provider_mirrors(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Mirror an installed external skill to every supported provider."""
+        """Test that an installed external skill reaches every supported provider."""
 
         stub_root_level_upstream(monkeypatch)
         materialize_registry(

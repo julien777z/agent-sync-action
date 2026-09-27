@@ -66,12 +66,16 @@ class TestExternalSkillModel:
             )
 
     def test_old_folder_key_is_rejected(self) -> None:
+        """Test that an obsolete folder key is rejected."""
+
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
             ExternalSkill.model_validate(
                 {"name": "sample", "repo": "example/sample", "folder": "review", "update_on_sync": True}
             )
 
     def test_old_name_override_key_is_rejected(self) -> None:
+        """Test that an obsolete name override key is rejected."""
+
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
             ExternalSkill.model_validate(
                 {
@@ -84,6 +88,8 @@ class TestExternalSkillModel:
 
     @pytest.mark.parametrize("skill_name_override", ["Bad Name", "UPPER", "../escape"])
     def test_invalid_skill_name_overrides_fail(self, skill_name_override: str) -> None:
+        """Test that invalid local skill names are rejected."""
+
         with pytest.raises(ValidationError):
             ExternalSkill(
                 kind="skill",
@@ -121,6 +127,8 @@ class TestExternalSkillModel:
             )
 
     def test_override_name_sets_local_path_without_changing_upstream_selector(self) -> None:
+        """Test that a local name override preserves the upstream selector."""
+
         skill = ExternalSkill(
             kind="skill",
             name="no-ai-slop",
@@ -135,6 +143,8 @@ class TestExternalSkillModel:
         assert skill.relative_path == Path("review/no-text-ai-slop")
 
     def test_duplicate_override_names_fail(self) -> None:
+        """Test that duplicate local names are rejected."""
+
         with pytest.raises(ValidationError, match="names must be unique"):
             ResourcesRegistry(
                 resources=[
