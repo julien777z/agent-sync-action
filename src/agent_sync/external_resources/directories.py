@@ -41,7 +41,11 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
         revision = resolve_revision(resource.repo)
         source_root = download_snapshot(resource.repo, revision, working_directory / "source")
         source = source_root / resource.source_path
-        if source.is_symlink() or not source.is_dir():
+        source_chain = (source, *source.parents)
+        if (
+            any(path.is_symlink() for path in source_chain if path.is_relative_to(source_root))
+            or not source.is_dir()
+        ):
             raise RuntimeError(
                 f"Resource source directory does not exist: {resource.repo}/{resource.source_path}"
             )

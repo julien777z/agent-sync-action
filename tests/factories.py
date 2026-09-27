@@ -64,6 +64,8 @@ def stub_external_directory_upstream(
     resource: ExternalDirectory,
     files: dict[str, str],
     root_license: str | None = None,
+    snapshot_path: str | None = None,
+    links: dict[str, str] | None = None,
 ) -> None:
     """Serve a synthetic upstream reference directory from an immutable snapshot."""
 
@@ -76,7 +78,11 @@ def stub_external_directory_upstream(
         """Materialize the selected directory in a synthetic snapshot."""
 
         root = destination / "repository"
-        materialize_tree(root / resource.source_path, files)
+        materialize_tree(root / (snapshot_path or resource.source_path), files)
+        for link, target in (links or {}).items():
+            link_path = root / link
+            link_path.parent.mkdir(parents=True, exist_ok=True)
+            link_path.symlink_to(target, target_is_directory=True)
         if root_license is not None:
             (root / "LICENSE").write_text(root_license, encoding="utf-8")
         return root

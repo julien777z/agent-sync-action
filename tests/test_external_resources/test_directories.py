@@ -163,6 +163,29 @@ class TestExternalResources:
         assert marker.is_symlink()
         assert outside_marker.read_text(encoding="utf-8") == marker_content
 
+    def test_refuses_linked_source_parent(
+        self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that a linked source ancestor cannot select another upstream directory."""
+
+        resource = ExternalResourceFactory.build(
+            name="linked-source-parent",
+            repo="example/linked-source-parent",
+            source_path="references/sub",
+        )
+        stub_external_directory_upstream(
+            monkeypatch,
+            resource,
+            {"guide.md": "upstream"},
+            snapshot_path="docs/sub",
+            links={"references": "docs"},
+        )
+
+        with pytest.raises(RuntimeError, match="source directory does not exist"):
+            update_external_directory(workspace, resource, dry_run=False)
+
+        assert not (workspace.agents_dir / "resources" / resource.name).exists()
+
     def test_refuses_linked_resource_parent(self, workspace: Workspace, tmp_path: Path) -> None:
         """Test that resource writes cannot follow a linked parent outside the workspace."""
 
