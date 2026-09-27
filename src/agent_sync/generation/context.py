@@ -20,6 +20,7 @@ from agent_sync.models.settings import SourceConfig
 from agent_sync.models.workspace import Workspace
 from agent_sync.skills import discover_skill_directories
 from agent_sync.utils import validate_slug
+from agent_sync.workspace import agents_dir, read_optional_text
 
 
 def load_generation_context(
@@ -43,8 +44,8 @@ def load_generation_context(
 def load_root_instructions(workspace: Workspace, filename: str) -> str:
     """Read optional root guidance without its front matter."""
 
-    path = workspace.agents_dir / filename
-    content = workspace.read_text(path)
+    path = agents_dir(workspace) / filename
+    content = read_optional_text(path)
 
     if content is None:
         return ""
@@ -57,7 +58,7 @@ def load_root_instructions(workspace: Workspace, filename: str) -> str:
 def load_skills(workspace: Workspace) -> list[SkillSource]:
     """Load validated skill directories, which may be grouped in folders."""
 
-    skills_dir = workspace.agents_dir / "skills"
+    skills_dir = agents_dir(workspace) / "skills"
 
     if not skills_dir.exists():
         return []
@@ -130,7 +131,7 @@ def load_rules(workspace: Workspace) -> list[RuleSource]:
 def load_hooks(workspace: Workspace) -> list[HookSource]:
     """Load hook files and executable intent."""
 
-    hooks_dir = workspace.agents_dir / "hooks"
+    hooks_dir = agents_dir(workspace) / "hooks"
 
     if not hooks_dir.exists():
         return []
@@ -138,7 +139,7 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
     sources: list[HookSource] = []
 
     for path in sorted(path for path in hooks_dir.iterdir() if path.is_file()):
-        content = workspace.read_text(path)
+        content = read_optional_text(path)
 
         if content is not None:
             sources.append(
@@ -159,7 +160,7 @@ def load_markdown_sources[T: BaseModel](
 ) -> list[tuple[Path, str, T, str]]:
     """Load typed Markdown documents from one source directory."""
 
-    directory = workspace.agents_dir / directory_name
+    directory = agents_dir(workspace) / directory_name
 
     if not directory.exists():
         return []
@@ -168,7 +169,7 @@ def load_markdown_sources[T: BaseModel](
 
     for path in sorted(directory.glob("*.md")):
         slug = validate_slug(path.stem, path)
-        content = workspace.read_text(path)
+        content = read_optional_text(path)
 
         if content is not None:
             front_matter, body = parse_markdown(content, model, str(path))

@@ -5,6 +5,7 @@ from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.settings import CodexSettings, PlatformSettings
 from agent_sync.utils import ensure_trailing_newline
+from agent_sync.workspace import output_root, settings_dir
 
 
 def generate_claude_settings(
@@ -20,7 +21,7 @@ def generate_claude_settings(
 
     return [
         GeneratedFile(
-            target_path=provider.root(context.workspace.output_root) / "settings.json",
+            target_path=provider.root(output_root(context.workspace)) / "settings.json",
             content=ensure_trailing_newline(
                 json.dumps(
                     {
@@ -31,7 +32,7 @@ def generate_claude_settings(
                 )
             ),
             artifact=ArtifactKind.SETTING,
-            source_path=context.workspace.settings_dir / f"{provider.value}.json",
+            source_path=settings_dir(context.workspace) / f"{provider.value}.json",
             provider=provider,
         )
     ]
@@ -57,11 +58,11 @@ def generate_codex_settings(
             update={"project_doc_max_bytes": len(context.instructions.encode("utf-8"))}
         )
 
-    source_path = context.workspace.settings_dir / "codex.json"
+    source_path = settings_dir(context.workspace) / "codex.json"
 
     return [
         GeneratedFile(
-            target_path=provider.root(context.workspace.output_root) / "config.toml",
+            target_path=provider.root(output_root(context.workspace)) / "config.toml",
             content=synchronized.render_toml(GENERATED_FILE_NOTICE),
             artifact=ArtifactKind.SETTING,
             source_path=source_path,

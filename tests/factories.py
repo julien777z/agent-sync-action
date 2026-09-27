@@ -14,6 +14,7 @@ from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 
 ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
     kind="skill",
@@ -221,15 +222,15 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
     """Write one canonical source of every kind a provider tree mirrors."""
 
     materialize_rule(
-        workspace.agents_dir / "rules/sample.md",
+        agents_dir(workspace) / "rules/sample.md",
         RuleFrontMatterFactory.build(name="sample", always_apply=False),
     )
 
-    hook = workspace.agents_dir / "hooks/setup.sh"
+    hook = agents_dir(workspace) / "hooks/setup.sh"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
 
     materialize_skill(
-        workspace.agents_dir / "skills/sample/SKILL.md",
+        agents_dir(workspace) / "skills/sample/SKILL.md",
         SkillFrontMatterFactory.build(name="sample", disable_model_invocation=explicit_invocation),
     )

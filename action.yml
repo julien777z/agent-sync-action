@@ -52,8 +52,9 @@ runs:
             git fetch --depth=1 origin "$before" 2>/dev/null || true
           fi
           if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
+             && registry_prefix="$(git -C "$AGENTS_DIR" rev-parse --show-prefix 2>/dev/null)" \
              && git diff --name-only "$before" "$CURRENT_SHA" \
-                  | grep -Fqx -e "$AGENTS_DIR/external_resources.json"; then
+                  | grep -Fqx -e "${registry_prefix}external_resources.json"; then
             enabled=true
           fi
         fi

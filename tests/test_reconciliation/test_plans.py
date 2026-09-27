@@ -13,6 +13,7 @@ from agent_sync.models.output import (
 from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
 from agent_sync.source import load_source_config
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 from tests.factories import (
     RuleFrontMatterFactory,
     materialize_every_source_kind,
@@ -29,7 +30,7 @@ class TestReconciliation:
     ) -> None:
         """Test that link outputs replace either legacy target shape safely."""
 
-        source = workspace.agents_dir / "rules/sample.md"
+        source = agents_dir(workspace) / "rules/sample.md"
         source.parent.mkdir()
         source.write_text("source\n")
 
@@ -88,7 +89,7 @@ class TestReconciliation:
             target_path=target,
             content="generated\n",
             artifact=ArtifactKind.SETTING,
-            source_path=workspace.agents_dir / "settings/claude.json",
+            source_path=agents_dir(workspace) / "settings/claude.json",
             provider=Provider.CLAUDE,
         )
         plan = build_plan(workspace, Manifest(outputs=[output]))
@@ -244,7 +245,7 @@ class TestReconciliation:
         """Test that a non-directory owned path cannot block reconciliation."""
 
         materialize_rule(
-            workspace.agents_dir / "rules/sample.md",
+            agents_dir(workspace) / "rules/sample.md",
             RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         directory = workspace.root / ".claude/rules"
@@ -269,7 +270,7 @@ class TestReconciliation:
         """Test that provider-root symlinks cannot redirect generated output externally."""
 
         materialize_rule(
-            workspace.agents_dir / "rules/sample.md",
+            agents_dir(workspace) / "rules/sample.md",
             RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         external = workspace.root / "external"
@@ -293,7 +294,7 @@ class TestReconciliation:
         """Test that deleting a blocked provider root still recreates its rule links."""
 
         materialize_rule(
-            workspace.agents_dir / "rules/sample.md",
+            agents_dir(workspace) / "rules/sample.md",
             RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         external = workspace.root / "external"
@@ -331,7 +332,7 @@ class TestReconciliation:
     ) -> None:
         """Test that a removed canonical source prunes its generated files."""
 
-        rules_dir = workspace.agents_dir / "rules"
+        rules_dir = agents_dir(workspace) / "rules"
         rules_dir.mkdir()
         source = rules_dir / "sample.md"
         source.write_text("---\nalwaysApply: false\n---\n\n# Sample\n")
@@ -357,7 +358,7 @@ class TestReconciliation:
             content="#!/bin/sh\n",
             executable=True,
             artifact=ArtifactKind.HOOK,
-            source_path=workspace.agents_dir / "hooks/script",
+            source_path=agents_dir(workspace) / "hooks/script",
         )
 
         plan = build_plan(workspace, Manifest(outputs=[output]))

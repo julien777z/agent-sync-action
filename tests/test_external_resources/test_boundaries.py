@@ -10,6 +10,7 @@ from agent_sync.external_resources.skills import normalize_skill_metadata, updat
 from agent_sync.external_resources.github import copy_legal_files, resolve_revision
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 from tests.factories import (
     ExternalSkillFactory,
     SkillFrontMatterFactory,
@@ -243,7 +244,7 @@ class TestExternalSkillBoundaries:
         update_external_skill(
             workspace,
             skill,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=True,
             config=ActionConfig(),
         )
@@ -327,11 +328,11 @@ class TestExternalSkillBoundaries:
         assert update_external_skill(
             workspace,
             ROOT_LEVEL_SKILL,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=False,
             config=ActionConfig(),
         )
-        assert (workspace.agents_dir / "skills/local-skill/SKILL.md").read_text() == (
+        assert (agents_dir(workspace) / "skills/local-skill/SKILL.md").read_text() == (
             "---\n"
             "name: local-skill\n"
             "description: A skill.\n"
@@ -352,10 +353,10 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review/style"})
 
         assert update_external_skill(
-            workspace, skill, workspace.agents_dir / "skills", dry_run=False, config=ActionConfig()
+            workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
         )
-        assert "Content." in (workspace.agents_dir / "skills/review/style/local-skill/SKILL.md").read_text()
-        assert not (workspace.agents_dir / "skills/local-skill").exists()
+        assert "Content." in (agents_dir(workspace) / "skills/review/style/local-skill/SKILL.md").read_text()
+        assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
     def test_vendor_renames_an_existing_skill_with_an_override(
         self,
@@ -365,7 +366,7 @@ class TestExternalSkillBoundaries:
         """Test that an override renames an existing managed skill."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         previous = skills_dir / "review/local-skill"
         materialize_skill(
             previous / "SKILL.md",
@@ -393,7 +394,7 @@ class TestExternalSkillBoundaries:
 
         stub_root_level_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
-        grouped = workspace.agents_dir / "skills/review/local-skill"
+        grouped = agents_dir(workspace) / "skills/review/local-skill"
         materialize_skill(
             grouped / "SKILL.md",
             SkillFrontMatterFactory.build(
@@ -404,10 +405,10 @@ class TestExternalSkillBoundaries:
         )
 
         assert update_external_skill(
-            workspace, skill, workspace.agents_dir / "skills", dry_run=False, config=ActionConfig()
+            workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
         )
         assert "Content." in (grouped / "SKILL.md").read_text()
-        assert not (workspace.agents_dir / "skills/local-skill").exists()
+        assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
     def test_occupied_destination_preserves_existing_skill(
         self,
@@ -417,7 +418,7 @@ class TestExternalSkillBoundaries:
         """Test that an occupied destination preserves both skill directories."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(
             current,
@@ -447,7 +448,7 @@ class TestExternalSkillBoundaries:
         """Test that an unmanaged same-named skill survives a registry refresh."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
         original = current.read_text()
@@ -467,7 +468,7 @@ class TestExternalSkillBoundaries:
         """Test that a linked skill cannot be claimed as a managed installation."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         source = workspace.root / "linked-skill" / "SKILL.md"
         materialize_skill(
             source,
@@ -507,7 +508,7 @@ class TestExternalSkillBoundaries:
 
         stub_root_level_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": category})
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / current
         stray.mkdir(parents=True)
         (stray / "SKILL.md").write_text(
@@ -528,7 +529,7 @@ class TestExternalSkillBoundaries:
         """Test that only folders the move emptied are removed."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         for name in ("local-skill", "neighbour"):
             materialize_skill(
                 skills_dir / "review" / name / "SKILL.md",
@@ -557,7 +558,7 @@ class TestExternalSkillBoundaries:
         """Test that a dry run reports an identical skill in the wrong folder as a change."""
 
         stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / "local-skill"
         stray.mkdir(parents=True)
         (stray / "SKILL.md").write_text(
@@ -618,8 +619,8 @@ class TestExternalSkillBoundaries:
         assert update_external_skill(
             workspace,
             skill,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=False,
             config=ActionConfig(),
         )
-        assert (workspace.agents_dir / "skills/sample/LICENSE").read_text() == "License text.\n"
+        assert (agents_dir(workspace) / "skills/sample/LICENSE").read_text() == "License text.\n"

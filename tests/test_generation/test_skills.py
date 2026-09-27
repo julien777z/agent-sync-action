@@ -4,6 +4,7 @@ from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import generate_skills
 from agent_sync.models.output import GeneratedLink, Provider
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 from tests.factories import SkillFrontMatterFactory, load_context, materialize_skill
 
 
@@ -17,7 +18,7 @@ class TestSkillGeneration:
         """Test that all provider skill paths link to one canonical directory."""
 
         front_matter = SkillFrontMatterFactory.build()
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         context = load_context(workspace)
         outputs = [output for provider in Provider for output in generate_skills(context, provider)]
@@ -38,7 +39,7 @@ class TestSkillGeneration:
         """Test that a skill inside a grouping folder links from the flat provider path."""
 
         front_matter = SkillFrontMatterFactory.build()
-        source = workspace.agents_dir / "skills" / "doctors" / front_matter.name / "SKILL.md"
+        source = agents_dir(workspace) / "skills" / "doctors" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         context = load_context(workspace)
         outputs = [output for provider in Provider for output in generate_skills(context, provider)]
@@ -59,7 +60,7 @@ class TestSkillGeneration:
         """Test that the same slug in two grouping folders is rejected rather than silently shadowed."""
 
         front_matter = SkillFrontMatterFactory.build()
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         materialize_skill(skills_dir / "doctors" / front_matter.name / "SKILL.md", front_matter)
         materialize_skill(skills_dir / "git" / front_matter.name / "SKILL.md", front_matter)
 
@@ -72,14 +73,14 @@ class TestSkillGeneration:
     ) -> None:
         """Test that a directory with neither a SKILL.md nor a nested skill is still an error."""
 
-        (workspace.agents_dir / "skills" / "doctors" / "references").mkdir(parents=True)
+        (agents_dir(workspace) / "skills" / "doctors" / "references").mkdir(parents=True)
 
         with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
             load_context(workspace)
 
     def test_explicit_only_skill_links_to_one_canonical_directory(self, workspace: Workspace) -> None:
         front_matter = SkillFrontMatterFactory.build(disable_model_invocation=True)
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
 
         outputs = [
@@ -96,7 +97,7 @@ class TestSkillGeneration:
         self, workspace: Workspace, as_symlink: bool
     ) -> None:
         front_matter = SkillFrontMatterFactory.build()
-        source = workspace.agents_dir / "skills" / front_matter.name / "SKILL.md"
+        source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         metadata = source.parent / "agents/openai.yaml"
         metadata.parent.mkdir()
@@ -125,7 +126,7 @@ class TestSkillGeneration:
     ) -> None:
         """Test that incomplete or misaligned skill metadata fails generation."""
 
-        skill_dir = workspace.agents_dir / "skills/sample-skill"
+        skill_dir = agents_dir(workspace) / "skills/sample-skill"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
             f"---\n{front_matter}\n---\n\n# Sample Skill\n",
@@ -141,7 +142,7 @@ class TestSkillGeneration:
     ) -> None:
         """Test that every canonical skill directory contains its required document."""
 
-        (workspace.agents_dir / "skills/sample-skill").mkdir(parents=True)
+        (agents_dir(workspace) / "skills/sample-skill").mkdir(parents=True)
 
         with pytest.raises(AgentSyncError, match="Missing SKILL.md"):
             load_context(workspace)

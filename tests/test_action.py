@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -96,6 +97,40 @@ class TestAction:
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
         assert 'python "$GITHUB_ACTION_PATH/.github/scripts/stage_generated_paths.py"' in action_text
+
+    def test_refresh_detects_registry_changes_with_a_dot_prefixed_agents_dir(self, tmp_path: Path) -> None:
+        """Test that Git path comparison accepts an equivalent agents directory spelling."""
+
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+        registry = tmp_path / ".agents/external_resources.json"
+        registry.parent.mkdir()
+        registry.write_text('{"resources":[]}\n')
+        subprocess.run(["git", "add", ".agents/external_resources.json"], cwd=tmp_path, check=True)
+        commit = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--quiet"]
+        subprocess.run([*commit, "-m", "initial"], cwd=tmp_path, check=True)
+        before = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+
+        registry.write_text('{"resources":[{"kind":"directory"}]}\n')
+        subprocess.run(["git", "add", ".agents/external_resources.json"], cwd=tmp_path, check=True)
+        subprocess.run([*commit, "-m", "update"], cwd=tmp_path, check=True)
+        current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+
+        steps = yaml.safe_load(Path("action.yml").read_text(encoding="utf-8"))["runs"]["steps"]
+        refresh = next(step for step in steps if step["id"] == "refresh")
+        output = tmp_path / "action-output"
+        env = {
+            **os.environ,
+            "REFRESH": "false",
+            "EVENT_NAME": "push",
+            "BEFORE": before,
+            "CURRENT_SHA": current,
+            "AGENTS_DIR": "./.agents",
+            "GITHUB_OUTPUT": str(output),
+        }
+
+        subprocess.run(["bash", "-c", refresh["run"]], cwd=tmp_path, env=env, check=True)
+
+        assert output.read_text() == "enabled=true\n"
 
     def test_both_persist_modes_call_the_staging_script(self) -> None:
         """Test that both commit paths use the same staging script."""

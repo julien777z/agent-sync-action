@@ -8,6 +8,7 @@ from agent_sync.external_resources import sync
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir, output_root
 from tests.factories import (
     ExternalSkillFactory,
     ResourcesRegistryFactory,
@@ -32,14 +33,14 @@ class TestExternalSkillService:
 
         stub_root_level_upstream(monkeypatch)
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[ROOT_LEVEL_SKILL]),
         )
         sync.sync_external_resources(workspace, dry_run=False, config=ActionConfig())
         assert mirror_providers(workspace, dry_run=False) is False
 
         for provider in (".claude", ".cursor", ".codex"):
-            document = workspace.output_root / provider / "skills/local-skill/SKILL.md"
+            document = output_root(workspace) / provider / "skills/local-skill/SKILL.md"
             assert document.is_file()
             assert "name: local-skill" in document.read_text()
 
@@ -54,7 +55,7 @@ class TestExternalSkillService:
         caplog.set_level(logging.INFO)
 
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[ExternalSkillFactory.build()]),
         )
 
@@ -86,11 +87,11 @@ class TestExternalSkillService:
         """Test that disabled entries leave existing local skills untouched."""
 
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[ExternalSkillFactory.build(update_on_sync=False)]),
         )
 
-        local_skill = workspace.agents_dir / "skills/sample/SKILL.md"
+        local_skill = agents_dir(workspace) / "skills/sample/SKILL.md"
         local_skill.parent.mkdir(parents=True)
         local_skill.write_text("local\n")
 

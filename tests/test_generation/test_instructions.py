@@ -6,6 +6,7 @@ import pytest
 from agent_sync.models.settings import CodexSettings
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir, output_root, settings_dir
 
 
 class TestInstructions:
@@ -18,8 +19,8 @@ class TestInstructions:
         """Keep global, always-on, project, and pointers in that order."""
 
         workspace = workspace.model_copy(update={"output_dirname": output_dirname})
-        (workspace.agents_dir / "global.md").write_text("---\ndescription: global\n---\n\nGlobal text.\n")
-        rules = workspace.agents_dir / "rules"
+        (agents_dir(workspace) / "global.md").write_text("---\ndescription: global\n---\n\nGlobal text.\n")
+        rules = agents_dir(workspace) / "rules"
         rules.mkdir()
         (rules / "always.md").write_text("---\nalwaysApply: true\n---\n\nAlways text.\n")
         (rules / "scoped.md").write_text(
@@ -28,9 +29,9 @@ class TestInstructions:
         (rules / "topic.md").write_text(
             "---\ndescription: working on deployments\nalwaysApply: false\n---\n\nTopic text.\n"
         )
-        (workspace.agents_dir / "project.md").write_text("---\ndescription: project\n---\n\nProject text.\n")
-        workspace.settings_dir.mkdir()
-        settings_path = workspace.settings_dir / "codex.json"
+        (agents_dir(workspace) / "project.md").write_text("---\ndescription: project\n---\n\nProject text.\n")
+        settings_dir(workspace).mkdir()
+        settings_path = settings_dir(workspace) / "codex.json"
         settings_path.write_text(json.dumps(CodexSettings(model="gpt-5").model_dump(exclude_none=True)))
         (workspace.root / "CLAUDE.md").write_text("Claude instructions.\n")
 
@@ -42,12 +43,12 @@ class TestInstructions:
         assert "Scoped text." not in content
         assert "Topic text." not in content
         assert "Read `.agents/rules/topic.md` when its topic is relevant: working on deployments" in content
-        assert (workspace.output_root / ".claude/rules/scoped.md").is_file()
-        assert not (workspace.output_root / ".claude/rules/scoped.md").is_symlink()
-        assert (workspace.output_root / ".cursor/rules/topic.mdc").is_file()
-        assert not (workspace.output_root / ".claude/rules/always.md").exists()
+        assert (output_root(workspace) / ".claude/rules/scoped.md").is_file()
+        assert not (output_root(workspace) / ".claude/rules/scoped.md").is_symlink()
+        assert (output_root(workspace) / ".cursor/rules/topic.mdc").is_file()
+        assert not (output_root(workspace) / ".claude/rules/always.md").exists()
         assert (workspace.root / "CLAUDE.md").read_text() == "Claude instructions.\n"
-        config = tomllib.loads((workspace.output_root / ".codex/config.toml").read_text())
+        config = tomllib.loads((output_root(workspace) / ".codex/config.toml").read_text())
         assert config["project_doc_max_bytes"] == len(content.encode("utf-8"))
         assert mirror_providers(workspace, dry_run=True) is False
 
@@ -55,7 +56,7 @@ class TestInstructions:
     def test_each_root_source_works_alone(self, workspace: Workspace, filename: str) -> None:
         """Generate instructions from either optional root document."""
 
-        (workspace.agents_dir / filename).write_text("---\ndescription: root\n---\n\nRoot text.\n")
+        (agents_dir(workspace) / filename).write_text("---\ndescription: root\n---\n\nRoot text.\n")
         assert mirror_providers(workspace, dry_run=False) is False
         assert "Root text." in (workspace.root / "AGENTS.md").read_text()
 
@@ -63,7 +64,7 @@ class TestInstructions:
     def test_rules_generate_without_root_sources(self, workspace: Workspace, always_apply: bool) -> None:
         """Create root instructions from either class of rule alone."""
 
-        rules = workspace.agents_dir / "rules"
+        rules = agents_dir(workspace) / "rules"
         rules.mkdir()
         (rules / "sample.md").write_text(
             f"---\ndescription: Sample topic.\nalwaysApply: {str(always_apply).lower()}\n---\n\nSample body.\n"
@@ -78,9 +79,9 @@ class TestInstructions:
         """Remove a stale generated file while preserving user-owned guidance."""
 
         instructions = workspace.root / "AGENTS.md"
-        (workspace.agents_dir / "project.md").write_text("Project text.\n")
+        (agents_dir(workspace) / "project.md").write_text("Project text.\n")
         assert mirror_providers(workspace, dry_run=False) is False
-        (workspace.agents_dir / "project.md").unlink()
+        (agents_dir(workspace) / "project.md").unlink()
         assert mirror_providers(workspace, dry_run=True) is True
         assert instructions.exists()
         assert mirror_providers(workspace, dry_run=False) is False
@@ -92,8 +93,8 @@ class TestInstructions:
     def test_no_source_preserves_explicit_codex_capacity(self, workspace: Workspace) -> None:
         """Leave an explicit capacity alone when no document is generated."""
 
-        workspace.settings_dir.mkdir()
-        (workspace.settings_dir / "codex.json").write_text('{"project_doc_max_bytes":65536}')
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "codex.json").write_text('{"project_doc_max_bytes":65536}')
         assert mirror_providers(workspace, dry_run=False) is False
         config = tomllib.loads((workspace.root / ".codex/config.toml").read_text())
         assert config["project_doc_max_bytes"] == 65536
@@ -102,7 +103,7 @@ class TestInstructions:
     def test_instructions_create_codex_capacity_without_settings(self, workspace: Workspace) -> None:
         """Size the generated Codex document without requiring a settings source."""
 
-        (workspace.agents_dir / "project.md").write_text("Project text.\n")
+        (agents_dir(workspace) / "project.md").write_text("Project text.\n")
         assert mirror_providers(workspace, dry_run=False) is False
         instructions = (workspace.root / "AGENTS.md").read_bytes()
         config = tomllib.loads((workspace.root / ".codex/config.toml").read_text())
@@ -112,10 +113,10 @@ class TestInstructions:
     def test_removing_last_source_restores_source_codex_capacity(self, workspace: Workspace) -> None:
         """A generated capacity does not persist after its document disappears."""
 
-        project = workspace.agents_dir / "project.md"
+        project = agents_dir(workspace) / "project.md"
         project.write_text("Project text.\n")
-        workspace.settings_dir.mkdir()
-        settings_path = workspace.settings_dir / "codex.json"
+        settings_dir(workspace).mkdir()
+        settings_path = settings_dir(workspace) / "codex.json"
         settings_path.write_text('{"project_doc_max_bytes":1234}')
         assert mirror_providers(workspace, dry_run=False) is False
         assert (
@@ -134,7 +135,7 @@ class TestInstructions:
         """Point Codex at the actual canonical rule path."""
 
         workspace = workspace.model_copy(update={"agents_dirname": "guidance"})
-        rules = workspace.agents_dir / "rules"
+        rules = agents_dir(workspace) / "rules"
         rules.mkdir(parents=True)
         (rules / "sample.md").write_text(
             "---\ndescription: Sample topic.\nalwaysApply: false\n---\n\nSample body.\n"
@@ -147,7 +148,7 @@ class TestInstructions:
     def test_omitted_rule_scope_defaults_to_always_on(self, workspace: Workspace) -> None:
         """Keep the production front-matter default visible in a generation test."""
 
-        rules = workspace.agents_dir / "rules"
+        rules = agents_dir(workspace) / "rules"
         rules.mkdir()
         (rules / "sample.md").write_text("# Sample body\n")
         assert mirror_providers(workspace, dry_run=False) is False

@@ -7,6 +7,7 @@ from agent_sync.external_resources.skills import update_external_skill
 from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
 from agent_sync.utils import load_json_model
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionConfig) -> None:
     """Update all registered external resources from their upstream sources."""
 
-    registry_path = workspace.agents_dir / EXTERNAL_RESOURCES_FILENAME
+    registry_path = agents_dir(workspace) / EXTERNAL_RESOURCES_FILENAME
     registry = load_json_model(registry_path, ResourcesRegistry)
     if registry is None:
         logger.info("No external-resource registry at %s; nothing to update.", registry_path)
@@ -28,7 +29,7 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
 
         if isinstance(resource, ExternalSkill):
             changed = update_external_skill(
-                workspace, resource, workspace.agents_dir / "skills", dry_run, config
+                workspace, resource, agents_dir(workspace) / "skills", dry_run, config
             )
             name = resource.local_name
         else:

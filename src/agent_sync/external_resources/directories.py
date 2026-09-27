@@ -8,6 +8,7 @@ from agent_sync.external_resources.github import copy_legal_files, download_snap
 from agent_sync.models.registry import DirectorySourceMarker, ExternalDirectory
 from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir, contains, find_parent_blockers
 
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
 
@@ -15,11 +16,11 @@ SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
 def update_external_directory(workspace: Workspace, resource: ExternalDirectory, dry_run: bool) -> bool:
     """Replace one managed directory while preserving upstream file contents."""
 
-    destination = workspace.agents_dir / "resources" / resource.name
+    destination = agents_dir(workspace) / "resources" / resource.name
     if (
         not destination.is_relative_to(workspace.root)
-        or not workspace.contains(destination)
-        or workspace.find_parent_blockers(destination)
+        or not contains(workspace, destination)
+        or find_parent_blockers(workspace, destination)
     ):
         raise RuntimeError(f"Resource directory has an unsafe parent: {destination}")
     marker = DirectorySourceMarker(repo=resource.repo, source_path=resource.source_path)

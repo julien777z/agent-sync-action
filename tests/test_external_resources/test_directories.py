@@ -16,6 +16,7 @@ from agent_sync.models.registry import (
     ResourcesRegistry,
 )
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir
 from tests.factories import (
     ExternalResourceFactory,
     ExternalSkillFactory,
@@ -55,7 +56,7 @@ class TestExternalResources:
         skill = ExternalSkillFactory.build()
         directory = ExternalResourceFactory.build()
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistry(resources=[skill, directory]),
         )
         calls: list[tuple[str, bool]] = []
@@ -68,7 +69,7 @@ class TestExternalResources:
             config: ActionConfig,
         ) -> bool:
             assert resolved_workspace == workspace
-            assert skills_dir == workspace.agents_dir / "skills"
+            assert skills_dir == agents_dir(workspace) / "skills"
             calls.append((entry.kind, dry_run))
             return True
 
@@ -102,14 +103,14 @@ class TestExternalResources:
 
         resource = ExternalResourceFactory.build()
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[resource]),
         )
         source_files = {"guide.md": "# Guide\n", "nested/example.txt": "example\n"}
 
         stub_external_directory_upstream(monkeypatch, resource, source_files, root_license="Sample license\n")
 
-        destination = workspace.agents_dir / "resources" / resource.name
+        destination = agents_dir(workspace) / "resources" / resource.name
         sync_external_resources(workspace, dry_run=False, config=ActionConfig())
         assert (destination / "guide.md").read_text() == source_files["guide.md"]
         assert (destination / "nested/example.txt").read_text() == source_files["nested/example.txt"]
@@ -128,7 +129,7 @@ class TestExternalResources:
 
         resource = ExternalResourceFactory.build(name="stale-link-reference", repo="example/stale-link")
         stub_external_directory_upstream(monkeypatch, resource, {"guide.md": "upstream"})
-        destination = workspace.agents_dir / "resources" / resource.name
+        destination = agents_dir(workspace) / "resources" / resource.name
         assert update_external_directory(workspace, resource, dry_run=False)
 
         stale_link = destination / "stale-link"
@@ -145,10 +146,10 @@ class TestExternalResources:
 
         resource = ExternalResourceFactory.build()
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[resource]),
         )
-        destination = workspace.agents_dir / "resources" / resource.name
+        destination = agents_dir(workspace) / "resources" / resource.name
         destination.mkdir(parents=True)
         (destination / "notes.md").write_text("local", encoding="utf-8")
 
@@ -163,7 +164,7 @@ class TestExternalResources:
         """Test that a linked ownership marker cannot claim a local directory."""
 
         resource = ExternalResourceFactory.build(name="linked-source-reference", repo="example/linked-source")
-        destination = workspace.agents_dir / "resources" / resource.name
+        destination = agents_dir(workspace) / "resources" / resource.name
         destination.mkdir(parents=True)
         local_note = destination / "notes.md"
         materialize_tree(destination, {"notes.md": "local"})
@@ -206,19 +207,19 @@ class TestExternalResources:
         with pytest.raises(RuntimeError, match="source directory does not exist"):
             update_external_directory(workspace, resource, dry_run=False)
 
-        assert not (workspace.agents_dir / "resources" / resource.name).exists()
+        assert not (agents_dir(workspace) / "resources" / resource.name).exists()
 
     def test_refuses_linked_resource_parent(self, workspace: Workspace, tmp_path: Path) -> None:
         """Test that resource writes cannot follow a linked parent outside the workspace."""
 
         resource = ExternalResourceFactory.build()
         materialize_registry(
-            workspace.agents_dir / "external_resources.json",
+            agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[resource]),
         )
         outside = tmp_path / "outside"
         outside.mkdir()
-        (workspace.agents_dir / "resources").symlink_to(outside, target_is_directory=True)
+        (agents_dir(workspace) / "resources").symlink_to(outside, target_is_directory=True)
 
         with pytest.raises(RuntimeError, match="unsafe parent"):
             sync_external_resources(workspace, dry_run=False, config=ActionConfig())

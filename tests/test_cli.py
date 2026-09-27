@@ -6,6 +6,7 @@ import pytest
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import agents_dir, settings_dir
 from tests.factories import run_cli
 
 
@@ -37,7 +38,7 @@ class TestCli:
     def test_old_registry_is_not_loaded(self, workspace: Workspace) -> None:
         """Test that an obsolete registry cannot activate a second vendoring path."""
 
-        (workspace.agents_dir / "external_skills.json").write_text("{invalid")
+        (agents_dir(workspace) / "external_skills.json").write_text("{invalid")
 
         assert run_cli(["vendor-resources", "--root", str(workspace.root)]).returncode == 0
 
@@ -74,7 +75,7 @@ class TestCli:
     ) -> None:
         """Test that the CLI maps detected differences to exit code one."""
 
-        (workspace.agents_dir / "project.md").write_text("# Project\n")
+        (agents_dir(workspace) / "project.md").write_text("# Project\n")
         result = run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 1
@@ -99,8 +100,8 @@ class TestCli:
     def test_invalid_source_returns_exit_code_two(self, workspace: Workspace) -> None:
         """Test that invalid canonical input is reported with exit code two."""
 
-        workspace.settings_dir.mkdir()
-        (workspace.settings_dir / "claude.json").write_text("{invalid")
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text("{invalid")
 
         result = run_cli(["mirror-providers", "--root", str(workspace.root)])
 

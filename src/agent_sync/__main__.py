@@ -6,8 +6,9 @@ from pydantic import ValidationError
 from agent_sync.config import ActionConfig
 from agent_sync.errors import AgentSyncError
 from agent_sync.external_resources.sync import sync_external_resources
-from agent_sync.models.workspace import CliArguments, Workspace
+from agent_sync.models.workspace import CliArguments
 from agent_sync.reconciliation import mirror_providers
+from agent_sync.workspace import resolve_workspace
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
 
     try:
         config = ActionConfig()
-        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir, config)
+        workspace = resolve_workspace(parsed.root, parsed.agents_dir, parsed.output_dir, config)
 
         match parsed.command:
             case "mirror-providers":

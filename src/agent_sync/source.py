@@ -8,6 +8,7 @@ from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
 from agent_sync.utils import load_json_model, validate_slug
 from agent_sync.models.workspace import Workspace
+from agent_sync.workspace import models_dir, settings_dir
 
 
 def load_source_config(workspace: Workspace) -> SourceConfig:
@@ -15,8 +16,8 @@ def load_source_config(workspace: Workspace) -> SourceConfig:
 
     settings: dict[Provider, PlatformSettings | CodexSettings] = {}
 
-    if workspace.settings_dir.exists():
-        for path in sorted(workspace.settings_dir.glob("*.json")):
+    if settings_dir(workspace).exists():
+        for path in sorted(settings_dir(workspace).glob("*.json")):
             try:
                 provider = Provider(path.stem)
             except ValueError as exc:
@@ -30,8 +31,8 @@ def load_source_config(workspace: Workspace) -> SourceConfig:
 
     overrides: dict[str, AgentModelOverride] = {}
 
-    if workspace.models_dir.exists():
-        for path in sorted(workspace.models_dir.glob("*.json")):
+    if models_dir(workspace).exists():
+        for path in sorted(models_dir(workspace).glob("*.json")):
             slug = validate_slug(path.stem, path)
             loaded = load_json_model(path, AgentModelOverride)
 

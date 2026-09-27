@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
+from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 
 
 class TestExternalSkillModel:
@@ -158,3 +158,18 @@ class TestExternalSkillModel:
                     ExternalSkill(kind="skill", name="shared", repo="example/two", update_on_sync=True),
                 ]
             )
+
+    @pytest.mark.parametrize("nested_first", [False, True])
+    def test_overlapping_skill_destinations_fail(self, nested_first: bool) -> None:
+        """Test that a skill cannot also be another skill's category directory."""
+
+        parent = ExternalSkill(kind="skill", name="review", repo="example/one", update_on_sync=True)
+        child = ExternalSkill(
+            kind="skill", name="child", repo="example/two", category="review", update_on_sync=True
+        )
+        resources: list[ExternalSkill | ExternalDirectory] = (
+            [child, parent] if nested_first else [parent, child]
+        )
+
+        with pytest.raises(ValidationError, match="destinations overlap"):
+            ResourcesRegistry(resources=resources)

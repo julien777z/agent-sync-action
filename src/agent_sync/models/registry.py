@@ -140,4 +140,12 @@ class ResourcesRegistry(BaseModel):
         if duplicates:
             raise ValueError(f"External resource names must be unique: {', '.join(duplicates)}")
 
+        skill_paths = [
+            resource.relative_path for resource in self.resources if isinstance(resource, ExternalSkill)
+        ]
+        for index, path in enumerate(skill_paths):
+            for other in skill_paths[:index]:
+                if path == other or path in other.parents or other in path.parents:
+                    raise ValueError(f"External skill destinations overlap: {other} and {path}")
+
         return self
