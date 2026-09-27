@@ -37,8 +37,10 @@ def stage_generated_paths(agents_dir: str, output_dir: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Stage Agent Sync-owned outputs in a consumer checkout.")
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="Stage Agent Sync-owned outputs in a consumer checkout."
+    )
     parser.add_argument("--agents-dir", required=True)
     parser.add_argument("--output-dir", required=True)
-    arguments = parser.parse_args()
+    arguments: argparse.Namespace = parser.parse_args()
     stage_generated_paths(arguments.agents_dir, arguments.output_dir)

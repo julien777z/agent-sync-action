@@ -219,6 +219,7 @@ Installed skills record their source URL and keep the upstream license files fro
 poetry install --extras dev
 poetry run python -m agent_sync vendor-skills --root .
 poetry run python -m agent_sync mirror-providers --root .
+poetry run pytest -q
 ```
 
 Both commands take `--agents-dir` and `--dry-run`. `mirror-providers` also takes `--output-dir`.
