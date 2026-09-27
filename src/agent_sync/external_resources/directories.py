@@ -6,8 +6,8 @@ from typing import Final
 
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.models.registry import DirectorySourceMarker, ExternalDirectory
-from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.models.workspace import Workspace
+from agent_sync.utils import replace_tree, trees_differ
 from agent_sync.workspace import agents_dir, contains, find_parent_blockers
 
 SOURCE_MARKER: Final[str] = ".agent-sync-source.json"
@@ -23,13 +23,16 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
         or find_parent_blockers(workspace, destination)
     ):
         raise RuntimeError(f"Resource directory has an unsafe parent: {destination}")
+
     marker = DirectorySourceMarker(repo=resource.repo, source_path=resource.source_path)
     marker_text = json.dumps(marker, indent=2) + "\n"
 
     if destination.is_symlink():
         raise RuntimeError(f"Resource directory is a link: {destination}")
+
     if destination.exists():
         marker_path = destination / SOURCE_MARKER
+
         if (
             marker_path.is_symlink()
             or not marker_path.is_file()
@@ -43,6 +46,7 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
         source_root = download_snapshot(resource.repo, revision, working_directory / "source")
         source = source_root / resource.source_path
         source_chain = (source, *source.parents)
+
         if (
             any(path.is_symlink() for path in source_chain if path.is_relative_to(source_root))
             or not source.is_dir()
@@ -50,8 +54,10 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
             raise RuntimeError(
                 f"Resource source directory does not exist: {resource.repo}/{resource.source_path}"
             )
+
         if any(path.is_symlink() for path in source.rglob("*")):
             raise RuntimeError(f"Resource source contains a link: {resource.repo}/{resource.source_path}")
+
         if (source / SOURCE_MARKER).exists():
             raise RuntimeError(
                 f"Resource source uses reserved marker name: {resource.repo}/{resource.source_path}"
@@ -59,8 +65,11 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
 
         staged = working_directory / "resource"
         shutil.copytree(source, staged)
+
         copy_legal_files(staged, source_root)
+
         (staged / SOURCE_MARKER).write_text(marker_text, encoding="utf-8")
+
         changed = trees_differ(staged, destination)
 
         if changed and not dry_run:

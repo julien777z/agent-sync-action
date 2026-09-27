@@ -155,7 +155,7 @@ config = third_party_package.Config(
 
 ## Configuration
 
-- Define each configuration owner's settings in one descriptively named `BaseSettings` class such as `ToolSettings` in its `config.py`. A repository may have distinct application, worker, or script configuration owners; do not combine unrelated settings merely to produce one repository-wide class. Keep each config module declarative: instantiate its settings once at that owner's composition boundary, then pass or import that validated object wherever settings are needed.
+- Define settings for distinct configuration owners separately, and instantiate each validated settings object at its runtime composition boundary.
 - Put environment-backed, deployment-tunable, or intentionally overridable values in that settings class. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
 - Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
 - Use `TypedDict` only for static structured data that is not configuration.
@@ -164,15 +164,15 @@ config = third_party_package.Config(
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ToolSettings(BaseSettings):
+class RuntimeSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APPLICATION_", frozen=True)
 
     tool_cli_version: str = "1.2.3"
     request_timeout_seconds: int = 30
 
 
-# application.py or another composition boundary
-TOOL_SETTINGS = ToolSettings()
+# runtime composition boundary
+settings = RuntimeSettings()
 ```
 
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
@@ -244,7 +244,7 @@ def get_auth_secret(config: Settings | None = None) -> str:
 - Do not place models beside operational code or collect unrelated models in a catch-all `models.py` module.
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
-- Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception for the repository's settings class only; instantiate that class at the application or script composition boundary.
+- Put runtime mappings and operational behavior in the module that owns their use. A typed settings module built with `pydantic-settings` is the exception for settings declarations; instantiate settings at the runtime composition boundary.
 
 - Do not convert between models you own with `Target(**source.model_dump())`, `Target.model_validate(source.model_dump())`, or `Target(**source.__dict__)`. These dictionary-shaped conversions erase the relationship between the source and target contracts, can collide with explicitly supplied fields, and may re-run normalization or encryption.
 - Put the conversion on the target in a typed `from_<source>` or `build_*` classmethod that names the fields. If the copy becomes long, consolidate the models or carry the source model as a nested field instead of flattening it.

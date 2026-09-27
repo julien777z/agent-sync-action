@@ -1,17 +1,26 @@
 import logging
+from enum import StrEnum
 from typing import Final
 
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources.directories import update_external_directory
 from agent_sync.external_resources.skills import update_external_skill
 from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
-from agent_sync.utils import load_json_model
 from agent_sync.models.workspace import Workspace
+from agent_sync.utils import load_json_model
 from agent_sync.workspace import agents_dir
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
+
+
+class ResourceUpdateStatus(StrEnum):
+    """Describe the result of syncing one external resource."""
+
+    WOULD_UPDATE = "would update"
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
 
 
 def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionConfig) -> None:
@@ -36,5 +45,8 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
             changed = update_external_directory(workspace, resource, dry_run)
             name = resource.name
 
-        status = "would update" if dry_run and changed else "updated" if changed else "unchanged"
+        status = ResourceUpdateStatus.UNCHANGED
+        if changed:
+            status = ResourceUpdateStatus.WOULD_UPDATE if dry_run else ResourceUpdateStatus.UPDATED
+
         logger.info("  %s (%s): %s", name, resource.repo, status)
