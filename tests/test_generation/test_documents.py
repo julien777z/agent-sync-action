@@ -133,7 +133,7 @@ class TestDocumentGeneration:
         assert linked[0].link_target == source
         assert isinstance(generated[0], GeneratedFile)
         assert f"{missing_key}:\n- '**/*.py'\n" in generated[0].content
-        assert f"{authored_key}: '**/*.py'\n" in generated[0].content
+        assert f"{authored_key}:" not in generated[0].content
 
     def test_matching_scope_keys_link_both_mirrors(self, workspace: Workspace) -> None:
         """Test that fully authored scopes need no generated rule body."""

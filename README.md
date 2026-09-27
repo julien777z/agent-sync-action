@@ -130,7 +130,7 @@ A rule applies to every task by default. Give it file patterns and set `alwaysAp
 its Claude and Cursor mirrors only while matching files are in play. Cursor reads `globs`; Claude
 reads `paths`. When both keys are present, they must describe the same patterns, and both mirrors
 are symlinks to the canonical rule. If only one key is present, that provider gets a symlink and
-Agent Sync generates a file for the other provider with the missing key. Without either key, both
+Agent Sync generates a file for the other provider with only its scope key. Without either key, both
 mirrors are symlinks and Claude loads the rule unconditionally. See the
 [Claude rules](https://code.claude.com/docs/en/memory) and
 [Cursor rules](https://docs.cursor.com/context/rules) documentation for project rule symlinks and

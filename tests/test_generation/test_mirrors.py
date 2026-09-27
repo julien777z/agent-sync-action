@@ -54,8 +54,8 @@ class TestMirrorIntegration:
         claude = workspace.root / ".claude/rules/python.md"
         cursor = workspace.root / ".cursor/rules/python.mdc"
         assert claude.is_file() and not claude.is_symlink()
-        assert "globs:\n- '**/*.py'" in claude.read_text()
         assert "paths:\n- '**/*.py'" in claude.read_text()
+        assert "globs:" not in claude.read_text()
         assert "Use typed values." in claude.read_text()
         assert cursor.is_symlink()
         assert cursor.resolve() == source

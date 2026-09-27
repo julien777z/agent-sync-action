@@ -78,6 +78,7 @@ def generate_rule_mirrors(
     """Link scoped rules when their provider metadata is already canonical."""
 
     scope_key = "paths" if provider is Provider.CLAUDE else "globs"
+    other_scope_key = "globs" if provider is Provider.CLAUDE else "paths"
     outputs: list[GeneratedOutput] = []
     for source in context.rules:
         if not source.body or source.front_matter.always_apply:
@@ -103,7 +104,12 @@ def generate_rule_mirrors(
             GeneratedFile(
                 target_path=target,
                 content=normalize_rule(
-                    source.front_matter.model_copy(update={scope_key: source.front_matter.scope_patterns}),
+                    source.front_matter.model_copy(
+                        update={
+                            scope_key: source.front_matter.scope_patterns,
+                            other_scope_key: None,
+                        }
+                    ),
                     f"<!-- {GENERATED_FILE_NOTICE} -->\n\n{source.body}",
                 ),
                 artifact=ArtifactKind.RULE,
