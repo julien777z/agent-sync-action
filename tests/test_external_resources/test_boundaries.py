@@ -148,6 +148,20 @@ class TestExternalSkillBoundaries:
 
         assert installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root) == installed
 
+    def test_source_discovery_prefers_canonical_skill_over_provider_copies(self, tmp_path: Path) -> None:
+        """Choose the upstream canonical copy when a repository ships provider mirrors."""
+
+        for prefix in (".agents", ".claude", ".cursor", "plugin"):
+            directory = tmp_path / prefix / "skills/impeccable"
+            directory.mkdir(parents=True)
+            (directory / "SKILL.md").write_text(
+                "---\nname: impeccable\ndescription: Design guidance.\n---\n\nContent.\n"
+            )
+
+        assert installer.locate_skill_directory(tmp_path, "impeccable") == (
+            tmp_path / ".agents/skills/impeccable"
+        )
+
     def test_source_skill_discovery_uses_metadata_for_a_root_skill(
         self,
         tmp_path: Path,
