@@ -112,7 +112,7 @@ grouping folder cannot namespace two skills apart.
 | Input | Default | Purpose |
 |---|---|---|
 | `github-token` | `${{ github.token }}` | Token used to commit, push, or open a pull request. |
-| `refresh-external-skills` | `false` | Install registered external skills before mirroring. |
+| `refresh-external-skills` | `false` | Update registered external skills and resources before mirroring. |
 | `skills-cli-version` | `1.5.13` | Version of the skills CLI used to update external skills. |
 | `mode` | `commit` | Persist changes with `commit` or `pull-request`. |
 | `agents-dir` | `.agents` | Agent configuration source directory. |

@@ -7,6 +7,7 @@ from agent_sync.config import ACTION_CONFIG, ActionConfig
 from agent_sync import external_sources
 from agent_sync.external_skills import installer
 from agent_sync.external_skills import sync
+from agent_sync.external_sources import copy_legal_files
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.workspace import Workspace
 from tests.factories import (
@@ -20,6 +21,21 @@ from tests.factories import (
 
 class TestExternalSkillBoundaries:
     """Test that immutable GitHub snapshots and installer behavior work."""
+
+    def test_preserves_selected_legal_file_on_root_collision(self, tmp_path: Path) -> None:
+        """Test that root legal files cannot overwrite selected upstream content."""
+
+        source_root = tmp_path / "source"
+        selected = tmp_path / "selected"
+        source_root.mkdir()
+        selected.mkdir()
+        (source_root / "LICENSE").write_text("Repository license\n")
+        (selected / "LICENSE").write_text("Selected license\n")
+
+        with pytest.raises(RuntimeError, match="Conflicting legal file"):
+            copy_legal_files(selected, source_root)
+
+        assert (selected / "LICENSE").read_text() == "Selected license\n"
 
     def test_runtime_config_accepts_namespaced_overrides(
         self,
@@ -165,7 +181,7 @@ class TestExternalSkillBoundaries:
 
             return revision
 
-        monkeypatch.setattr(external_sources, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(sync, "resolve_revision", fake_resolve)
 
         def fake_download(repository: str, downloaded_revision: str, destination: Path) -> Path:
             """Create one synthetic downloaded snapshot."""
@@ -179,7 +195,7 @@ class TestExternalSkillBoundaries:
 
             return source_root
 
-        monkeypatch.setattr(external_sources, "download_snapshot", fake_download)
+        monkeypatch.setattr(sync, "download_snapshot", fake_download)
 
         def fake_install(
             installed_skill: ExternalSkill,
@@ -538,7 +554,7 @@ class TestExternalSkillBoundaries:
 
             return "a" * 40
 
-        monkeypatch.setattr(external_sources, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(sync, "resolve_revision", fake_resolve)
 
         def fake_download(repository: str, revision: str, destination: Path) -> Path:
             """Create a nested synthetic skill and root license."""
@@ -553,7 +569,7 @@ class TestExternalSkillBoundaries:
 
             return source_root
 
-        monkeypatch.setattr(external_sources, "download_snapshot", fake_download)
+        monkeypatch.setattr(sync, "download_snapshot", fake_download)
 
         def fake_install(
             installed_skill: ExternalSkill,

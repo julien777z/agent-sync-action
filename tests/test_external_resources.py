@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync import external_sources
+from agent_sync import external_resources
 from agent_sync.external_resources import SOURCE_MARKER, sync_external_resources
 from agent_sync.models.registry import ResourcesRegistry
 from agent_sync.workspace import Workspace
@@ -59,8 +59,8 @@ class TestExternalResources:
             (root / "LICENSE").write_text("Sample license\n", encoding="utf-8")
             return root
 
-        monkeypatch.setattr(external_sources, "resolve_revision", fake_resolve)
-        monkeypatch.setattr(external_sources, "download_snapshot", fake_download)
+        monkeypatch.setattr(external_resources, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(external_resources, "download_snapshot", fake_download)
 
         destination = workspace.agents_dir / "resources" / resource.name
         sync_external_resources(workspace, dry_run=False)
@@ -91,3 +91,20 @@ class TestExternalResources:
             sync_external_resources(workspace, dry_run=False)
 
         assert (destination / "notes.md").read_text() == "local"
+
+    def test_refuses_linked_resource_parent(self, workspace: Workspace, tmp_path: Path) -> None:
+        """Test that resource writes cannot follow a linked parent outside the workspace."""
+
+        resource = ExternalResourceFactory.build()
+        materialize_registry(
+            workspace.agents_dir / "external_resources.json",
+            ResourcesRegistryFactory.build(resources=[resource]),
+        )
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (workspace.agents_dir / "resources").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(RuntimeError, match="unsafe parent"):
+            sync_external_resources(workspace, dry_run=False)
+
+        assert not any(outside.iterdir())

@@ -51,4 +51,8 @@ def copy_legal_files(destination: Path, source_root: Path) -> None:
 
     for entry in sorted(source_root.iterdir()):
         if entry.is_file() and entry.name.upper().startswith(LEGAL_FILE_PREFIXES):
+            if (destination / entry.name).exists():
+                if (destination / entry.name).read_bytes() != entry.read_bytes():
+                    raise RuntimeError(f"Conflicting legal file in {destination}: {entry.name}")
+                continue
             shutil.copy2(entry, destination / entry.name)

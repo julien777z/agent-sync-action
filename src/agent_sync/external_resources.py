@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
-from agent_sync import external_sources
+from agent_sync.external_sources import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.models.registry import ExternalResource, ResourcesRegistry
 from agent_sync.utils import load_json_model, replace_tree, trees_differ
 from agent_sync.workspace import Workspace
@@ -36,6 +36,12 @@ def update_external_resource(workspace: Workspace, resource: ExternalResource, d
     """Replace one managed directory while preserving upstream file contents."""
 
     destination = workspace.agents_dir / "resources" / resource.name
+    if (
+        not destination.is_relative_to(workspace.root)
+        or not workspace.contains(destination)
+        or workspace.find_parent_blockers(destination)
+    ):
+        raise RuntimeError(f"Resource directory has an unsafe parent: {destination}")
     marker = {"repo": resource.repo, "source_path": resource.source_path}
     marker_text = json.dumps(marker, indent=2) + "\n"
 
@@ -48,8 +54,8 @@ def update_external_resource(workspace: Workspace, resource: ExternalResource, d
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-resource-") as temporary_directory:
         working_directory = Path(temporary_directory)
-        revision = external_sources.resolve_revision(resource.repo)
-        source_root = external_sources.download_snapshot(
+        revision = resolve_revision(resource.repo)
+        source_root = download_snapshot(
             resource.repo, revision, working_directory / "source"
         )
         source = source_root / resource.source_path
@@ -66,7 +72,7 @@ def update_external_resource(workspace: Workspace, resource: ExternalResource, d
 
         staged = working_directory / "resource"
         shutil.copytree(source, staged)
-        external_sources.copy_legal_files(staged, source_root)
+        copy_legal_files(staged, source_root)
         (staged / SOURCE_MARKER).write_text(marker_text, encoding="utf-8")
         changed = trees_differ(staged, destination)
 

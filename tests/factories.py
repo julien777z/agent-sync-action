@@ -4,9 +4,9 @@ import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
-from agent_sync import external_sources
 from agent_sync.document import render_front_matter
 from agent_sync.external_skills import installer
+from agent_sync.external_skills import sync
 from agent_sync.generation.context import GenerationContext, load_generation_context
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalResource, ExternalSkill, ResourcesRegistry, SkillsRegistry
@@ -53,8 +53,8 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
         installed.mkdir(parents=True)
         (installed / "SKILL.md").write_text(upstream_document)
 
-    monkeypatch.setattr(external_sources, "resolve_revision", fake_resolve)
-    monkeypatch.setattr(external_sources, "download_snapshot", fake_download)
+    monkeypatch.setattr(sync, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(sync, "download_snapshot", fake_download)
     monkeypatch.setattr(installer, "install_skill", fake_install)
 
 

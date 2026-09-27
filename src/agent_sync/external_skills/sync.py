@@ -4,8 +4,8 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
-from agent_sync import external_sources
 from agent_sync.document import parse_markdown, render_front_matter
+from agent_sync.external_sources import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.external_skills import installer
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
@@ -60,8 +60,8 @@ def update_external_skill(
 
     with tempfile.TemporaryDirectory(prefix="agent-sync-skill-") as temporary_directory:
         working_directory = Path(temporary_directory)
-        revision = external_sources.resolve_revision(skill.repo)
-        source_root = external_sources.download_snapshot(
+        revision = resolve_revision(skill.repo)
+        source_root = download_snapshot(
             skill.repo,
             revision,
             working_directory / "source",
@@ -78,7 +78,7 @@ def update_external_skill(
         if source_skill == source_root:
             installer.supplement_root_assets(installed, source_root)
 
-        external_sources.copy_legal_files(installed, source_root)
+        copy_legal_files(installed, source_root)
 
         normalize_skill_metadata(installed, skill)
 
