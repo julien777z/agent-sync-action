@@ -56,6 +56,7 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
         ],
         agents_dir(context.workspace).relative_to(context.workspace.root).as_posix(),
     )
+
     if not content:
         return []
 
@@ -88,6 +89,7 @@ def generate_rule_mirrors(
             / f"{source.slug}{provider.rule_extension}"
         )
         scope = getattr(source.front_matter, scope_key)
+
         if scope is not None or (source.front_matter.globs is None and source.front_matter.paths is None):
             outputs.append(
                 GeneratedLink(
@@ -158,9 +160,12 @@ def render_rule_pointer(path: Path, front_matter: RuleFrontMatter) -> str:
     source = f"`{path.as_posix()}`"
     description = front_matter.description or path.stem.replace("-", " ")
     patterns = front_matter.scope_patterns
+
     if patterns:
         scope = ", ".join(f"`{pattern}`" for pattern in patterns)
+
         return f"- Read {source} for files matching {scope}: {description}"
+
     return f"- Read {source} when its topic is relevant: {description}"
 
 

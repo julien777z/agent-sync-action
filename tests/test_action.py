@@ -98,8 +98,11 @@ class TestAction:
 
         assert 'python "$GITHUB_ACTION_PATH/.github/scripts/persist_changes.py"' in action_text
 
-    def test_refresh_detects_registry_changes_with_a_dot_prefixed_agents_dir(self, tmp_path: Path) -> None:
-        """Test that Git path comparison accepts an equivalent agents directory spelling."""
+    @pytest.mark.parametrize("first_push", [False, True], ids=["existing-branch", "new-branch"])
+    def test_refresh_detects_registry_changes_with_a_dot_prefixed_agents_dir(
+        self, tmp_path: Path, first_push: bool
+    ) -> None:
+        """Detect registry changes on existing and new branches with an equivalent agents path."""
 
         subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
 
@@ -136,7 +139,7 @@ class TestAction:
                 "--event",
                 "push",
                 "--before",
-                before,
+                "0" * 40 if first_push else before,
                 "--current",
                 current,
                 "--agents-dir",

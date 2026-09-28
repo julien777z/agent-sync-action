@@ -83,6 +83,7 @@ def generate_manifest(
         ),
         None,
     )
+
     if instructions is not None:
         context = context.model_copy(update={"instructions": instructions.content})
 

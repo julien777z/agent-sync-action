@@ -28,6 +28,7 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
 
     registry_path = agents_dir(workspace) / EXTERNAL_RESOURCES_FILENAME
     registry = load_json_model(registry_path, ResourcesRegistry)
+
     if registry is None:
         logger.info("No external-resource registry at %s; nothing to update.", registry_path)
         return
@@ -41,7 +42,6 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
     changed_count = 0
 
     for resource in updatable_resources:
-
         if isinstance(resource, ExternalSkill):
             changed = update_external_skill(
                 workspace, resource, agents_dir(workspace) / "skills", dry_run, config

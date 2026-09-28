@@ -40,6 +40,7 @@ def update_external_skill(
         )
 
         install_skill(skill, working_directory, source_root, config)
+
         installed = locate_skill_directory(
             working_directory,
             skill.upstream_skill,
@@ -72,12 +73,14 @@ def update_external_skill(
         if current is not None:
             if current.is_symlink():
                 raise RuntimeError(f"Skill directory is a link, not a managed installation: {current}")
+
             current_document = current / "SKILL.md"
             front_matter, _ = parse_markdown(
                 current_document.read_text(encoding="utf-8"),
                 SkillFrontMatter,
                 str(current_document),
             )
+
             if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
 
@@ -90,6 +93,7 @@ def update_external_skill(
             for parent in destination.parents:
                 if parent == skills_dir:
                     break
+
                 if parent.is_symlink() or (parent / "SKILL.md").exists():
                     raise RuntimeError(f"Skill category is occupied by a skill or link: {parent}")
             if current is not None and current != destination and current in destination.parents:
@@ -101,6 +105,7 @@ def update_external_skill(
                 folder = current.parent
                 while folder != skills_dir and folder.is_dir() and not any(folder.iterdir()):
                     folder.rmdir()
+
                     folder = folder.parent
 
     return changed

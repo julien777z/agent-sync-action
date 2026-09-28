@@ -66,6 +66,7 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
 
     for directory in discover_skill_directories(skills_dir):
         forbidden_metadata = directory / "agents/openai.yaml"
+
         if forbidden_metadata.exists() or forbidden_metadata.is_symlink():
             raise AgentSyncError(f"Repository skills cannot contain {forbidden_metadata}")
 

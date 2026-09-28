@@ -103,6 +103,7 @@ def snapshot_tree(directory: Path) -> dict[str, TreeEntry]:
     entries: dict[str, TreeEntry] = {}
     for path in sorted(directory.rglob("*")):
         relative_path = str(path.relative_to(directory))
+
         if path.is_symlink():
             entries[relative_path] = ("link", os.fsencode(os.readlink(path)))
         elif path.is_file():

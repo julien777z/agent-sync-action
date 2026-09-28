@@ -17,6 +17,7 @@ def update_external_directory(workspace: Workspace, resource: ExternalDirectory,
     """Replace one managed directory while preserving upstream file contents."""
 
     destination = agents_dir(workspace) / "resources" / resource.name
+
     if (
         not destination.is_relative_to(workspace.root)
         or not contains(workspace, destination)

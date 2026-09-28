@@ -10,6 +10,27 @@ def registry_changed(agents_dir: str, before: str, current: str) -> bool:
     if not before:
         return False
 
+    prefix = subprocess.run(
+        ["git", "-C", agents_dir, "rev-parse", "--show-prefix"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    if prefix.returncode != 0:
+        return False
+
+    registry = f"{prefix.stdout.strip()}external_resources.json"
+
+    if set(before) == {"0"}:
+        present = subprocess.run(
+            ["git", "cat-file", "-e", f"{current}:{registry}"],
+            capture_output=True,
+            check=False,
+        )
+
+        return present.returncode == 0
+
     previous = subprocess.run(
         ["git", "cat-file", "-e", f"{before}^{{commit}}"], capture_output=True, check=False
     )
@@ -24,24 +45,12 @@ def registry_changed(agents_dir: str, before: str, current: str) -> bool:
     if previous.returncode != 0:
         return False
 
-    prefix = subprocess.run(
-        ["git", "-C", agents_dir, "rev-parse", "--show-prefix"],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-
-    if prefix.returncode != 0:
-        return False
-
     changed = subprocess.run(
         ["git", "diff", "--name-only", "-z", before, current],
         capture_output=True,
         check=True,
     )
-    registry = f"{prefix.stdout.strip()}external_resources.json".encode()
-
-    return registry in changed.stdout.split(b"\0")
+    return registry.encode() in changed.stdout.split(b"\0")
 
 
 if __name__ == "__main__":

@@ -57,6 +57,7 @@ def replace_text(workspace: Workspace, path: Path, content: str, executable: boo
         delete_path(workspace, path)
 
     path.write_text(content, encoding="utf-8")
+
     path.chmod(0o755 if executable else 0o644)
 
 

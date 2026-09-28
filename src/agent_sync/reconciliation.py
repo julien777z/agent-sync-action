@@ -161,6 +161,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     stale: set[Path] = find_abandoned_outputs(workspace, manifest)
 
     instructions = workspace.root / "AGENTS.md"
+
     if (
         instructions not in expected
         and not instructions.is_symlink()

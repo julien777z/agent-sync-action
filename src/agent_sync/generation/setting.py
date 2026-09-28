@@ -49,6 +49,7 @@ def generate_codex_settings(
     if not isinstance(settings, CodexSettings):
         if not context.instructions:
             return []
+
         settings = CodexSettings()
 
     synchronized = settings
