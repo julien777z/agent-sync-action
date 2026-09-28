@@ -1,10 +1,14 @@
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ActionConfig(BaseSettings):
     """Load runtime settings from typed defaults or environment overrides."""
+
+    COMMIT_AUTHOR_NAME: ClassVar[str] = "github-actions[bot]"
+    COMMIT_AUTHOR_EMAIL: ClassVar[str] = "github-actions[bot]@users.noreply.github.com"
 
     model_config = SettingsConfigDict(
         env_prefix="AGENT_SYNC_",

@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from agent_sync.config import ActionConfig
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -47,8 +49,8 @@ def mirror_providers(agents_dir: str, output_dir: str) -> None:
 def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: str, ref: str) -> None:
     """Commit and push generated changes in the selected mode."""
 
-    run_git("config", "user.name", "github-actions[bot]")
-    run_git("config", "user.email", "github-actions[bot]@users.noreply.github.com")
+    run_git("config", "user.name", ActionConfig.COMMIT_AUTHOR_NAME)
+    run_git("config", "user.email", ActionConfig.COMMIT_AUTHOR_EMAIL)
     subprocess.run(
         ["git", "config", "--local", "--unset-all", "http.https://github.com/.extraheader"],
         check=False,
