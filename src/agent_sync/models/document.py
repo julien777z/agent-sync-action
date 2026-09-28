@@ -20,7 +20,6 @@ class SkillFrontMatter(BaseModel):
 
     name: str
     description: str
-    short_description: str | None = None
     disable_model_invocation: bool = Field(
         default=False,
         alias="disable-model-invocation",

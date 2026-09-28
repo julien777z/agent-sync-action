@@ -105,7 +105,9 @@ def update_external_skill(
             )
             if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
-            short_description = front_matter.short_description
+            local_summary = (front_matter.model_extra or {}).get("short_description")
+            if isinstance(local_summary, str):
+                short_description = local_summary
 
         normalize_skill_metadata(installed, skill, short_description)
         changed = current not in (None, destination) or trees_differ(installed, destination)
