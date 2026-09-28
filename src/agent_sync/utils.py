@@ -1,16 +1,20 @@
 import json
-import logging
+import os
 import re
+import shutil
+import tempfile
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from pydantic import BaseModel, ValidationError
 
-from agent_sync.errors import AgentSyncError
 
-logger = logging.getLogger(__name__)
+class AgentSyncError(ValueError):
+    """Report invalid canonical input or an unsafe generated state."""
+
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+type TreeEntry = tuple[Literal["file", "directory", "link", "other"], bytes]
 
 
 def ensure_trailing_newline(text: str) -> str:
@@ -70,14 +74,43 @@ def trees_differ(source: Path, destination: Path) -> bool:
     return snapshot_tree(source) != snapshot_tree(destination)
 
 
-def snapshot_tree(directory: Path) -> dict[str, bytes]:
-    """Read every file in a directory tree into a comparable snapshot."""
+def replace_tree(source: Path, destination: Path, current: Path | None) -> None:
+    """Replace a directory from a sibling staging area, restoring the original on failure."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".agent-sync-stage-", dir=destination.parent) as stage_root:
+        stage = Path(stage_root)
+        replacement = stage / "replacement"
+        previous = stage / "previous"
+        shutil.copytree(source, replacement)
+
+        if current is not None:
+            os.replace(current, previous)
+        try:
+            os.replace(replacement, destination)
+        except OSError:
+            if current is not None:
+                os.replace(previous, current)
+            raise
+
+
+def snapshot_tree(directory: Path) -> dict[str, TreeEntry]:
+    """Read every tree entry without following links into a comparable snapshot."""
 
     if not directory.is_dir():
         return {}
 
-    return {
-        str(path.relative_to(directory)): path.read_bytes()
-        for path in sorted(directory.rglob("*"))
-        if path.is_file()
-    }
+    entries: dict[str, TreeEntry] = {}
+    for path in sorted(directory.rglob("*")):
+        relative_path = str(path.relative_to(directory))
+
+        if path.is_symlink():
+            entries[relative_path] = ("link", os.fsencode(os.readlink(path)))
+        elif path.is_file():
+            entries[relative_path] = ("file", path.read_bytes())
+        elif path.is_dir():
+            entries[relative_path] = ("directory", b"")
+        else:
+            entries[relative_path] = ("other", b"")
+
+    return entries

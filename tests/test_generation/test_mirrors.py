@@ -1,8 +1,8 @@
 import os
 
-
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir, output_root, settings_dir
 from tests.factories import (
     RuleFrontMatterFactory,
     SkillFrontMatterFactory,
@@ -21,13 +21,13 @@ class TestMirrorIntegration:
         """Test that mirroring writes rules and skill links, then reaches a clean dry run."""
 
         materialize_rule(
-            workspace.agents_dir / "rules/python.md",
+            agents_dir(workspace) / "rules/python.md",
             RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
 
         skill_front_matter = SkillFrontMatterFactory.build(name="review")
         materialize_skill(
-            workspace.agents_dir / "skills/review/SKILL.md",
+            agents_dir(workspace) / "skills/review/SKILL.md",
             skill_front_matter,
         )
 
@@ -41,7 +41,7 @@ class TestMirrorIntegration:
     def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
         """Leave repository formatting in the source while adding only the missing scope."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
         original = (
             '---\ndescription: "Python guidance"\nalwaysApply: false\nglobs:\n'
@@ -64,7 +64,7 @@ class TestMirrorIntegration:
     def test_existing_files_become_links_when_both_scopes_are_authored(self, workspace: Workspace) -> None:
         """Test that adding the second scope replaces a generated file with a link."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
         source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
         assert mirror_providers(workspace, dry_run=False) is False
@@ -86,52 +86,52 @@ class TestMirrorIntegration:
         """Test that a configured output directory receives every provider artifact."""
 
         materialize_skill(
-            relocated_workspace.agents_dir / "skills/review/SKILL.md",
+            agents_dir(relocated_workspace) / "skills/review/SKILL.md",
             SkillFrontMatterFactory.build(name="review"),
         )
         materialize_rule(
-            relocated_workspace.agents_dir / "rules/python.md",
+            agents_dir(relocated_workspace) / "rules/python.md",
             RuleFrontMatterFactory.build(name="removed", always_apply=False),
         )
         materialize_rule(
-            relocated_workspace.agents_dir / "rules/typescript.md",
+            agents_dir(relocated_workspace) / "rules/typescript.md",
             RuleFrontMatterFactory.build(name="removed", starlark="allow_rule()"),
         )
 
-        agents_dir = relocated_workspace.agents_dir / "agents"
-        agents_dir.mkdir()
-        (agents_dir / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
+        agent_sources = agents_dir(relocated_workspace) / "agents"
+        agent_sources.mkdir()
+        (agent_sources / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
 
-        hooks_dir = relocated_workspace.agents_dir / "hooks"
+        hooks_dir = agents_dir(relocated_workspace) / "hooks"
         hooks_dir.mkdir()
         (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
 
-        relocated_workspace.settings_dir.mkdir()
-        (relocated_workspace.settings_dir / "claude.json").write_text('{"model":"default"}')
-        (relocated_workspace.settings_dir / "codex.json").write_text(
+        settings_dir(relocated_workspace).mkdir()
+        (settings_dir(relocated_workspace) / "claude.json").write_text('{"model":"default"}')
+        (settings_dir(relocated_workspace) / "codex.json").write_text(
             '{"model":"gpt-5","project_doc_max_bytes":1}'
         )
 
         assert mirror_providers(relocated_workspace, dry_run=False) is False
 
-        output_root = relocated_workspace.output_root
+        generated_root = output_root(relocated_workspace)
 
-        assert (output_root / ".claude/skills/review").is_symlink()
-        assert (output_root / ".claude/rules/python.md").is_symlink()
-        assert (output_root / ".claude/rules/python.md").resolve() == (
-            relocated_workspace.agents_dir / "rules/python.md"
+        assert (generated_root / ".claude/skills/review").is_symlink()
+        assert (generated_root / ".claude/rules/python.md").is_symlink()
+        assert (generated_root / ".claude/rules/python.md").resolve() == (
+            agents_dir(relocated_workspace) / "rules/python.md"
         )
-        assert (output_root / ".codex/rules/typescript.rules").is_file()
-        assert (output_root / ".claude/agents/review.md").is_file()
-        assert (output_root / ".claude/hooks/check").is_file()
-        assert (output_root / ".claude/settings.json").is_file()
-        assert (output_root / ".codex/config.toml").is_file()
+        assert (generated_root / ".codex/rules/typescript.rules").is_file()
+        assert (generated_root / ".claude/agents/review.md").is_file()
+        assert (generated_root / ".claude/hooks/check").is_file()
+        assert (generated_root / ".claude/settings.json").is_file()
+        assert (generated_root / ".codex/config.toml").is_file()
         assert (relocated_workspace.root / "AGENTS.md").is_file()
         assert not (relocated_workspace.root / ".claude").exists()
         assert mirror_providers(relocated_workspace, dry_run=True) is False
 
     def test_explicit_skill_remains_a_canonical_link(self, workspace: Workspace) -> None:
-        source = workspace.agents_dir / "skills/review/SKILL.md"
+        source = agents_dir(workspace) / "skills/review/SKILL.md"
         front_matter = SkillFrontMatterFactory.build(name="review", disable_model_invocation=True)
         materialize_skill(source, front_matter)
 

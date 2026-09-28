@@ -2,14 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir
 
 
 def create_workspace(root: Path, output_dirname: str = "") -> Workspace:
     """Create one synthetic consumer workspace with its canonical source directory."""
 
     resolved = Workspace(root=root, output_dirname=output_dirname)
-    resolved.agents_dir.mkdir()
+    agents_dir(resolved).mkdir()
 
     return resolved
 

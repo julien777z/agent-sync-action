@@ -6,9 +6,10 @@ from agent_sync.generation.rule import (
     generate_rule_mirrors,
     generate_shared_rule_outputs,
 )
-from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Provider
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.utils import AgentSyncError
+from agent_sync.workspace import agents_dir, models_dir, settings_dir
 from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
 
 
@@ -21,13 +22,13 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that agent-specific models override provider-wide settings."""
 
-        agents_dir = workspace.agents_dir / "agents"
-        agents_dir.mkdir()
-        (agents_dir / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
-        workspace.settings_dir.mkdir()
-        (workspace.settings_dir / "claude.json").write_text('{"model":"default"}')
-        workspace.models_dir.mkdir()
-        (workspace.models_dir / "review.json").write_text('{"claude":"override","cursor":"cursor-model"}')
+        agent_sources = agents_dir(workspace) / "agents"
+        agent_sources.mkdir()
+        (agent_sources / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text('{"model":"default"}')
+        models_dir(workspace).mkdir()
+        (models_dir(workspace) / "review.json").write_text('{"claude":"override","cursor":"cursor-model"}')
 
         context = load_context(workspace)
         outputs = [
@@ -52,7 +53,7 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that unscoped provider mirrors point to canonical text."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         materialize_rule(source, RuleFrontMatterFactory.build(name="removed", always_apply=False))
         original = source.read_text()
         context = load_context(workspace)
@@ -78,7 +79,7 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that a Starlark-only rule still generates its Codex output."""
 
-        rules_dir = workspace.agents_dir / "rules"
+        rules_dir = agents_dir(workspace) / "rules"
         rules_dir.mkdir()
         source = rules_dir / "git.md"
         source.write_text('---\nstarlark: |\n  allow_rule(prefix_rule = ["git", "status"])\n' "---\n")
@@ -120,7 +121,7 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that one missing scope key requires one generated file."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)
         source.write_text(f'---\n{authored_key}: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
 
@@ -138,7 +139,7 @@ class TestDocumentGeneration:
     def test_matching_scope_keys_link_both_mirrors(self, workspace: Workspace) -> None:
         """Test that fully authored scopes need no generated rule body."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)
         source.write_text('---\nglobs: "**/*.py"\npaths: ["**/*.py"]\nalwaysApply: false\n---\n\n# Rule\n')
 
@@ -152,7 +153,7 @@ class TestDocumentGeneration:
     def test_mismatched_scope_keys_are_rejected(self, workspace: Workspace) -> None:
         """Test that providers cannot silently use different file scopes."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)
         source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.ts"\nalwaysApply: false\n---\n\n# Rule\n')
 
@@ -165,7 +166,7 @@ class TestDocumentGeneration:
     ) -> None:
         """Test that a Claude-style paths scope annotates the root instructions."""
 
-        source = workspace.agents_dir / "rules/python.md"
+        source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)
         source.write_text('---\npaths: ["**/*.py", "**/*.pyi"]\nalwaysApply: false\n---\n\n# Rule\n')
 
@@ -183,7 +184,7 @@ class TestDocumentGeneration:
     def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
         """Test that shell and shebang hooks are marked executable."""
 
-        hooks_dir = workspace.agents_dir / "hooks"
+        hooks_dir = agents_dir(workspace) / "hooks"
         hooks_dir.mkdir()
         (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
 

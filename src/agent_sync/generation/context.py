@@ -1,80 +1,24 @@
-import logging
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
-from agent_sync.config import SourceConfig
 from agent_sync.document import parse_markdown
-from agent_sync.errors import AgentSyncError
 from agent_sync.models.document import (
     AgentFrontMatter,
     RuleFrontMatter,
     SkillFrontMatter,
 )
+from agent_sync.models.generation import (
+    AgentSource,
+    GenerationContext,
+    HookSource,
+    RuleSource,
+    SkillSource,
+)
+from agent_sync.models.settings import SourceConfig, Workspace
 from agent_sync.skills import discover_skill_directories
-from agent_sync.utils import validate_slug
-from agent_sync.workspace import Workspace
-
-logger = logging.getLogger(__name__)
-
-
-class SkillSource(BaseModel):
-    """Hold one validated skill source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    directory: Path
-    front_matter: SkillFrontMatter
-
-
-class AgentSource(BaseModel):
-    """Hold one parsed agent source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    front_matter: AgentFrontMatter
-    body: str
-
-
-class RuleSource(BaseModel):
-    """Hold one parsed rule source."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    path: Path
-    front_matter: RuleFrontMatter
-    body: str
-
-
-class HookSource(BaseModel):
-    """Hold one hook source and its executable intent."""
-
-    model_config = ConfigDict(frozen=True)
-
-    path: Path
-    content: str
-    executable: bool
-
-
-class GenerationContext(BaseModel):
-    """Hold all immutable inputs for one generation run."""
-
-    model_config = ConfigDict(frozen=True)
-
-    workspace: Workspace
-    source_config: SourceConfig
-    skills: tuple[SkillSource, ...]
-    agents: tuple[AgentSource, ...]
-    rules: tuple[RuleSource, ...]
-    global_instructions: str = ""
-    project_instructions: str = ""
-    hooks: tuple[HookSource, ...]
-    instructions: str = ""
+from agent_sync.utils import AgentSyncError, validate_slug
+from agent_sync.workspace import agents_dir, read_optional_text
 
 
 def load_generation_context(
@@ -98,8 +42,8 @@ def load_generation_context(
 def load_root_instructions(workspace: Workspace, filename: str) -> str:
     """Read optional root guidance without its front matter."""
 
-    path = workspace.agents_dir / filename
-    content = workspace.read_text(path)
+    path = agents_dir(workspace) / filename
+    content = read_optional_text(path)
 
     if content is None:
         return ""
@@ -112,7 +56,7 @@ def load_root_instructions(workspace: Workspace, filename: str) -> str:
 def load_skills(workspace: Workspace) -> list[SkillSource]:
     """Load validated skill directories, which may be grouped in folders."""
 
-    skills_dir = workspace.agents_dir / "skills"
+    skills_dir = agents_dir(workspace) / "skills"
 
     if not skills_dir.exists():
         return []
@@ -122,6 +66,7 @@ def load_skills(workspace: Workspace) -> list[SkillSource]:
 
     for directory in discover_skill_directories(skills_dir):
         forbidden_metadata = directory / "agents/openai.yaml"
+
         if forbidden_metadata.exists() or forbidden_metadata.is_symlink():
             raise AgentSyncError(f"Repository skills cannot contain {forbidden_metadata}")
 
@@ -185,7 +130,7 @@ def load_rules(workspace: Workspace) -> list[RuleSource]:
 def load_hooks(workspace: Workspace) -> list[HookSource]:
     """Load hook files and executable intent."""
 
-    hooks_dir = workspace.agents_dir / "hooks"
+    hooks_dir = agents_dir(workspace) / "hooks"
 
     if not hooks_dir.exists():
         return []
@@ -193,7 +138,7 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
     sources: list[HookSource] = []
 
     for path in sorted(path for path in hooks_dir.iterdir() if path.is_file()):
-        content = workspace.read_text(path)
+        content = read_optional_text(path)
 
         if content is not None:
             sources.append(
@@ -214,7 +159,7 @@ def load_markdown_sources[T: BaseModel](
 ) -> list[tuple[Path, str, T, str]]:
     """Load typed Markdown documents from one source directory."""
 
-    directory = workspace.agents_dir / directory_name
+    directory = agents_dir(workspace) / directory_name
 
     if not directory.exists():
         return []
@@ -223,7 +168,7 @@ def load_markdown_sources[T: BaseModel](
 
     for path in sorted(directory.glob("*.md")):
         slug = validate_slug(path.stem, path)
-        content = workspace.read_text(path)
+        content = read_optional_text(path)
 
         if content is not None:
             front_matter, body = parse_markdown(content, model, str(path))

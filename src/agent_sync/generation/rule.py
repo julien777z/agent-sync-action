@@ -1,11 +1,10 @@
-import logging
 from pathlib import Path
 from typing import Final
 
-from agent_sync.document import FrontMatterValues, render_front_matter
+from agent_sync.document import render_front_matter
 from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
-from agent_sync.generation.context import GenerationContext
-from agent_sync.models.document import RuleFrontMatter
+from agent_sync.models.document import FrontMatterValues, RuleFrontMatter
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
@@ -14,8 +13,7 @@ from agent_sync.models.output import (
     Provider,
 )
 from agent_sync.utils import ensure_trailing_newline, serialized_field_names
-
-logger = logging.getLogger(__name__)
+from agent_sync.workspace import agents_dir, output_root
 
 DISCARDED_RULE_KEYS: Final[frozenset[str]] = frozenset({"name"})
 
@@ -56,8 +54,9 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
             for part in (context.global_instructions, *sections, context.project_instructions, scoped_rules)
             if part
         ],
-        context.workspace.agents_dir.relative_to(context.workspace.root).as_posix(),
+        agents_dir(context.workspace).relative_to(context.workspace.root).as_posix(),
     )
+
     if not content:
         return []
 
@@ -66,7 +65,7 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
             target_path=context.workspace.root / "AGENTS.md",
             content=content,
             artifact=ArtifactKind.INSTRUCTIONS,
-            source_path=context.workspace.agents_dir / "rules",
+            source_path=agents_dir(context.workspace) / "rules",
         )
     ]
 
@@ -85,9 +84,12 @@ def generate_rule_mirrors(
             continue
 
         target = (
-            provider.root(context.workspace.output_root) / "rules" / f"{source.slug}{provider.rule_extension}"
+            provider.root(output_root(context.workspace))
+            / "rules"
+            / f"{source.slug}{provider.rule_extension}"
         )
         scope = getattr(source.front_matter, scope_key)
+
         if scope is not None or (source.front_matter.globs is None and source.front_matter.paths is None):
             outputs.append(
                 GeneratedLink(
@@ -127,7 +129,7 @@ def generate_codex_rules(
 ) -> list[GeneratedOutput]:
     """Generate Codex Starlark rule files."""
 
-    root = provider.root(context.workspace.output_root)
+    root = provider.root(output_root(context.workspace))
 
     return [
         GeneratedFile(
@@ -158,9 +160,12 @@ def render_rule_pointer(path: Path, front_matter: RuleFrontMatter) -> str:
     source = f"`{path.as_posix()}`"
     description = front_matter.description or path.stem.replace("-", " ")
     patterns = front_matter.scope_patterns
+
     if patterns:
         scope = ", ".join(f"`{pattern}`" for pattern in patterns)
+
         return f"- Read {source} for files matching {scope}: {description}"
+
     return f"- Read {source} when its topic is relevant: {description}"
 
 

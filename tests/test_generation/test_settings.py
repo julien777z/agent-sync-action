@@ -1,11 +1,11 @@
 import json
 import tomllib
 
-
 from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.output import GeneratedFile, Provider
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir, settings_dir
 from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
 
 
@@ -15,8 +15,8 @@ class TestSettingsGeneration:
     def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
         """Test that Claude settings preserve validated provider keys."""
 
-        workspace.settings_dir.mkdir()
-        (workspace.settings_dir / "claude.json").write_text(
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text(
             '{"$comment":"source comment","model":"sonnet",'
             '"permissions":{"allow":["Read"]},'
             '"features":{"default_mode_request_user_input":true,"experimental-feature":false}}'
@@ -47,13 +47,13 @@ class TestSettingsGeneration:
         """Test that generated instructions determine Codex document capacity."""
 
         materialize_rule(
-            workspace.agents_dir / "rules/project.md",
+            agents_dir(workspace) / "rules/project.md",
             RuleFrontMatterFactory.build(name="removed"),
             body="# Project Rules\n\nKeep changes focused.",
         )
 
-        workspace.settings_dir.mkdir(parents=True)
-        settings_path = workspace.settings_dir / "codex.json"
+        settings_dir(workspace).mkdir(parents=True)
+        settings_path = settings_dir(workspace) / "codex.json"
         settings_path.write_text(
             '{"model":"gpt-5","project_doc_max_bytes":1,'
             '"features":{"default_mode_request_user_input":true}}'
@@ -89,8 +89,8 @@ class TestSettingsGeneration:
     def test_codex_features_accept_arbitrary_names(self, workspace: Workspace) -> None:
         """Test that arbitrary Codex feature names are synchronized unchanged."""
 
-        workspace.settings_dir.mkdir()
-        settings_path = workspace.settings_dir / "codex.json"
+        settings_dir(workspace).mkdir()
+        settings_path = settings_dir(workspace) / "codex.json"
         settings_path.write_text(
             '{"project_doc_max_bytes":1,"features":'
             '{"default_mode_request_user_input":true,"experimental-feature":false}}'
@@ -111,8 +111,8 @@ class TestSettingsGeneration:
     def test_invalid_existing_toml_is_overwritten(self, workspace: Workspace) -> None:
         """Test that existing Codex content never affects generated settings."""
 
-        workspace.settings_dir.mkdir()
-        (workspace.settings_dir / "codex.json").write_text('{"project_doc_max_bytes":1}')
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "codex.json").write_text('{"project_doc_max_bytes":1}')
 
         config_path = workspace.root / ".codex/config.toml"
         config_path.parent.mkdir()

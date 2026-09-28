@@ -1,15 +1,12 @@
-import logging
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Final
 
-from agent_sync.config import ACTION_CONFIG
+from agent_sync.config import ActionConfig
 from agent_sync.document import parse_markdown
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
-
-logger = logging.getLogger(__name__)
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
@@ -26,16 +23,17 @@ TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
         "Makefile",
     }
 )
-LEGAL_FILE_PREFIXES: Final[tuple[str, ...]] = ("LICENSE", "COPYING", "NOTICE")
 
 
-def install_skill(skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+def install_skill(
+    skill: ExternalSkill, working_directory: Path, source_root: Path, config: ActionConfig
+) -> None:
     """Install one skill from a downloaded repository snapshot."""
 
     command = [
         "npx",
         "--yes",
-        f"skills@{ACTION_CONFIG.skills_cli_version}",
+        f"skills@{config.skills_cli_version}",
         "add",
         str(source_root),
         "--skill",
@@ -73,6 +71,12 @@ def locate_skill_directory(
         for path in search_root.rglob("SKILL.md")
         if excluded_root is None or excluded_root not in path.parents
     )
+
+    canonical_document = search_root / ".agents" / "skills" / name / "SKILL.md"
+
+    if canonical_document in documents:
+        return canonical_document.parent
+
     directory_matches = [document.parent for document in documents if document.parent.name == name]
 
     if len(directory_matches) == 1:
@@ -114,16 +118,3 @@ def supplement_root_assets(destination: Path, source_root: Path) -> None:
             shutil.copytree(entry, target, dirs_exist_ok=True)
         else:
             shutil.copy2(entry, target)
-
-
-def copy_legal_files(destination: Path, source_root: Path) -> None:
-    """Copy repository-root legal files into the installed skill."""
-
-    legal_files = [
-        entry
-        for entry in sorted(source_root.iterdir())
-        if entry.is_file() and entry.name.upper().startswith(LEGAL_FILE_PREFIXES)
-    ]
-
-    for legal_file in legal_files:
-        shutil.copy2(legal_file, destination / legal_file.name)

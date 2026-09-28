@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -26,8 +27,8 @@ class TestAction:
                 "description": "Token used to commit and push changes (or open a pull request).",
                 "default": "${{ github.token }}",
             },
-            "refresh-external-skills": {
-                "description": "Force vendoring external skills from the registry before mirroring.",
+            "refresh-external-resources": {
+                "description": "Force vendoring external skills and resources from the registry before mirroring.",
                 "default": "false",
             },
             "skills-cli-version": {
@@ -40,8 +41,7 @@ class TestAction:
             },
             "agents-dir": {
                 "description": (
-                    "Source-of-truth directory name; the registry is read from "
-                    "<agents-dir>/external_skills.json."
+                    "Source-of-truth directory name; the external registry is read from this directory."
                 ),
                 "default": ".agents",
             },
@@ -91,28 +91,88 @@ class TestAction:
 
         assert not interpolations
 
-    def test_staging_uses_the_checked_in_script(self) -> None:
-        """Test that the action delegates staging to its checked-in script."""
+    def test_persistence_uses_the_checked_in_script(self) -> None:
+        """Test that the action delegates persistence to its checked-in script."""
 
         action_text = Path("action.yml").read_text(encoding="utf-8")
 
-        assert 'python "$GITHUB_ACTION_PATH/.github/scripts/stage_generated_paths.py"' in action_text
+        assert 'python "$GITHUB_ACTION_PATH/.github/scripts/persist_changes.py"' in action_text
+
+    @pytest.mark.parametrize("first_push", [False, True], ids=["existing-branch", "new-branch"])
+    def test_refresh_detects_registry_changes_with_a_dot_prefixed_agents_dir(
+        self, tmp_path: Path, first_push: bool
+    ) -> None:
+        """Detect registry changes on existing and new branches with an equivalent agents path."""
+
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+
+        registry = tmp_path / ".agents/external_resources.json"
+        registry.parent.mkdir()
+        registry.write_text('{"resources":[]}\n')
+
+        subprocess.run(["git", "add", ".agents/external_resources.json"], cwd=tmp_path, check=True)
+        commit = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--quiet"]
+
+        subprocess.run([*commit, "-m", "initial"], cwd=tmp_path, check=True)
+
+        before = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+
+        registry.write_text('{"resources":[{"kind":"directory"}]}\n')
+
+        subprocess.run(["git", "add", ".agents/external_resources.json"], cwd=tmp_path, check=True)
+        subprocess.run([*commit, "-m", "update"], cwd=tmp_path, check=True)
+
+        current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+
+        output = tmp_path / "action-output"
+        env = {
+            **os.environ,
+            "GITHUB_OUTPUT": str(output),
+        }
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(".github/scripts/refresh_external_resources.py").resolve()),
+                "--force",
+                "false",
+                "--event",
+                "push",
+                "--before",
+                "0" * 40 if first_push else before,
+                "--current",
+                current,
+                "--agents-dir",
+                "./.agents",
+            ],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+        )
+
+        assert output.read_text() == "enabled=true\n"
 
     def test_both_persist_modes_call_the_staging_script(self) -> None:
         """Test that both commit paths use the same staging script."""
 
-        action_text = Path("action.yml").read_text(encoding="utf-8")
-
-        calls = [line for line in action_text.splitlines() if "stage_generated_paths.py" in line]
+        calls = [
+            line
+            for line in Path(".github/scripts/persist_changes.py").read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("stage_generated_paths(action_path,")
+        ]
         assert len(calls) == 2
 
     def test_uses_the_installed_unified_cli(self) -> None:
         """Test that every action operation uses the canonical package entrypoint."""
 
         action_text = Path("action.yml").read_text(encoding="utf-8")
+        persistence_text = Path(".github/scripts/persist_changes.py").read_text(encoding="utf-8")
 
         assert "python -m agent_sync mirror-providers" in action_text
-        assert "python -m agent_sync vendor-skills" in action_text
+        assert "python -m agent_sync vendor-resources" in action_text
+        assert "vendor-skills" not in action_text + persistence_text
+        assert "external_skills.json" not in action_text + persistence_text
+        assert "refresh-external-skills" not in action_text + persistence_text
         assert "AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}" in action_text
         assert "PYTHONPATH=" not in action_text
         assert "requirements.txt" not in action_text
@@ -124,7 +184,7 @@ class TestAction:
 
         assert "poetry run python -m agent_sync mirror-providers --root ." in workflow_text
         assert "uses: ./" in workflow_text
-        assert 'refresh-external-skills: "true"' in workflow_text
+        assert 'refresh-external-resources: "true"' in workflow_text
 
     def test_sets_up_node_when_vendoring_may_run(self) -> None:
         """Test that Node setup covers initial and post-rebase vendoring."""

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_sync.errors import AgentSyncError
+from agent_sync.utils import AgentSyncError
 from agent_sync.skills import discover_skill_directories, locate_skill_by_name
 
 

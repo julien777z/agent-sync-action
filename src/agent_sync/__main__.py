@@ -1,27 +1,16 @@
 import argparse
 import logging
-from typing import Literal
+from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
 
-from agent_sync.errors import AgentSyncError
-from agent_sync.external_skills.sync import sync_external_skills
+from agent_sync.config import ActionConfig
+from agent_sync.external_resources.sync import sync_external_resources
+from agent_sync.models.settings import Workspace
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.workspace import Workspace
+from agent_sync.utils import AgentSyncError
 
-logger = logging.getLogger(__name__)
-
-
-class CliArguments(BaseModel):
-    """Validate parsed command-line arguments before dispatch."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    command: Literal["mirror-providers", "vendor-skills"]
-    root: str | None
-    agents_dir: str | None
-    output_dir: str | None = None
-    dry_run: bool
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
@@ -51,10 +40,11 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="agent-sync",
-        description="Mirror canonical agent sources and vendor registered skills.",
+        description="Mirror canonical agent sources and vendor registered skills and resources.",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
+    parser.set_defaults(output_dir=None)
 
     mirror_parser = commands.add_parser(
         "mirror-providers",
@@ -71,29 +61,33 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    vendor_parser = commands.add_parser(
-        "vendor-skills",
-        help="Vendor registered external skills into canonical sources.",
+    resource_parser = commands.add_parser(
+        "vendor-resources",
+        help="Vendor registered external skills and reference directories into canonical sources.",
     )
-    add_workspace_arguments(vendor_parser)
+    add_workspace_arguments(resource_parser)
 
     return parser
 
 
 if __name__ == "__main__":
     parser = create_parser()
-    parsed = CliArguments.model_validate(vars(parser.parse_args()))
+    parsed = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     try:
-        workspace = Workspace.resolve(parsed.root, parsed.agents_dir, parsed.output_dir)
+        config = ActionConfig()
+        workspace = Workspace(
+            root=Path(parsed.root or config.root or Path.cwd()).resolve(),
+            agents_dirname=parsed.agents_dir or config.agents_dir,
+            output_dirname=parsed.output_dir or config.output_dir,
+        )
 
-        match parsed.command:
-            case "mirror-providers":
-                differences_found = mirror_providers(workspace, parsed.dry_run)
-            case "vendor-skills":
-                sync_external_skills(workspace, parsed.dry_run)
-                differences_found = False
+        if parsed.command == "mirror-providers":
+            differences_found = mirror_providers(workspace, parsed.dry_run)
+        else:
+            sync_external_resources(workspace, parsed.dry_run, config)
+            differences_found = False
 
         exit_code = 1 if differences_found else 0
     except (AgentSyncError, OSError, RuntimeError, ValidationError) as exc:

@@ -1,11 +1,9 @@
-import logging
 from pathlib import Path
+from typing import Literal, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from agent_sync.utils import SAFE_SLUG_PATTERN
-
-logger = logging.getLogger(__name__)
+from agent_sync.utils import SAFE_SLUG_PATTERN, escapes_base_directory
 
 
 class ExternalSkill(BaseModel):
@@ -13,6 +11,7 @@ class ExternalSkill(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    kind: Literal["skill"]
     name: str
     repo: str
     skill: str | None = None
@@ -76,31 +75,79 @@ class ExternalSkill(BaseModel):
         return self.skill or self.name
 
 
-class SkillsRegistry(BaseModel):
-    """The .agents/external_skills.json external-skill registry."""
+class ExternalDirectory(BaseModel):
+    """Represent a reference directory to vendor without treating it as a skill."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    kind: Literal["directory"]
+    name: str
+    repo: str
+    source_path: str
+    update_on_sync: bool
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Require a safe local directory name."""
+
+        if not SAFE_SLUG_PATTERN.fullmatch(value):
+            raise ValueError(f"Invalid resource name '{value}'")
+
+        return value
+
+    @field_validator("source_path")
+    @classmethod
+    def validate_source_path(cls, value: str) -> str:
+        """Keep the selected directory inside the upstream repository."""
+
+        if not value or escapes_base_directory(Path(value)):
+            raise ValueError("Resource source_path must be a relative repository path")
+
+        return value
+
+
+class DirectorySourceMarker(TypedDict):
+    """Identify the upstream directory that owns one vendored reference collection."""
+
+    repo: str
+    source_path: str
+
+
+class ResourcesRegistry(BaseModel):
+    """Represent the external resource registry."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     version: int = 1
-    skills: list[ExternalSkill] = Field(default_factory=list[ExternalSkill])
+    resources: list[ExternalSkill | ExternalDirectory] = Field(
+        default_factory=list[ExternalSkill | ExternalDirectory]
+    )
 
     @model_validator(mode="after")
-    def validate_unique_names(self) -> "SkillsRegistry":
-        """Reject entries that would write to the same local skill directory."""
+    def validate_unique_names(self) -> Self:
+        """Reject duplicate entry names and skill destinations."""
 
-        names = [skill.local_name for skill in self.skills]
+        names = [resource.name for resource in self.resources]
         duplicates = sorted({name for name in names if names.count(name) > 1})
+        skill_names = [
+            resource.local_name for resource in self.resources if isinstance(resource, ExternalSkill)
+        ]
+        duplicate_skills = sorted({name for name in skill_names if skill_names.count(name) > 1})
+
+        if duplicate_skills:
+            raise ValueError(f"External skill names must be unique: {', '.join(duplicate_skills)}")
 
         if duplicates:
-            raise ValueError(f"External skill names must be unique: {', '.join(duplicates)}")
+            raise ValueError(f"External resource names must be unique: {', '.join(duplicates)}")
+
+        skill_paths = [
+            resource.relative_path for resource in self.resources if isinstance(resource, ExternalSkill)
+        ]
+
+        for index, path in enumerate(skill_paths):
+            for other in skill_paths[:index]:
+                if path == other or path in other.parents or other in path.parents:
+                    raise ValueError(f"External skill destinations overlap: {other} and {path}")
 
         return self
-
-
-class ExternalSkillResult(BaseModel):
-    """The outcome of updating one external skill in .agents/skills/."""
-
-    model_config = ConfigDict(frozen=True)
-
-    skill: ExternalSkill
-    changed: bool

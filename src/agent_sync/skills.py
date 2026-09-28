@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from agent_sync.errors import AgentSyncError
+from agent_sync.utils import AgentSyncError
 
 
 def child_directories(root: Path) -> list[Path]:

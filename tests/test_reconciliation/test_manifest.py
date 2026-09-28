@@ -2,7 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from agent_sync.models.output import ArtifactKind, GeneratedFile, Manifest
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir
 
 
 class TestManifest:
@@ -15,7 +16,7 @@ class TestManifest:
             target_path=workspace.root / "same",
             content="content\n",
             artifact=ArtifactKind.RULE,
-            source_path=workspace.agents_dir / "rules/sample.md",
+            source_path=agents_dir(workspace) / "rules/sample.md",
         )
 
         with pytest.raises(ValidationError, match="Duplicate generated targets"):

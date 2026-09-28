@@ -1,17 +1,24 @@
+import subprocess
+import sys
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 
+from agent_sync.config import ActionConfig
 from agent_sync.document import render_front_matter
-from agent_sync.external_skills import github, installer
-from agent_sync.generation.context import GenerationContext, load_generation_context
+from agent_sync.external_resources import directories, skills
+from agent_sync.generation.context import load_generation_context
+from agent_sync.models.generation import GenerationContext
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
-from agent_sync.models.registry import ExternalSkill, SkillsRegistry
+from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir
 
-ROOT_LEVEL_SKILL = ExternalSkill(
+ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
+    kind="skill",
     name="local-skill",
     repo="example/repository",
     skill="upstream-skill",
@@ -25,8 +32,15 @@ def load_context(workspace: Workspace) -> GenerationContext:
     return load_generation_context(workspace, load_source_config(workspace))
 
 
-def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document: str | None = None) -> None:
-    """Serve a synthetic upstream repository whose root is the skill."""
+def stub_skill_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    upstream_document: str | None = None,
+    root_license: str | None = None,
+    installed_license: str | None = None,
+    installed_license_kind: Literal["file", "link", "directory"] = "file",
+    nested_skill: bool = False,
+) -> None:
+    """Serve a synthetic upstream repository containing the requested skill."""
 
     if upstream_document is None:
         upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
@@ -37,24 +51,73 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document:
         return "a" * 40
 
     def fake_download(repository: str, revision: str, destination: Path) -> Path:
-        """Create a root-level upstream skill document."""
+        """Create an upstream skill document at the selected source location."""
 
         source_root = destination / "repository"
         source_root.mkdir(parents=True)
-        (source_root / "SKILL.md").write_text(upstream_document)
+        source_skill = source_root / "upstream-skill" if nested_skill else source_root
+        source_skill.mkdir(parents=True, exist_ok=True)
+        (source_skill / "SKILL.md").write_text(upstream_document)
+        if root_license is not None:
+            (source_root / "LICENSE").write_text(root_license)
 
         return source_root
 
-    def fake_install(installed_skill: ExternalSkill, working_directory: Path, source_root: Path) -> None:
+    def fake_install(
+        installed_skill: ExternalSkill,
+        working_directory: Path,
+        source_root: Path,
+        config: ActionConfig,
+    ) -> None:
         """Create the installed skill in the staging directory."""
 
         installed = working_directory / ".staging/skills" / installed_skill.name
         installed.mkdir(parents=True)
         (installed / "SKILL.md").write_text(upstream_document)
+        if installed_license is not None:
+            if installed_license_kind == "link":
+                (installed / "asset.txt").write_text(installed_license)
+                (installed / "LICENSE").symlink_to("asset.txt")
+            elif installed_license_kind == "directory":
+                (installed / "LICENSE").mkdir()
+            else:
+                (installed / "LICENSE").write_text(installed_license)
 
-    monkeypatch.setattr(github, "resolve_revision", fake_resolve)
-    monkeypatch.setattr(github, "download_snapshot", fake_download)
-    monkeypatch.setattr(installer, "install_skill", fake_install)
+    monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(skills, "download_snapshot", fake_download)
+    monkeypatch.setattr(skills, "install_skill", fake_install)
+
+
+def stub_external_directory_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    resource: ExternalDirectory,
+    files: dict[str, str],
+    root_license: str | None = None,
+    snapshot_path: str | None = None,
+    links: dict[str, str] | None = None,
+) -> None:
+    """Serve a synthetic upstream reference directory from an immutable snapshot."""
+
+    def fake_resolve(repository: str) -> str:
+        """Return a stable synthetic revision."""
+
+        return "a" * 40
+
+    def fake_download(repository: str, revision: str, destination: Path) -> Path:
+        """Materialize the selected directory in a synthetic snapshot."""
+
+        root = destination / "repository"
+        materialize_tree(root / (snapshot_path or resource.source_path), files)
+        for link, target in (links or {}).items():
+            link_path = root / link
+            link_path.parent.mkdir(parents=True, exist_ok=True)
+            link_path.symlink_to(target, target_is_directory=True)
+        if root_license is not None:
+            (root / "LICENSE").write_text(root_license, encoding="utf-8")
+        return root
+
+    monkeypatch.setattr(directories, "resolve_revision", fake_resolve)
+    monkeypatch.setattr(directories, "download_snapshot", fake_download)
 
 
 class SkillFrontMatterFactory(ModelFactory[SkillFrontMatter]):
@@ -84,6 +147,7 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
 
     __model__ = ExternalSkill
 
+    kind = "skill"
     name = "sample"
     repo = "example/repository"
     skill = None
@@ -92,16 +156,28 @@ class ExternalSkillFactory(ModelFactory[ExternalSkill]):
     update_on_sync = True
 
 
-class SkillsRegistryFactory(ModelFactory[SkillsRegistry]):
-    """Build deterministic external-skill registries."""
+class ExternalResourceFactory(ModelFactory[ExternalDirectory]):
+    """Build valid external-reference registrations."""
 
-    __model__ = SkillsRegistry
+    __model__ = ExternalDirectory
+
+    kind = "directory"
+    name = "sample-reference"
+    repo = "example/reference"
+    source_path = "guides"
+    update_on_sync = True
+
+
+class ResourcesRegistryFactory(ModelFactory[ResourcesRegistry]):
+    """Build deterministic external-reference registries."""
+
+    __model__ = ResourcesRegistry
 
     version = 1
 
     @classmethod
-    def skills(cls) -> list[ExternalSkill]:
-        """Default to an empty external-skill registry."""
+    def resources(cls) -> list[ExternalSkill | ExternalDirectory]:
+        """Default to an empty external-resource registry."""
 
         return []
 
@@ -137,10 +213,21 @@ def materialize_rule(
     path.write_text(render_front_matter(raw_front_matter, body), encoding="utf-8")
 
 
-def materialize_registry(path: Path, registry: SkillsRegistry) -> None:
-    """Write one external-skill registry into canonical sources."""
+def materialize_registry(path: Path, registry: ResourcesRegistry) -> None:
+    """Write one external registry into canonical sources."""
 
     path.write_text(registry.model_dump_json(), encoding="utf-8")
+
+
+def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run the package script with its real command-line boundary."""
+
+    return subprocess.run(
+        [sys.executable, "-m", "agent_sync", *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def materialize_tree(base: Path, files: dict[str, str]) -> None:
@@ -156,15 +243,15 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
     """Write one canonical source of every kind a provider tree mirrors."""
 
     materialize_rule(
-        workspace.agents_dir / "rules/sample.md",
+        agents_dir(workspace) / "rules/sample.md",
         RuleFrontMatterFactory.build(name="sample", always_apply=False),
     )
 
-    hook = workspace.agents_dir / "hooks/setup.sh"
+    hook = agents_dir(workspace) / "hooks/setup.sh"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
 
     materialize_skill(
-        workspace.agents_dir / "skills/sample/SKILL.md",
+        agents_dir(workspace) / "skills/sample/SKILL.md",
         SkillFrontMatterFactory.build(name="sample", disable_model_invocation=explicit_invocation),
     )

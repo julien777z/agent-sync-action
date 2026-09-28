@@ -1,16 +1,17 @@
-import logging
 from typing import NotRequired, Self, TypedDict
-
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     JsonValue,
+    RootModel,
     field_validator,
     model_validator,
 )
 
-logger = logging.getLogger(__name__)
+
+class FrontMatterValues(RootModel[dict[str, JsonValue]]):
+    """Validate recursive YAML values supported by front matter."""
 
 
 class SkillFrontMatter(BaseModel):
@@ -75,6 +76,7 @@ class RuleFrontMatter(BaseModel):
         if self.globs is not None and self.paths is not None:
             globs = [self.globs] if isinstance(self.globs, str) else self.globs
             paths = [self.paths] if isinstance(self.paths, str) else self.paths
+
             if globs != paths:
                 raise ValueError("globs and paths must describe the same patterns")
 
@@ -85,6 +87,7 @@ class RuleFrontMatter(BaseModel):
         """Return the file patterns this rule is scoped to."""
 
         scope = self.globs if self.globs is not None else self.paths
+
         if scope is None:
             return []
 

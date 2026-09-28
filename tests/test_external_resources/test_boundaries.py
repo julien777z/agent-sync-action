@@ -1,24 +1,95 @@
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
-from agent_sync.config import ACTION_CONFIG, ActionConfig
-from agent_sync.external_skills import github, installer
-from agent_sync.external_skills import sync
+from agent_sync.config import ActionConfig
+from agent_sync.external_resources import installer, skills
+from agent_sync.external_resources.github import copy_legal_files, resolve_revision
+from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
 from agent_sync.models.registry import ExternalSkill
-from agent_sync.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.workspace import agents_dir
 from tests.factories import (
     ExternalSkillFactory,
     SkillFrontMatterFactory,
     materialize_skill,
     ROOT_LEVEL_SKILL,
-    stub_root_level_upstream,
+    stub_skill_upstream,
 )
 
 
 class TestExternalSkillBoundaries:
     """Test that immutable GitHub snapshots and installer behavior work."""
+
+    def test_preserves_selected_legal_file_on_root_collision(self, tmp_path: Path) -> None:
+        """Test that root legal files cannot overwrite selected upstream content."""
+
+        source_root = tmp_path / "source"
+        selected = tmp_path / "selected"
+        source_root.mkdir()
+        selected.mkdir()
+        (source_root / "LICENSE").write_text("Repository license\n")
+        (selected / "LICENSE").write_text("Selected license\n")
+
+        with pytest.raises(RuntimeError, match="Conflicting legal file"):
+            copy_legal_files(selected, source_root)
+
+        assert (selected / "LICENSE").read_text() == "Selected license\n"
+
+    @pytest.mark.parametrize("installed_license_kind", ["file", "link"])
+    def test_skill_uses_repository_license_on_collision(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+        installed_license_kind: Literal["file", "link"],
+    ) -> None:
+        """A skill with its own license still installs the repository license."""
+
+        stub_skill_upstream(
+            monkeypatch,
+            root_license="Repository license\n",
+            installed_license="Selected license\n",
+            installed_license_kind=installed_license_kind,
+            nested_skill=True,
+        )
+
+        assert update_external_skill(
+            workspace,
+            ROOT_LEVEL_SKILL,
+            agents_dir(workspace) / "skills",
+            dry_run=False,
+            config=ActionConfig(),
+        )
+
+        assert (agents_dir(workspace) / "skills/local-skill/LICENSE").read_text() == "Repository license\n"
+        if installed_license_kind == "link":
+            assert (
+                agents_dir(workspace) / "skills/local-skill/asset.txt"
+            ).read_text() == "Selected license\n"
+
+    def test_skill_rejects_legal_directory_collision(
+        self, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
+    ) -> None:
+        """An installed skill directory cannot impersonate a legal file."""
+
+        stub_skill_upstream(
+            monkeypatch,
+            root_license="Repository license\n",
+            installed_license="Selected license\n",
+            installed_license_kind="directory",
+            nested_skill=True,
+        )
+
+        with pytest.raises(RuntimeError, match="Conflicting legal directory"):
+            update_external_skill(
+                workspace,
+                ROOT_LEVEL_SKILL,
+                agents_dir(workspace) / "skills",
+                dry_run=False,
+                config=ActionConfig(),
+            )
 
     def test_runtime_config_accepts_namespaced_overrides(
         self,
@@ -55,9 +126,9 @@ class TestExternalSkillBoundaries:
 
             return subprocess.CompletedProcess(command, 0, f"{revision}\tHEAD\n", "")
 
-        monkeypatch.setattr(github.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
 
-        assert github.resolve_revision("example/repository") == revision
+        assert resolve_revision("example/repository") == revision
 
     def test_invalid_revision_output_fails(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that unusable remote output fails before sources can be mixed."""
@@ -73,10 +144,10 @@ class TestExternalSkillBoundaries:
 
             return subprocess.CompletedProcess(command, 0, "not-a-sha\tHEAD\n", "")
 
-        monkeypatch.setattr(github.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
 
         with pytest.raises(RuntimeError, match="git ls-remote"):
-            github.resolve_revision("example/repository")
+            resolve_revision("example/repository")
 
     def test_installer_uses_downloaded_snapshot(
         self,
@@ -103,15 +174,17 @@ class TestExternalSkillBoundaries:
 
         monkeypatch.setattr(installer.subprocess, "run", fake_run)
         skill = ExternalSkill(
+            kind="skill",
             name="sample",
             repo="example/repository",
             update_on_sync=True,
         )
 
-        installer.install_skill(skill, tmp_path, source_root)
+        config = ActionConfig(skills_cli_version="0.0.0")
+        installer.install_skill(skill, tmp_path, source_root, config=config)
 
         assert str(source_root) in captured
-        assert f"skills@{ACTION_CONFIG.skills_cli_version}" in captured
+        assert "skills@0.0.0" in captured
         assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
 
     def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
@@ -130,6 +203,20 @@ class TestExternalSkillBoundaries:
         )
 
         assert installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root) == installed
+
+    def test_source_discovery_prefers_canonical_skill_over_provider_copies(self, tmp_path: Path) -> None:
+        """Test that source discovery selects the canonical copy over provider mirrors."""
+
+        for prefix in (".agents", ".claude", ".cursor", "plugin"):
+            directory = tmp_path / prefix / "skills/impeccable"
+            directory.mkdir(parents=True)
+            (directory / "SKILL.md").write_text(
+                "---\nname: impeccable\ndescription: Design guidance.\n---\n\nContent.\n"
+            )
+
+        assert installer.locate_skill_directory(tmp_path, "impeccable") == (
+            tmp_path / ".agents/skills/impeccable"
+        )
 
     def test_source_skill_discovery_uses_metadata_for_a_root_skill(
         self,
@@ -154,6 +241,7 @@ class TestExternalSkillBoundaries:
         revision = "c" * 40
         observed: list[tuple[str, str]] = []
         skill = ExternalSkill(
+            kind="skill",
             name="sample",
             repo="example/repository",
             update_on_sync=True,
@@ -164,7 +252,7 @@ class TestExternalSkillBoundaries:
 
             return revision
 
-        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
 
         def fake_download(repository: str, downloaded_revision: str, destination: Path) -> Path:
             """Create one synthetic downloaded snapshot."""
@@ -178,12 +266,13 @@ class TestExternalSkillBoundaries:
 
             return source_root
 
-        monkeypatch.setattr(github, "download_snapshot", fake_download)
+        monkeypatch.setattr(skills, "download_snapshot", fake_download)
 
         def fake_install(
             installed_skill: ExternalSkill,
             working_directory: Path,
             source_root: Path,
+            config: ActionConfig,
         ) -> None:
             """Create one synthetic installed skill."""
 
@@ -192,7 +281,7 @@ class TestExternalSkillBoundaries:
             installed.mkdir(parents=True)
             (installed / "SKILL.md").write_text("---\nname: sample\ndescription: A skill.\n---\n\nContent.\n")
 
-        monkeypatch.setattr(installer, "install_skill", fake_install)
+        monkeypatch.setattr(skills, "install_skill", fake_install)
 
         def fake_supplement(destination: Path, source_root: Path) -> None:
             """Record the snapshot used for supplemental assets."""
@@ -200,16 +289,17 @@ class TestExternalSkillBoundaries:
             observed.append(("assets", str(source_root)))
 
         monkeypatch.setattr(
-            installer,
+            skills,
             "supplement_root_assets",
             fake_supplement,
         )
 
-        sync.update_external_skill(
+        update_external_skill(
             workspace,
             skill,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=True,
+            config=ActionConfig(),
         )
 
         assert observed[0] == ("snapshot", revision)
@@ -234,13 +324,14 @@ class TestExternalSkillBoundaries:
             "# React\n"
         )
         skill = ExternalSkill(
+            kind="skill",
             name="react-best-practices",
             repo="vercel-labs/agent-skills",
             skill="vercel-react-best-practices",
             update_on_sync=True,
         )
 
-        sync.normalize_skill_metadata(installed, skill)
+        normalize_skill_metadata(installed, skill)
 
         assert (installed / "SKILL.md").read_text() == (
             "---\n"
@@ -265,13 +356,14 @@ class TestExternalSkillBoundaries:
         other_asset = provider_file.parent / "guide.md"
         other_asset.write_text("Skill reference.\n")
         skill = ExternalSkill(
+            kind="skill",
             name="original",
             skill_name_override="renamed-skill",
             repo="example/repository",
             update_on_sync=True,
         )
 
-        sync.normalize_skill_metadata(installed, skill)
+        normalize_skill_metadata(installed, skill)
 
         assert "name: renamed-skill\n" in (installed / "SKILL.md").read_text()
         assert not provider_file.exists()
@@ -284,15 +376,17 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that root asset copying cannot undo the local metadata rewrite."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
 
-        assert sync.update_external_skill(
+        assert update_external_skill(
             workspace,
             ROOT_LEVEL_SKILL,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=False,
+            config=ActionConfig(),
         )
-        assert (workspace.agents_dir / "skills/local-skill/SKILL.md").read_text() == (
+
+        assert (agents_dir(workspace) / "skills/local-skill/SKILL.md").read_text() == (
             "---\n"
             "name: local-skill\n"
             "description: A skill.\n"
@@ -309,20 +403,25 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a first install lands in the folder the registry declares."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review/style"})
 
-        assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
-        assert "Content." in (workspace.agents_dir / "skills/review/style/local-skill/SKILL.md").read_text()
-        assert not (workspace.agents_dir / "skills/local-skill").exists()
+        assert update_external_skill(
+            workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
+        )
+
+        assert "Content." in (agents_dir(workspace) / "skills/review/style/local-skill/SKILL.md").read_text()
+        assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
     def test_vendor_renames_an_existing_skill_with_an_override(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        """Test that an override renames an existing managed skill."""
+
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         previous = skills_dir / "review/local-skill"
         materialize_skill(
             previous / "SKILL.md",
@@ -336,7 +435,7 @@ class TestExternalSkillBoundaries:
             update={"category": "review", "skill_name_override": "renamed-skill"}
         )
 
-        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
         renamed = skills_dir / "review/renamed-skill/SKILL.md"
         assert "name: renamed-skill\n" in renamed.read_text()
         assert not previous.exists()
@@ -348,9 +447,9 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a skill already in its declared folder is refreshed where it is."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
-        grouped = workspace.agents_dir / "skills/review/local-skill"
+        grouped = agents_dir(workspace) / "skills/review/local-skill"
         materialize_skill(
             grouped / "SKILL.md",
             SkillFrontMatterFactory.build(
@@ -360,9 +459,12 @@ class TestExternalSkillBoundaries:
             body="Old.",
         )
 
-        assert sync.update_external_skill(workspace, skill, workspace.agents_dir / "skills", dry_run=False)
+        assert update_external_skill(
+            workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
+        )
+
         assert "Content." in (grouped / "SKILL.md").read_text()
-        assert not (workspace.agents_dir / "skills/local-skill").exists()
+        assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
     def test_vendor_keeps_local_short_description_on_refresh(
         self,
@@ -371,8 +473,8 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """An upstream refresh keeps the local README summary while updating the skill body."""
 
-        stub_root_level_upstream(monkeypatch)
-        skill_document = workspace.agents_dir / "skills/local-skill/SKILL.md"
+        stub_skill_upstream(monkeypatch)
+        skill_document = agents_dir(workspace) / "skills/local-skill/SKILL.md"
         materialize_skill(
             skill_document,
             SkillFrontMatterFactory.build(
@@ -386,16 +488,20 @@ class TestExternalSkillBoundaries:
             body="Old content.",
         )
 
-        assert sync.update_external_skill(
-            workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=False
+        assert update_external_skill(
+            workspace,
+            ROOT_LEVEL_SKILL,
+            agents_dir(workspace) / "skills",
+            dry_run=False,
+            config=ActionConfig(),
         )
         refreshed = skill_document.read_text()
         assert "short_description: Find and fix a stuck job.\n" in refreshed
         assert "Content." in refreshed
         assert "Old content." not in refreshed
 
-        assert not sync.update_external_skill(
-            workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=True
+        assert not update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, agents_dir(workspace) / "skills", dry_run=True, config=ActionConfig()
         )
 
     def test_vendor_requires_origin_for_an_existing_unmarked_summary(
@@ -405,8 +511,8 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """An ambiguous existing summary requires classification before vendor refresh."""
 
-        stub_root_level_upstream(monkeypatch)
-        skill_document = workspace.agents_dir / "skills/local-skill/SKILL.md"
+        stub_skill_upstream(monkeypatch)
+        skill_document = agents_dir(workspace) / "skills/local-skill/SKILL.md"
         materialize_skill(
             skill_document,
             SkillFrontMatterFactory.build(
@@ -418,8 +524,12 @@ class TestExternalSkillBoundaries:
         original = skill_document.read_text()
 
         with pytest.raises(RuntimeError, match="Skill summary origin is unknown"):
-            sync.update_external_skill(
-                workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=False
+            update_external_skill(
+                workspace,
+                ROOT_LEVEL_SKILL,
+                agents_dir(workspace) / "skills",
+                dry_run=False,
+                config=ActionConfig(),
             )
 
         assert skill_document.read_text() == original
@@ -443,9 +553,11 @@ class TestExternalSkillBoundaries:
                 f"short_description: {summary}\n---\n\n{body}\n"
             )
 
-        skills_dir = workspace.agents_dir / "skills"
-        stub_root_level_upstream(monkeypatch, upstream_document("Old upstream summary.", "Old content."))
-        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        skills_dir = agents_dir(workspace) / "skills"
+        stub_skill_upstream(monkeypatch, upstream_document("Old upstream summary.", "Old content."))
+        assert update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
+        )
         skill_document = skills_dir / "local-skill/SKILL.md"
         if local_summary is not None:
             skill_document.write_text(
@@ -455,8 +567,10 @@ class TestExternalSkillBoundaries:
                 )
             )
 
-        stub_root_level_upstream(monkeypatch, upstream_document("New upstream summary.", "New content."))
-        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        stub_skill_upstream(monkeypatch, upstream_document("New upstream summary.", "New content."))
+        assert update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
+        )
         refreshed = skill_document.read_text()
         assert f"\nshort_description: {expected_summary}\n" in refreshed
         assert "  agent_sync_upstream_short_description: New upstream summary.\n" in refreshed
@@ -464,22 +578,26 @@ class TestExternalSkillBoundaries:
         if local_summary is not None:
             assert "  agent_sync_local_short_description: true\n" in refreshed
             for upstream_summary in (local_summary, "Later upstream summary."):
-                stub_root_level_upstream(monkeypatch, upstream_document(upstream_summary, "Later content."))
-                assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+                stub_skill_upstream(monkeypatch, upstream_document(upstream_summary, "Later content."))
+                assert update_external_skill(
+                    workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
+                )
                 assert f"\nshort_description: {local_summary}\n" in skill_document.read_text()
         else:
             assert "agent_sync_local_short_description" not in refreshed
-        assert not sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=True)
+        assert not update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=True, config=ActionConfig()
+        )
 
     def test_occupied_destination_preserves_existing_skill(
         self,
         monkeypatch: pytest.MonkeyPatch,
         workspace: Workspace,
     ) -> None:
-        """Reject a move into an occupied destination without removing either directory."""
+        """Test that an occupied destination preserves both skill directories."""
 
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(
             current,
@@ -496,7 +614,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="destination already exists"):
-            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert current.read_text() == original
         assert marker.read_text() == "keep\n"
@@ -508,15 +626,15 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that an unmanaged same-named skill survives a registry refresh."""
 
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
         original = current.read_text()
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="not managed"):
-            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert current.read_text() == original
         assert not (skills_dir / "review" / ROOT_LEVEL_SKILL.local_name).exists()
@@ -528,8 +646,8 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a linked skill cannot be claimed as a managed installation."""
 
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         source = workspace.root / "linked-skill" / "SKILL.md"
         materialize_skill(
             source,
@@ -544,7 +662,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         with pytest.raises(RuntimeError, match="not a managed installation"):
-            sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+            update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
 
         assert link.is_symlink()
         assert source.exists()
@@ -567,9 +685,9 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that the registry's folder wins over wherever the skill currently sits."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": category})
-        skills_dir = workspace.agents_dir / "skills"
+        skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / current
         stray.mkdir(parents=True)
         (stray / "SKILL.md").write_text(
@@ -577,7 +695,8 @@ class TestExternalSkillBoundaries:
             "  source: https://github.com/example/repository\n---\n\nContent.\n"
         )
 
-        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=False)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
+
         assert "Content." in (skills_dir / expected / "SKILL.md").read_text()
         assert list(skills_dir.rglob("SKILL.md")) == [skills_dir / expected / "SKILL.md"]
         assert all(any(path.iterdir()) for path in skills_dir.rglob("*") if path.is_dir())
@@ -589,8 +708,8 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that only folders the move emptied are removed."""
 
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         for name in ("local-skill", "neighbour"):
             materialize_skill(
                 skills_dir / "review" / name / "SKILL.md",
@@ -604,7 +723,10 @@ class TestExternalSkillBoundaries:
                 ),
             )
 
-        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        assert update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
+        )
+
         assert (skills_dir / "local-skill/SKILL.md").exists()
         assert not (skills_dir / "review/local-skill").exists()
         assert (skills_dir / "review/neighbour/SKILL.md").exists()
@@ -616,8 +738,8 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a dry run reports an identical skill in the wrong folder as a change."""
 
-        stub_root_level_upstream(monkeypatch)
-        skills_dir = workspace.agents_dir / "skills"
+        stub_skill_upstream(monkeypatch)
+        skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / "local-skill"
         stray.mkdir(parents=True)
         (stray / "SKILL.md").write_text(
@@ -626,7 +748,8 @@ class TestExternalSkillBoundaries:
         )
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
-        assert sync.update_external_skill(workspace, skill, skills_dir, dry_run=True)
+        assert update_external_skill(workspace, skill, skills_dir, dry_run=True, config=ActionConfig())
+
         assert (stray / "SKILL.md").exists()
         assert not (skills_dir / "review").exists()
 
@@ -644,7 +767,7 @@ class TestExternalSkillBoundaries:
 
             return "a" * 40
 
-        monkeypatch.setattr(github, "resolve_revision", fake_resolve)
+        monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
 
         def fake_download(repository: str, revision: str, destination: Path) -> Path:
             """Create a nested synthetic skill and root license."""
@@ -659,12 +782,13 @@ class TestExternalSkillBoundaries:
 
             return source_root
 
-        monkeypatch.setattr(github, "download_snapshot", fake_download)
+        monkeypatch.setattr(skills, "download_snapshot", fake_download)
 
         def fake_install(
             installed_skill: ExternalSkill,
             working_directory: Path,
             source_root: Path,
+            config: ActionConfig,
         ) -> None:
             """Create a synthetic installed skill."""
 
@@ -672,12 +796,14 @@ class TestExternalSkillBoundaries:
             installed.mkdir(parents=True)
             (installed / "SKILL.md").write_text("---\nname: sample\ndescription: A skill.\n---\n\nContent.\n")
 
-        monkeypatch.setattr(installer, "install_skill", fake_install)
+        monkeypatch.setattr(skills, "install_skill", fake_install)
 
-        assert sync.update_external_skill(
+        assert update_external_skill(
             workspace,
             skill,
-            workspace.agents_dir / "skills",
+            agents_dir(workspace) / "skills",
             dry_run=False,
+            config=ActionConfig(),
         )
-        assert (workspace.agents_dir / "skills/sample/LICENSE").read_text() == "License text.\n"
+
+        assert (agents_dir(workspace) / "skills/sample/LICENSE").read_text() == "License text.\n"

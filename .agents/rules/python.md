@@ -66,7 +66,7 @@ class Report(BaseModel):
         return cls(lines=[_format_row(row) for row in rows])
 ```
 
-- Prefer string enums for string-valued domains instead of loose string constants.
+- Use `Enum` for named internal states. Use `StrEnum` when the string values themselves are part of a persisted, serialized, or external contract; format presentation text at the output boundary.
 
 ## Imports and Modules
 
@@ -155,7 +155,7 @@ config = third_party_package.Config(
 
 ## Configuration
 
-- Define the repository's settings in one descriptively named `BaseSettings` class such as `ActionConfig`, instantiate one module-level constant such as `ACTION_CONFIG = ActionConfig()`, and import that validated object wherever settings are needed.
+- Define settings for distinct configuration owners separately, and instantiate each validated settings object at its runtime composition boundary.
 - Put environment-backed, deployment-tunable, or intentionally overridable values in that settings class. This includes tool and CLI versions that are likely to change in future releases; do not freeze them as module constants.
 - Give configurable values typed defaults when the repository has a safe default, and let `pydantic-settings` provide namespaced environment overrides.
 - Use `TypedDict` only for static structured data that is not configuration.
@@ -164,14 +164,15 @@ config = third_party_package.Config(
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ActionConfig(BaseSettings):
+class RuntimeSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APPLICATION_", frozen=True)
 
     tool_cli_version: str = "1.2.3"
     request_timeout_seconds: int = 30
 
 
-ACTION_CONFIG = ActionConfig()
+# runtime composition boundary
+settings = RuntimeSettings()
 ```
 
 - API keys and secrets must be **required** config fields with **no defaults** (no `= ""` or `| None = None` escape hatches); optionality is reserved for credentials with a documented ambient fallback (for example AWS IAM role credentials).
@@ -243,7 +244,7 @@ def get_auth_secret(config: Settings | None = None) -> str:
 - Do not place models beside operational code or collect unrelated models in a catch-all `models.py` module.
 
 - Files under a `models/` package contain only declarative models, enums, and behavior intrinsic to validating or representing those models. Do not put runtime registries, mappings, instantiated collaborators, filesystem layouts, I/O, or orchestration in model files.
-- Put runtime mappings and operational behavior in the module that owns their use. A typed `config.py` built with `pydantic-settings` is the explicit exception: it may define settings models and instantiate the shared settings object.
+- Put runtime mappings and operational behavior in the module that owns their use. A typed settings module built with `pydantic-settings` is the exception for settings declarations; instantiate settings at the runtime composition boundary.
 
 - Do not convert between models you own with `Target(**source.model_dump())`, `Target.model_validate(source.model_dump())`, or `Target(**source.__dict__)`. These dictionary-shaped conversions erase the relationship between the source and target contracts, can collide with explicitly supplied fields, and may re-run normalization or encryption.
 - Put the conversion on the target in a typed `from_<source>` or `build_*` classmethod that names the fields. If the copy becomes long, consolidate the models or carry the source model as a nested field instead of flattening it.
@@ -594,7 +595,7 @@ def ensure_tenant_member(user: User) -> None:
 ## Logging
 
 - Use the `logging` module instead of `print()` for debugging, status, progress, or diagnostics in any code, including scripts and CLI tools.
-- Configure a logger at the top of each module: `logger = logging.getLogger(__name__)`.
+- In modules that log, configure a logger at the top: `logger = logging.getLogger(__name__)`.
 - Treat logger instances as runtime collaborators: name them `logger`, never `LOGGER`, and do not annotate them as `Final`.
 - Use appropriate log levels: `debug`, `info`, `warning`, `error`, `critical`.
 

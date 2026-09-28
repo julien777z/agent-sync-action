@@ -1,10 +1,10 @@
 import difflib
 import logging
 import os
+from enum import Enum, auto
 from pathlib import Path
 from typing import Final
 
-from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import has_generated_notice
 from agent_sync.generation.registry import (
     ARTIFACT_REGISTRY,
@@ -19,10 +19,31 @@ from agent_sync.models.output import (
     Manifest,
     ReconciliationPlan,
 )
+from agent_sync.models.settings import Workspace
 from agent_sync.source import load_source_config
-from agent_sync.workspace import Workspace
+from agent_sync.utils import AgentSyncError
+from agent_sync.workspace import (
+    agents_dir,
+    delete_path,
+    find_parent_blockers,
+    output_root,
+    read_link,
+    read_optional_text,
+    replace_link,
+    replace_text,
+)
 
-logger = logging.getLogger(__name__)
+
+class ReconciliationStatus(Enum):
+    """Name one reported reconciliation outcome."""
+
+    CREATED = auto()
+    UPDATED = auto()
+    MISSING = auto()
+    CHANGED = auto()
+
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 MAX_DIFF_LINES: Final[int] = 20
 
@@ -30,8 +51,8 @@ MAX_DIFF_LINES: Final[int] = 20
 def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
     """Mirror agent sources and report whether a dry run found differences."""
 
-    if not workspace.agents_dir.exists():
-        raise AgentSyncError(f"Missing agents directory: {workspace.agents_dir}")
+    if not agents_dir(workspace).exists():
+        raise AgentSyncError(f"Missing agents directory: {agents_dir(workspace)}")
 
     source_config = load_source_config(workspace)
     manifest = generate_manifest(workspace, source_config)
@@ -82,7 +103,7 @@ def compare_output(
     """Return a change when one generated output differs from disk."""
 
     if isinstance(output, GeneratedLink):
-        existing = workspace.read_link(output.target_path)
+        existing = read_link(output.target_path)
         expected = os.path.relpath(output.link_target, output.target_path.parent)
 
         return None if existing == expected else Change(output=output, existing=existing)
@@ -90,7 +111,7 @@ def compare_output(
     if output.target_path.is_symlink() or output.target_path.is_dir():
         return Change(output=output, existing=None)
 
-    existing = workspace.read_text(output.target_path)
+    existing = read_optional_text(output.target_path)
     executable_matches = (
         not output.target_path.exists()
         or bool(output.target_path.stat().st_mode & 0o111) == output.executable
@@ -114,13 +135,13 @@ def holds_only(path: Path, paths: set[Path]) -> bool:
 def find_abandoned_outputs(workspace: Workspace, manifest: Manifest) -> set[Path]:
     """Find where this run's own outputs sit at the repository root, left by a relocated output."""
 
-    if workspace.output_root == workspace.root:
+    if output_root(workspace) == workspace.root:
         return set()
 
     relocated = {
-        workspace.root / output.target_path.relative_to(workspace.output_root)
+        workspace.root / output.target_path.relative_to(output_root(workspace))
         for output in manifest.outputs
-        if output.target_path.is_relative_to(workspace.output_root)
+        if output.target_path.is_relative_to(output_root(workspace))
     }
     abandoned = {path for path in relocated if path.is_symlink() or path.exists()}
 
@@ -140,10 +161,11 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     stale: set[Path] = find_abandoned_outputs(workspace, manifest)
 
     instructions = workspace.root / "AGENTS.md"
+
     if (
         instructions not in expected
         and not instructions.is_symlink()
-        and (content := workspace.read_text(instructions))
+        and (content := read_optional_text(instructions))
     ):
         if has_generated_notice(content):
             stale.add(instructions)
@@ -151,11 +173,11 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
     stale.update(
         blocker
         for output in manifest.outputs
-        for blocker in workspace.find_parent_blockers(output.target_path)
+        for blocker in find_parent_blockers(workspace, output.target_path)
     )
 
     for provider, directory_name in owned_provider_directories():
-        directory = provider.root(workspace.output_root) / directory_name
+        directory = provider.root(output_root(workspace)) / directory_name
 
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             stale.add(directory)
@@ -180,7 +202,7 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
 
     for registration in ARTIFACT_REGISTRY.values():
         for provider, filenames in registration["owned_files"].items():
-            root = provider.root(workspace.output_root)
+            root = provider.root(output_root(workspace))
 
             stale.update(
                 path
@@ -195,7 +217,7 @@ def apply_plan(workspace: Workspace, plan: ReconciliationPlan) -> None:
     """Apply one validated reconciliation plan to disk."""
 
     for stale_path in plan.stale_paths:
-        workspace.delete(stale_path)
+        delete_path(workspace, stale_path)
 
         logger.info("deleted: %s", stale_path)
 
@@ -203,12 +225,12 @@ def apply_plan(workspace: Workspace, plan: ReconciliationPlan) -> None:
         output = change.output
 
         if isinstance(output, GeneratedFile):
-            workspace.replace_text(output.target_path, output.content, output.executable)
+            replace_text(workspace, output.target_path, output.content, output.executable)
 
-            status = "created" if change.existing is None else "updated"
-            logger.info("%s: %s", status, output.target_path)
+            status = ReconciliationStatus.CREATED if change.existing is None else ReconciliationStatus.UPDATED
+            logger.info("%s: %s", status.name.lower(), output.target_path)
         else:
-            workspace.replace_link(output.target_path, output.link_target)
+            replace_link(workspace, output.target_path, output.link_target)
 
             logger.info(
                 "linked: %s -> %s",
@@ -223,10 +245,10 @@ def report_plan(plan: ReconciliationPlan) -> None:
     logger.info("Differences detected:")
 
     for change in plan.changes:
-        status = "missing" if change.existing is None else "changed"
+        status = ReconciliationStatus.MISSING if change.existing is None else ReconciliationStatus.CHANGED
         logger.info(
             "  [%s] %s (%s)",
-            status,
+            status.name.lower(),
             change.output.target_path,
             change.output.artifact,
         )
