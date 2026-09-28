@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -15,7 +16,7 @@ from tests.factories import (
     SkillFrontMatterFactory,
     materialize_skill,
     ROOT_LEVEL_SKILL,
-    stub_root_level_upstream,
+    stub_skill_upstream,
 )
 
 
@@ -36,6 +37,59 @@ class TestExternalSkillBoundaries:
             copy_legal_files(selected, source_root)
 
         assert (selected / "LICENSE").read_text() == "Selected license\n"
+
+    @pytest.mark.parametrize("installed_license_kind", ["file", "link"])
+    def test_skill_uses_repository_license_on_collision(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+        installed_license_kind: Literal["file", "link"],
+    ) -> None:
+        """A skill with its own license still installs the repository license."""
+
+        stub_skill_upstream(
+            monkeypatch,
+            root_license="Repository license\n",
+            installed_license="Selected license\n",
+            installed_license_kind=installed_license_kind,
+            nested_skill=True,
+        )
+
+        assert update_external_skill(
+            workspace,
+            ROOT_LEVEL_SKILL,
+            agents_dir(workspace) / "skills",
+            dry_run=False,
+            config=ActionConfig(),
+        )
+
+        assert (agents_dir(workspace) / "skills/local-skill/LICENSE").read_text() == "Repository license\n"
+        if installed_license_kind == "link":
+            assert (
+                agents_dir(workspace) / "skills/local-skill/asset.txt"
+            ).read_text() == "Selected license\n"
+
+    def test_skill_rejects_legal_directory_collision(
+        self, monkeypatch: pytest.MonkeyPatch, workspace: Workspace
+    ) -> None:
+        """An installed skill directory cannot impersonate a legal file."""
+
+        stub_skill_upstream(
+            monkeypatch,
+            root_license="Repository license\n",
+            installed_license="Selected license\n",
+            installed_license_kind="directory",
+            nested_skill=True,
+        )
+
+        with pytest.raises(RuntimeError, match="Conflicting legal directory"):
+            update_external_skill(
+                workspace,
+                ROOT_LEVEL_SKILL,
+                agents_dir(workspace) / "skills",
+                dry_run=False,
+                config=ActionConfig(),
+            )
 
     def test_runtime_config_accepts_namespaced_overrides(
         self,
@@ -322,7 +376,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that root asset copying cannot undo the local metadata rewrite."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
 
         assert update_external_skill(
             workspace,
@@ -349,7 +403,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a first install lands in the folder the registry declares."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review/style"})
 
         assert update_external_skill(
@@ -366,7 +420,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that an override renames an existing managed skill."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         previous = skills_dir / "review/local-skill"
         materialize_skill(
@@ -393,7 +447,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a skill already in its declared folder is refreshed where it is."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
         grouped = agents_dir(workspace) / "skills/review/local-skill"
         materialize_skill(
@@ -419,7 +473,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """An upstream refresh keeps the local README summary while updating the skill body."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill_document = agents_dir(workspace) / "skills/local-skill/SKILL.md"
         materialize_skill(
             skill_document,
@@ -457,7 +511,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """An ambiguous existing summary requires classification before vendor refresh."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill_document = agents_dir(workspace) / "skills/local-skill/SKILL.md"
         materialize_skill(
             skill_document,
@@ -500,7 +554,7 @@ class TestExternalSkillBoundaries:
             )
 
         skills_dir = agents_dir(workspace) / "skills"
-        stub_root_level_upstream(monkeypatch, upstream_document("Old upstream summary.", "Old content."))
+        stub_skill_upstream(monkeypatch, upstream_document("Old upstream summary.", "Old content."))
         assert update_external_skill(
             workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
         )
@@ -513,7 +567,7 @@ class TestExternalSkillBoundaries:
                 )
             )
 
-        stub_root_level_upstream(monkeypatch, upstream_document("New upstream summary.", "New content."))
+        stub_skill_upstream(monkeypatch, upstream_document("New upstream summary.", "New content."))
         assert update_external_skill(
             workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
         )
@@ -524,7 +578,7 @@ class TestExternalSkillBoundaries:
         if local_summary is not None:
             assert "  agent_sync_local_short_description: true\n" in refreshed
             for upstream_summary in (local_summary, "Later upstream summary."):
-                stub_root_level_upstream(monkeypatch, upstream_document(upstream_summary, "Later content."))
+                stub_skill_upstream(monkeypatch, upstream_document(upstream_summary, "Later content."))
                 assert update_external_skill(
                     workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
                 )
@@ -542,7 +596,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that an occupied destination preserves both skill directories."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(
@@ -572,7 +626,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that an unmanaged same-named skill survives a registry refresh."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         current = skills_dir / ROOT_LEVEL_SKILL.local_name / "SKILL.md"
         materialize_skill(current, SkillFrontMatterFactory.build(name=ROOT_LEVEL_SKILL.local_name))
@@ -592,7 +646,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a linked skill cannot be claimed as a managed installation."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         source = workspace.root / "linked-skill" / "SKILL.md"
         materialize_skill(
@@ -631,7 +685,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that the registry's folder wins over wherever the skill currently sits."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": category})
         skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / current
@@ -654,7 +708,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that only folders the move emptied are removed."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         for name in ("local-skill", "neighbour"):
             materialize_skill(
@@ -684,7 +738,7 @@ class TestExternalSkillBoundaries:
     ) -> None:
         """Test that a dry run reports an identical skill in the wrong folder as a change."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         skills_dir = agents_dir(workspace) / "skills"
         stray = skills_dir / "local-skill"
         stray.mkdir(parents=True)

@@ -14,7 +14,7 @@ from tests.factories import (
     ResourcesRegistryFactory,
     ROOT_LEVEL_SKILL,
     materialize_registry,
-    stub_root_level_upstream,
+    stub_skill_upstream,
 )
 
 
@@ -31,7 +31,7 @@ class TestExternalSkillService:
     ) -> None:
         """Test that an installed external skill reaches every supported provider."""
 
-        stub_root_level_upstream(monkeypatch)
+        stub_skill_upstream(monkeypatch)
         materialize_registry(
             agents_dir(workspace) / "external_resources.json",
             ResourcesRegistryFactory.build(resources=[ROOT_LEVEL_SKILL]),

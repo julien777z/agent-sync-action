@@ -54,7 +54,7 @@ def update_external_skill(
         if source_skill == source_root:
             supplement_root_assets(installed, source_root)
 
-        copy_legal_files(installed, source_root)
+        copy_legal_files(installed, source_root, overwrite_existing=True)
 
         destination = skills_dir / skill.relative_path
         current = locate_skill_by_name(skills_dir, skill.local_name)

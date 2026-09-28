@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -31,8 +32,15 @@ def load_context(workspace: Workspace) -> GenerationContext:
     return load_generation_context(workspace, load_source_config(workspace))
 
 
-def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document: str | None = None) -> None:
-    """Serve a synthetic upstream repository whose root is the skill."""
+def stub_skill_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    upstream_document: str | None = None,
+    root_license: str | None = None,
+    installed_license: str | None = None,
+    installed_license_kind: Literal["file", "link", "directory"] = "file",
+    nested_skill: bool = False,
+) -> None:
+    """Serve a synthetic upstream repository containing the requested skill."""
 
     if upstream_document is None:
         upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
@@ -43,11 +51,15 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document:
         return "a" * 40
 
     def fake_download(repository: str, revision: str, destination: Path) -> Path:
-        """Create a root-level upstream skill document."""
+        """Create an upstream skill document at the selected source location."""
 
         source_root = destination / "repository"
         source_root.mkdir(parents=True)
-        (source_root / "SKILL.md").write_text(upstream_document)
+        source_skill = source_root / "upstream-skill" if nested_skill else source_root
+        source_skill.mkdir(parents=True, exist_ok=True)
+        (source_skill / "SKILL.md").write_text(upstream_document)
+        if root_license is not None:
+            (source_root / "LICENSE").write_text(root_license)
 
         return source_root
 
@@ -62,6 +74,14 @@ def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document:
         installed = working_directory / ".staging/skills" / installed_skill.name
         installed.mkdir(parents=True)
         (installed / "SKILL.md").write_text(upstream_document)
+        if installed_license is not None:
+            if installed_license_kind == "link":
+                (installed / "asset.txt").write_text(installed_license)
+                (installed / "LICENSE").symlink_to("asset.txt")
+            elif installed_license_kind == "directory":
+                (installed / "LICENSE").mkdir()
+            else:
+                (installed / "LICENSE").write_text(installed_license)
 
     monkeypatch.setattr(skills, "resolve_revision", fake_resolve)
     monkeypatch.setattr(skills, "download_snapshot", fake_download)

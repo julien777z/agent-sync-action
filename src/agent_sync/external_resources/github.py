@@ -46,7 +46,7 @@ def download_snapshot(repository: str, revision: str, destination: Path) -> Path
     return roots[0]
 
 
-def copy_legal_files(destination: Path, source_root: Path) -> None:
+def copy_legal_files(destination: Path, source_root: Path, *, overwrite_existing: bool = False) -> None:
     """Copy repository-root legal files beside vendored content."""
 
     for entry in sorted(source_root.iterdir()):
@@ -55,9 +55,19 @@ def copy_legal_files(destination: Path, source_root: Path) -> None:
 
         target = destination / entry.name
 
-        if not target.exists():
-            shutil.copy2(entry, target)
+        if target.is_symlink():
+            if not overwrite_existing:
+                raise RuntimeError(f"Conflicting legal link in {destination}: {entry.name}")
+
+            target.unlink()
+
+        if target.is_dir():
+            raise RuntimeError(f"Conflicting legal directory in {destination}: {entry.name}")
+
+        if target.exists() and not overwrite_existing:
+            if target.read_bytes() != entry.read_bytes():
+                raise RuntimeError(f"Conflicting legal file in {destination}: {entry.name}")
+
             continue
 
-        if target.read_bytes() != entry.read_bytes():
-            raise RuntimeError(f"Conflicting legal file in {destination}: {entry.name}")
+        shutil.copy2(entry, target)
