@@ -1,5 +1,5 @@
 import logging
-from typing import Self
+from typing import NotRequired, Self, TypedDict
 
 from pydantic import (
     BaseModel,
@@ -36,6 +36,14 @@ class SkillFrontMatter(BaseModel):
             raise ValueError("Skill metadata must not be empty")
 
         return value
+
+
+class SkillMetadataUpdate(TypedDict):
+    """Type the metadata patch applied to a vendored skill document."""
+
+    name: str
+    metadata: dict[str, JsonValue]
+    short_description: NotRequired[str]
 
 
 class AgentFrontMatter(BaseModel):

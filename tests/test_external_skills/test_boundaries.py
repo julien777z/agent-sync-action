@@ -395,6 +395,53 @@ class TestExternalSkillBoundaries:
             workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=True
         )
 
+    @pytest.mark.parametrize(
+        ("local_summary", "expected_summary"),
+        [(None, "New upstream summary."), ("Local summary.", "Local summary.")],
+    )
+    def test_vendor_tracks_upstream_summary_without_overwriting_local_edits(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+        local_summary: str | None,
+        expected_summary: str,
+    ) -> None:
+        """An upstream summary refreshes unless the installed value was edited locally."""
+
+        def upstream_document(summary: str, body: str) -> str:
+            return (
+                "---\nname: upstream-skill\ndescription: A skill.\n"
+                f"short_description: {summary}\n---\n\n{body}\n"
+            )
+
+        skills_dir = workspace.agents_dir / "skills"
+        stub_root_level_upstream(monkeypatch, upstream_document("Old upstream summary.", "Old content."))
+        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        skill_document = skills_dir / "local-skill/SKILL.md"
+        if local_summary is not None:
+            skill_document.write_text(
+                skill_document.read_text().replace(
+                    "\nshort_description: Old upstream summary.\n",
+                    f"\nshort_description: {local_summary}\n",
+                )
+            )
+
+        stub_root_level_upstream(monkeypatch, upstream_document("New upstream summary.", "New content."))
+        assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+        refreshed = skill_document.read_text()
+        assert f"\nshort_description: {expected_summary}\n" in refreshed
+        assert "  agent_sync_upstream_short_description: New upstream summary.\n" in refreshed
+        assert "New content." in refreshed
+        if local_summary is not None:
+            assert "  agent_sync_local_short_description: true\n" in refreshed
+            for upstream_summary in (local_summary, "Later upstream summary."):
+                stub_root_level_upstream(monkeypatch, upstream_document(upstream_summary, "Later content."))
+                assert sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False)
+                assert f"\nshort_description: {local_summary}\n" in skill_document.read_text()
+        else:
+            assert "agent_sync_local_short_description" not in refreshed
+        assert not sync.update_external_skill(workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=True)
+
     def test_occupied_destination_preserves_existing_skill(
         self,
         monkeypatch: pytest.MonkeyPatch,

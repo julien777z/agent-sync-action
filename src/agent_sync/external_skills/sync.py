@@ -7,7 +7,7 @@ from typing import Final
 
 from agent_sync.document import parse_markdown, render_front_matter
 from agent_sync.external_skills import github, installer
-from agent_sync.models.document import SkillFrontMatter
+from agent_sync.models.document import SkillFrontMatter, SkillMetadataUpdate
 from agent_sync.models.registry import ExternalSkill, ExternalSkillResult, SkillsRegistry
 from agent_sync.skills import locate_skill_by_name
 from agent_sync.utils import load_json_model, trees_differ
@@ -16,6 +16,8 @@ from agent_sync.workspace import Workspace
 logger = logging.getLogger(__name__)
 
 EXTERNAL_SKILLS_FILENAME: Final[str] = "external_skills.json"
+UPSTREAM_SHORT_DESCRIPTION_KEY: Final[str] = "agent_sync_upstream_short_description"
+LOCAL_SHORT_DESCRIPTION_KEY: Final[str] = "agent_sync_local_short_description"
 
 
 def sync_external_skills(workspace: Workspace, dry_run: bool) -> None:
@@ -106,7 +108,10 @@ def update_external_skill(
             if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
             local_summary = (front_matter.model_extra or {}).get("short_description")
-            if isinstance(local_summary, str):
+            current_metadata = front_matter.metadata or {}
+            upstream_summary = current_metadata.get(UPSTREAM_SHORT_DESCRIPTION_KEY)
+            locally_authored = current_metadata.get(LOCAL_SHORT_DESCRIPTION_KEY) is True
+            if isinstance(local_summary, str) and (locally_authored or local_summary != upstream_summary):
                 short_description = local_summary
 
         normalize_skill_metadata(installed, skill, short_description)
@@ -160,7 +165,16 @@ def normalize_skill_metadata(
     front_matter, body = parse_markdown(content, SkillFrontMatter, str(document))
     metadata = dict(front_matter.metadata or {})
     metadata["source"] = f"https://github.com/{skill.repo}"
-    updates = {"name": skill.local_name, "metadata": metadata}
+    upstream_summary = (front_matter.model_extra or {}).get("short_description")
+    if isinstance(upstream_summary, str):
+        metadata[UPSTREAM_SHORT_DESCRIPTION_KEY] = upstream_summary
+    else:
+        metadata.pop(UPSTREAM_SHORT_DESCRIPTION_KEY, None)
+    if short_description is not None:
+        metadata[LOCAL_SHORT_DESCRIPTION_KEY] = True
+    else:
+        metadata.pop(LOCAL_SHORT_DESCRIPTION_KEY, None)
+    updates = SkillMetadataUpdate(name=skill.local_name, metadata=metadata)
     if short_description is not None:
         updates["short_description"] = short_description
 
