@@ -1,19 +1,18 @@
-import io
+import os
 import re
 import shutil
 import subprocess
-import tarfile
-import urllib.request
 from pathlib import Path
 from typing import Final
 
 LEGAL_FILE_PREFIXES: Final[tuple[str, ...]] = ("LICENSE", "COPYING", "NOTICE")
+REPOSITORY_URL_TEMPLATE: Final[str] = "https://github.com/{repository}.git"
 
 
 def resolve_revision(repository: str) -> str:
     """Resolve a GitHub repository HEAD to one immutable commit SHA."""
 
-    command = ["git", "ls-remote", f"https://github.com/{repository}.git", "HEAD"]
+    command = ["git", "ls-remote", REPOSITORY_URL_TEMPLATE.format(repository=repository), "HEAD"]
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     revision = result.stdout.split(maxsplit=1)[0] if result.stdout.strip() else ""
 
@@ -26,24 +25,46 @@ def resolve_revision(repository: str) -> str:
     return revision
 
 
+def run_git(command: list[str]) -> None:
+    """Run one git command, raising with its output when it fails."""
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"},
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"`{' '.join(command)}` failed (exit {result.returncode}):\n{result.stderr}")
+
+
 def download_snapshot(repository: str, revision: str, destination: Path) -> Path:
-    """Download one GitHub revision and return its extracted repository root."""
+    """Fetch one GitHub revision over git and return its checked-out repository root."""
 
-    url = f"https://codeload.github.com/{repository}/tar.gz/{revision}"
-    request = urllib.request.Request(url, headers={"User-Agent": "agent-sync"})
+    source_root = destination / "repository"
+    source_root.mkdir(parents=True)
 
-    with urllib.request.urlopen(request, timeout=60) as response:
-        payload = response.read()
+    run_git(["git", "init", "--quiet", str(source_root)])
+    run_git(
+        [
+            "git",
+            "-C",
+            str(source_root),
+            "fetch",
+            "--quiet",
+            "--depth",
+            "1",
+            REPOSITORY_URL_TEMPLATE.format(repository=repository),
+            revision,
+        ]
+    )
+    run_git(["git", "-C", str(source_root), "checkout", "--quiet", "--detach", "FETCH_HEAD"])
 
-    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
-        archive.extractall(destination, filter="data")
+    shutil.rmtree(source_root / ".git")
 
-    roots = [path for path in destination.iterdir() if path.is_dir()]
-
-    if len(roots) != 1:
-        raise RuntimeError(f"Unexpected tarball layout for {repository}: {[path.name for path in roots]}")
-
-    return roots[0]
+    return source_root
 
 
 def copy_legal_files(destination: Path, source_root: Path, *, overwrite_existing: bool = False) -> None:

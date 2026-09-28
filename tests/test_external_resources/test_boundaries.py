@@ -6,11 +6,12 @@ import pytest
 
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources import installer, skills
-from agent_sync.external_resources.github import copy_legal_files, resolve_revision
+from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
+from tests.conftest import GitHubUpstream
 from tests.factories import (
     ExternalSkillFactory,
     SkillFrontMatterFactory,
@@ -148,6 +149,23 @@ class TestExternalSkillBoundaries:
 
         with pytest.raises(RuntimeError, match="git ls-remote"):
             resolve_revision("example/repository")
+
+    def test_snapshot_checks_out_pinned_revision(
+        self, github_upstream: GitHubUpstream, tmp_path: Path
+    ) -> None:
+        """Test that a snapshot holds the pinned revision's files and no repository metadata."""
+
+        source_root = download_snapshot(
+            github_upstream.repository, github_upstream.revision, tmp_path / "source"
+        )
+
+        assert sorted(path.name for path in source_root.iterdir()) == ["LICENSE", "SKILL.md"]
+
+    def test_unknown_revision_fails(self, github_upstream: GitHubUpstream, tmp_path: Path) -> None:
+        """Test that a revision the upstream does not hold fails instead of yielding an empty snapshot."""
+
+        with pytest.raises(RuntimeError, match="fetch"):
+            download_snapshot(github_upstream.repository, "b" * 40, tmp_path / "source")
 
     def test_installer_uses_downloaded_snapshot(
         self,
