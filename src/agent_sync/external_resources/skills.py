@@ -88,6 +88,7 @@ def update_external_skill(
 
             local_summary = (front_matter.model_extra or {}).get("short_description")
             current_metadata = front_matter.metadata or {}
+
             if (
                 isinstance(local_summary, str)
                 and UPSTREAM_SHORT_DESCRIPTION_KEY not in current_metadata
@@ -98,12 +99,15 @@ def update_external_skill(
                     f"Set metadata.{LOCAL_SHORT_DESCRIPTION_KEY}: true to keep the local summary, "
                     "or remove short_description to use the upstream value."
                 )
+
             upstream_summary = current_metadata.get(UPSTREAM_SHORT_DESCRIPTION_KEY)
             locally_authored = current_metadata.get(LOCAL_SHORT_DESCRIPTION_KEY) is True
+
             if isinstance(local_summary, str) and (locally_authored or local_summary != upstream_summary):
                 short_description = local_summary
 
         normalize_skill_metadata(installed, skill, short_description)
+
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
@@ -141,16 +145,21 @@ def normalize_skill_metadata(
     front_matter, body = parse_markdown(content, SkillFrontMatter, str(document))
     metadata = dict(front_matter.metadata or {})
     metadata["source"] = f"https://github.com/{skill.repo}"
+
     upstream_summary = (front_matter.model_extra or {}).get("short_description")
+
     if isinstance(upstream_summary, str):
         metadata[UPSTREAM_SHORT_DESCRIPTION_KEY] = upstream_summary
     else:
         metadata.pop(UPSTREAM_SHORT_DESCRIPTION_KEY, None)
+
     if short_description is not None:
         metadata[LOCAL_SHORT_DESCRIPTION_KEY] = True
     else:
         metadata.pop(LOCAL_SHORT_DESCRIPTION_KEY, None)
+
     updates = SkillMetadataUpdate(name=skill.local_name, metadata=metadata)
+
     if short_description is not None:
         updates["short_description"] = short_description
 
