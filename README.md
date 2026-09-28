@@ -196,6 +196,9 @@ For example, this installs the
   skills refresh: when `refresh-external-skills` is `true`, on a scheduled workflow run, or
   after a push changes `.agents/external_skills.json`.
 
+You can add `short_description` to a vendored skill's `SKILL.md` for a local skill index.
+Agent Sync keeps that summary when it refreshes the skill from upstream.
+
 ### Category Folders
 
 Add `category` to keep a vendored skill beside the skills it belongs with. This entry installs the

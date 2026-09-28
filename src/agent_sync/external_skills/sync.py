@@ -80,8 +80,6 @@ def update_external_skill(
 
         installer.copy_legal_files(installed, source_root)
 
-        normalize_skill_metadata(installed, skill)
-
         destination = skills_dir / skill.relative_path
         current = locate_skill_by_name(skills_dir, skill.local_name)
         previous = (
@@ -95,6 +93,7 @@ def update_external_skill(
             raise RuntimeError(
                 f"Both '{skill.name}' and '{skill.local_name}' exist; resolve the old skill before syncing"
             )
+        short_description: str | None = None
         if current is not None:
             if current.is_symlink():
                 raise RuntimeError(f"Skill directory is a link, not a managed installation: {current}")
@@ -106,6 +105,9 @@ def update_external_skill(
             )
             if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
+            short_description = front_matter.short_description
+
+        normalize_skill_metadata(installed, skill, short_description)
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
@@ -146,7 +148,9 @@ def update_external_skill(
     return changed
 
 
-def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
+def normalize_skill_metadata(
+    installed: Path, skill: ExternalSkill, short_description: str | None = None
+) -> None:
     """Rewrite installed skill metadata for its local canonical directory."""
 
     document = installed / "SKILL.md"
@@ -154,15 +158,13 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
     front_matter, body = parse_markdown(content, SkillFrontMatter, str(document))
     metadata = dict(front_matter.metadata or {})
     metadata["source"] = f"https://github.com/{skill.repo}"
+    updates = {"name": skill.local_name, "metadata": metadata}
+    if short_description is not None:
+        updates["short_description"] = short_description
 
     document.write_text(
         render_front_matter(
-            front_matter.model_copy(
-                update={
-                    "name": skill.local_name,
-                    "metadata": metadata,
-                }
-            ),
+            front_matter.model_copy(update=updates),
             body,
         ),
         encoding="utf-8",

@@ -364,6 +364,37 @@ class TestExternalSkillBoundaries:
         assert "Content." in (grouped / "SKILL.md").read_text()
         assert not (workspace.agents_dir / "skills/local-skill").exists()
 
+    def test_vendor_keeps_local_short_description_on_refresh(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """An upstream refresh keeps the local README summary while updating the skill body."""
+
+        stub_root_level_upstream(monkeypatch)
+        skill_document = workspace.agents_dir / "skills/local-skill/SKILL.md"
+        materialize_skill(
+            skill_document,
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.local_name,
+                short_description="Find and fix a stuck job.",
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+            body="Old content.",
+        )
+
+        assert sync.update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=False
+        )
+        refreshed = skill_document.read_text()
+        assert "short_description: Find and fix a stuck job.\n" in refreshed
+        assert "Content." in refreshed
+        assert "Old content." not in refreshed
+
+        assert not sync.update_external_skill(
+            workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=True
+        )
+
     def test_occupied_destination_preserves_existing_skill(
         self,
         monkeypatch: pytest.MonkeyPatch,
