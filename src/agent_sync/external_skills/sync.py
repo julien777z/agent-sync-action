@@ -109,6 +109,16 @@ def update_external_skill(
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
             local_summary = (front_matter.model_extra or {}).get("short_description")
             current_metadata = front_matter.metadata or {}
+            if (
+                isinstance(local_summary, str)
+                and UPSTREAM_SHORT_DESCRIPTION_KEY not in current_metadata
+                and LOCAL_SHORT_DESCRIPTION_KEY not in current_metadata
+            ):
+                raise RuntimeError(
+                    f"Skill summary origin is unknown: {current_document}. "
+                    f"Set metadata.{LOCAL_SHORT_DESCRIPTION_KEY}: true to keep the local summary, "
+                    "or remove short_description to use the upstream value."
+                )
             upstream_summary = current_metadata.get(UPSTREAM_SHORT_DESCRIPTION_KEY)
             locally_authored = current_metadata.get(LOCAL_SHORT_DESCRIPTION_KEY) is True
             if isinstance(local_summary, str) and (locally_authored or local_summary != upstream_summary):

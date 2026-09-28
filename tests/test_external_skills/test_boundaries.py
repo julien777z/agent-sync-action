@@ -378,7 +378,10 @@ class TestExternalSkillBoundaries:
             SkillFrontMatterFactory.build(
                 name=ROOT_LEVEL_SKILL.local_name,
                 short_description="Find and fix a stuck job.",
-                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+                metadata={
+                    "source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}",
+                    "agent_sync_local_short_description": True,
+                },
             ),
             body="Old content.",
         )
@@ -394,6 +397,32 @@ class TestExternalSkillBoundaries:
         assert not sync.update_external_skill(
             workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=True
         )
+
+    def test_vendor_requires_origin_for_an_existing_unmarked_summary(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace: Workspace,
+    ) -> None:
+        """An ambiguous existing summary requires classification before vendor refresh."""
+
+        stub_root_level_upstream(monkeypatch)
+        skill_document = workspace.agents_dir / "skills/local-skill/SKILL.md"
+        materialize_skill(
+            skill_document,
+            SkillFrontMatterFactory.build(
+                name=ROOT_LEVEL_SKILL.local_name,
+                short_description="Existing summary.",
+                metadata={"source": f"https://github.com/{ROOT_LEVEL_SKILL.repo}"},
+            ),
+        )
+        original = skill_document.read_text()
+
+        with pytest.raises(RuntimeError, match="Skill summary origin is unknown"):
+            sync.update_external_skill(
+                workspace, ROOT_LEVEL_SKILL, workspace.agents_dir / "skills", dry_run=False
+            )
+
+        assert skill_document.read_text() == original
 
     @pytest.mark.parametrize(
         ("local_summary", "expected_summary"),
