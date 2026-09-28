@@ -6,8 +6,7 @@ from pydantic import ValidationError
 
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
-from agent_sync.external_resources.directories import SOURCE_MARKER
-from agent_sync.external_resources.directories import update_external_directory
+from agent_sync.external_resources.directories import SOURCE_MARKER, update_external_directory
 from agent_sync.external_resources.sync import sync_external_resources
 from agent_sync.models.registry import (
     DirectorySourceMarker,
@@ -15,7 +14,7 @@ from agent_sync.models.registry import (
     ExternalSkill,
     ResourcesRegistry,
 )
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 from tests.factories import (
     ExternalResourceFactory,
@@ -80,7 +79,9 @@ class TestExternalResources:
 
         monkeypatch.setattr(sync, "update_external_skill", update_skill)
         monkeypatch.setattr(sync, "update_external_directory", update_directory)
+
         sync_external_resources(workspace, dry_run=True, config=ActionConfig())
+
         assert calls == [("skill", True), ("directory", True)]
 
     @pytest.mark.parametrize("kind", ["unknown", None], ids=["invalid", "missing"])
@@ -112,6 +113,7 @@ class TestExternalResources:
 
         destination = agents_dir(workspace) / "resources" / resource.name
         sync_external_resources(workspace, dry_run=False, config=ActionConfig())
+
         assert (destination / "guide.md").read_text() == source_files["guide.md"]
         assert (destination / "nested/example.txt").read_text() == source_files["nested/example.txt"]
         assert (destination / SOURCE_MARKER).is_file()
@@ -119,8 +121,11 @@ class TestExternalResources:
 
         (destination / "stale.md").write_text("stale", encoding="utf-8")
         sync_external_resources(workspace, dry_run=True, config=ActionConfig())
+
         assert (destination / "stale.md").exists()
+
         sync_external_resources(workspace, dry_run=False, config=ActionConfig())
+
         assert not (destination / "stale.md").exists()
         assert not update_external_directory(workspace, resource, dry_run=False)
 
@@ -134,9 +139,11 @@ class TestExternalResources:
 
         stale_link = destination / "stale-link"
         stale_link.symlink_to("missing")
+
         assert stale_link.is_symlink()
 
         assert update_external_directory(workspace, resource, dry_run=False)
+
         assert not stale_link.exists()
         assert not stale_link.is_symlink()
         assert not update_external_directory(workspace, resource, dry_run=False)

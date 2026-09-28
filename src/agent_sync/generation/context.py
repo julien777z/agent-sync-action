@@ -3,7 +3,6 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from agent_sync.document import parse_markdown
-from agent_sync.errors import AgentSyncError
 from agent_sync.models.document import (
     AgentFrontMatter,
     RuleFrontMatter,
@@ -16,10 +15,9 @@ from agent_sync.models.generation import (
     RuleSource,
     SkillSource,
 )
-from agent_sync.models.settings import SourceConfig
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import SourceConfig, Workspace
 from agent_sync.skills import discover_skill_directories
-from agent_sync.utils import validate_slug
+from agent_sync.utils import AgentSyncError, validate_slug
 from agent_sync.workspace import agents_dir, read_optional_text
 
 

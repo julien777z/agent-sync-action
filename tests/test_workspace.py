@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agent_sync.errors import AgentSyncError
-from agent_sync.models.workspace import Workspace
+from agent_sync.utils import AgentSyncError
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import delete_path, output_root, read_optional_text
 
 

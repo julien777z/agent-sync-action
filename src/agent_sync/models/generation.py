@@ -6,8 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from agent_sync.models.document import AgentFrontMatter, RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.output import GeneratedOutput, Provider
-from agent_sync.models.settings import SourceConfig
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import SourceConfig, Workspace
 
 
 class SkillSource(BaseModel):

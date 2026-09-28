@@ -8,7 +8,10 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ValidationError
 
-from agent_sync.errors import AgentSyncError
+
+class AgentSyncError(ValueError):
+    """Report invalid canonical input or an unsafe generated state."""
+
 
 SAFE_SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 type TreeEntry = tuple[Literal["file", "directory", "link", "other"], bytes]
@@ -80,6 +83,7 @@ def replace_tree(source: Path, destination: Path, current: Path | None) -> None:
         replacement = stage / "replacement"
         previous = stage / "previous"
         shutil.copytree(source, replacement)
+
         if current is not None:
             os.replace(current, previous)
         try:

@@ -13,7 +13,7 @@ from agent_sync.models.generation import GenerationContext
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 
 ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(

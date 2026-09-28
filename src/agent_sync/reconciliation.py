@@ -1,10 +1,10 @@
 import difflib
 import logging
 import os
+from enum import Enum, auto
 from pathlib import Path
 from typing import Final
 
-from agent_sync.errors import AgentSyncError
 from agent_sync.generation.artifact import has_generated_notice
 from agent_sync.generation.registry import (
     ARTIFACT_REGISTRY,
@@ -19,8 +19,9 @@ from agent_sync.models.output import (
     Manifest,
     ReconciliationPlan,
 )
+from agent_sync.models.settings import Workspace
 from agent_sync.source import load_source_config
-from agent_sync.models.workspace import Workspace
+from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import (
     agents_dir,
     delete_path,
@@ -31,6 +32,16 @@ from agent_sync.workspace import (
     replace_link,
     replace_text,
 )
+
+
+class ReconciliationStatus(Enum):
+    """Name one reported reconciliation outcome."""
+
+    CREATED = auto()
+    UPDATED = auto()
+    MISSING = auto()
+    CHANGED = auto()
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -215,8 +226,8 @@ def apply_plan(workspace: Workspace, plan: ReconciliationPlan) -> None:
         if isinstance(output, GeneratedFile):
             replace_text(workspace, output.target_path, output.content, output.executable)
 
-            status = "created" if change.existing is None else "updated"
-            logger.info("%s: %s", status, output.target_path)
+            status = ReconciliationStatus.CREATED if change.existing is None else ReconciliationStatus.UPDATED
+            logger.info("%s: %s", status.name.lower(), output.target_path)
         else:
             replace_link(workspace, output.target_path, output.link_target)
 
@@ -233,10 +244,10 @@ def report_plan(plan: ReconciliationPlan) -> None:
     logger.info("Differences detected:")
 
     for change in plan.changes:
-        status = "missing" if change.existing is None else "changed"
+        status = ReconciliationStatus.MISSING if change.existing is None else ReconciliationStatus.CHANGED
         logger.info(
             "  [%s] %s (%s)",
-            status,
+            status.name.lower(),
             change.output.target_path,
             change.output.artifact,
         )

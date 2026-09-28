@@ -5,7 +5,7 @@ import pytest
 
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir, settings_dir
 from tests.factories import run_cli
 

@@ -1,9 +1,9 @@
 import pytest
 
-from agent_sync.errors import AgentSyncError
 from agent_sync.models.output import Provider
+from agent_sync.models.settings import Workspace
 from agent_sync.source import load_source_config
-from agent_sync.models.workspace import Workspace
+from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import models_dir, settings_dir
 
 

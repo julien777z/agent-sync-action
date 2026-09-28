@@ -1,9 +1,8 @@
 import yaml
 from pydantic import BaseModel, JsonValue, ValidationError
 
-from agent_sync.errors import AgentSyncError
 from agent_sync.models.document import FrontMatterValues
-from agent_sync.utils import ensure_trailing_newline
+from agent_sync.utils import AgentSyncError, ensure_trailing_newline
 
 type YamlMapping = dict[str, JsonValue]
 

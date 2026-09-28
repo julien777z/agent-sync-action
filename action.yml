@@ -32,6 +32,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: ${{ github.action_path }}/.python-version
+
     - name: Decide external-resource refresh
       id: refresh
       shell: bash
@@ -41,24 +46,10 @@ runs:
         BEFORE: ${{ github.event.before }}
         CURRENT_SHA: ${{ github.sha }}
         AGENTS_DIR: ${{ inputs.agents-dir }}
-      run: |
-        set -uo pipefail
-        enabled=false
-        if [ "$REFRESH" = "true" ]; then
-          enabled=true
-        elif [ "$EVENT_NAME" = "push" ]; then
-          before="$BEFORE"
-          if [ -n "$before" ] && ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
-            git fetch --depth=1 origin "$before" 2>/dev/null || true
-          fi
-          if [ -n "$before" ] && git cat-file -e "${before}^{commit}" 2>/dev/null \
-             && registry_prefix="$(git -C "$AGENTS_DIR" rev-parse --show-prefix 2>/dev/null)" \
-             && git diff --name-only "$before" "$CURRENT_SHA" \
-                  | grep -Fqx -e "${registry_prefix}external_resources.json"; then
-            enabled=true
-          fi
-        fi
-        echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+      run: >-
+        python "$GITHUB_ACTION_PATH/.github/scripts/refresh_external_resources.py"
+        --force "$REFRESH" --event "$EVENT_NAME" --before "$BEFORE"
+        --current "$CURRENT_SHA" --agents-dir "$AGENTS_DIR"
 
     - name: Read Node version
       if: ${{ steps.refresh.outputs.enabled == 'true' || inputs.mode == 'commit' }}
@@ -68,11 +59,6 @@ runs:
         # setup-node cannot read a composite action's version file directly.
         node_version="$(tr -d '[:space:]' < "$GITHUB_ACTION_PATH/.nvmrc")"
         echo "version=$node_version" >> "$GITHUB_OUTPUT"
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version-file: ${{ github.action_path }}/.python-version
 
     - name: Set up Node
       if: ${{ steps.refresh.outputs.enabled == 'true' || inputs.mode == 'commit' }}
@@ -109,51 +95,10 @@ runs:
         AGENTS_DIR: ${{ inputs.agents-dir }}
         OUTPUT_DIR: ${{ inputs.output-dir }}
         REF_NAME: ${{ github.ref_name }}
-      run: |
-        set -euo pipefail
-
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-        # Drive git (not just gh) with the provided token so pushes use it; the
-        # checkout's stored header would otherwise override the remote URL creds.
-        git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
-        git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-        python "$GITHUB_ACTION_PATH/.github/scripts/stage_generated_paths.py" --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR"
-
-        if git diff --cached --quiet; then
-          echo "No changes to commit."
-          exit 0
-        fi
-
-        if [ "$MODE" = "pull-request" ]; then
-          branch="agent-sync/$REF_NAME"
-          git commit -m "chore: run agent sync"
-          git push --force origin "HEAD:$branch"
-          if ! gh pr view "$branch" >/dev/null 2>&1; then
-            gh pr create --base "$REF_NAME" --head "$branch" \
-              --title "chore: agent sync" \
-              --body "Automated provider mirroring and resource vendoring update."
-          fi
-        else
-          git commit -m "chore: run agent sync"
-          pre_rebase_head="$(git rev-parse HEAD)"
-          git pull --rebase origin "$REF_NAME"
-
-          if ! git diff --quiet "$pre_rebase_head" HEAD -- "$AGENTS_DIR/external_resources.json"; then
-            python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR"
-          fi
-          python -m agent_sync mirror-providers --root . --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR"
-
-          python "$GITHUB_ACTION_PATH/.github/scripts/stage_generated_paths.py" --agents-dir "$AGENTS_DIR" --output-dir "$OUTPUT_DIR"
-
-          if ! git diff --cached --quiet; then
-            git commit --amend --no-edit
-          fi
-
-          git push origin "HEAD:$REF_NAME"
-        fi
+      run: >-
+        python "$GITHUB_ACTION_PATH/.github/scripts/persist_changes.py"
+        --action-path "$GITHUB_ACTION_PATH" --agents-dir "$AGENTS_DIR"
+        --output-dir "$OUTPUT_DIR" --mode "$MODE" --ref "$REF_NAME"
 
     - name: Verify sync idempotence
       if: ${{ inputs.dry-run != 'true' }}

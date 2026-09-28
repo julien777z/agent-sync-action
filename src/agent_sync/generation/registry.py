@@ -8,15 +8,14 @@ from agent_sync.generation.rule import (
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import generate_claude_settings, generate_codex_settings
+from agent_sync.models.generation import ArtifactRegistration
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
     Manifest,
     Provider,
 )
-from agent_sync.models.generation import ArtifactRegistration
-from agent_sync.models.settings import SourceConfig
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import SourceConfig, Workspace
 
 ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
     ArtifactKind.SKILL: ArtifactRegistration(

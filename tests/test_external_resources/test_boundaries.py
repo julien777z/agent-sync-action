@@ -4,12 +4,11 @@ from pathlib import Path
 import pytest
 
 from agent_sync.config import ActionConfig
-from agent_sync.external_resources import installer
-from agent_sync.external_resources import skills
-from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
+from agent_sync.external_resources import installer, skills
 from agent_sync.external_resources.github import copy_legal_files, resolve_revision
+from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
 from agent_sync.models.registry import ExternalSkill
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 from tests.factories import (
     ExternalSkillFactory,
@@ -332,6 +331,7 @@ class TestExternalSkillBoundaries:
             dry_run=False,
             config=ActionConfig(),
         )
+
         assert (agents_dir(workspace) / "skills/local-skill/SKILL.md").read_text() == (
             "---\n"
             "name: local-skill\n"
@@ -355,6 +355,7 @@ class TestExternalSkillBoundaries:
         assert update_external_skill(
             workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
         )
+
         assert "Content." in (agents_dir(workspace) / "skills/review/style/local-skill/SKILL.md").read_text()
         assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
@@ -407,6 +408,7 @@ class TestExternalSkillBoundaries:
         assert update_external_skill(
             workspace, skill, agents_dir(workspace) / "skills", dry_run=False, config=ActionConfig()
         )
+
         assert "Content." in (grouped / "SKILL.md").read_text()
         assert not (agents_dir(workspace) / "skills/local-skill").exists()
 
@@ -517,6 +519,7 @@ class TestExternalSkillBoundaries:
         )
 
         assert update_external_skill(workspace, skill, skills_dir, dry_run=False, config=ActionConfig())
+
         assert "Content." in (skills_dir / expected / "SKILL.md").read_text()
         assert list(skills_dir.rglob("SKILL.md")) == [skills_dir / expected / "SKILL.md"]
         assert all(any(path.iterdir()) for path in skills_dir.rglob("*") if path.is_dir())
@@ -546,6 +549,7 @@ class TestExternalSkillBoundaries:
         assert update_external_skill(
             workspace, ROOT_LEVEL_SKILL, skills_dir, dry_run=False, config=ActionConfig()
         )
+
         assert (skills_dir / "local-skill/SKILL.md").exists()
         assert not (skills_dir / "review/local-skill").exists()
         assert (skills_dir / "review/neighbour/SKILL.md").exists()
@@ -568,6 +572,7 @@ class TestExternalSkillBoundaries:
         skill = ROOT_LEVEL_SKILL.model_copy(update={"category": "review"})
 
         assert update_external_skill(workspace, skill, skills_dir, dry_run=True, config=ActionConfig())
+
         assert (stray / "SKILL.md").exists()
         assert not (skills_dir / "review").exists()
 
@@ -623,4 +628,5 @@ class TestExternalSkillBoundaries:
             dry_run=False,
             config=ActionConfig(),
         )
+
         assert (agents_dir(workspace) / "skills/sample/LICENSE").read_text() == "License text.\n"

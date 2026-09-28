@@ -5,10 +5,10 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from agent_sync.config import ActionConfig
-from agent_sync.errors import AgentSyncError
 from agent_sync.external_resources.sync import sync_external_resources
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.reconciliation import mirror_providers
+from agent_sync.utils import AgentSyncError
 
 logger: logging.Logger = logging.getLogger(__name__)
 

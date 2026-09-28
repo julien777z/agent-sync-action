@@ -7,7 +7,7 @@ from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
 from agent_sync.models.registry import ExternalSkill
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir, output_root
 from tests.factories import (
     ExternalSkillFactory,
@@ -37,6 +37,7 @@ class TestExternalSkillService:
             ResourcesRegistryFactory.build(resources=[ROOT_LEVEL_SKILL]),
         )
         sync.sync_external_resources(workspace, dry_run=False, config=ActionConfig())
+
         assert mirror_providers(workspace, dry_run=False) is False
 
         for provider in (".claude", ".cursor", ".codex"):
@@ -77,7 +78,9 @@ class TestExternalSkillService:
         )
 
         assert sync.sync_external_resources(workspace, dry_run=True, config=ActionConfig()) is None
+
         assert "sample (example/repository): would update" in caplog.text
+        assert "1 of 1 external resource(s) would change." in caplog.text
 
     def test_disabled_update_on_sync_skips_vendoring(
         self,
@@ -109,4 +112,5 @@ class TestExternalSkillService:
         monkeypatch.setattr(sync, "update_external_skill", fail_update)
 
         assert sync.sync_external_resources(workspace, dry_run=False, config=ActionConfig()) is None
+
         assert local_skill.read_text() == "local\n"

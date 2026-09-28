@@ -2,8 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
-from agent_sync.errors import AgentSyncError
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
+from agent_sync.utils import AgentSyncError
 
 
 def agents_dir(workspace: Workspace) -> Path:

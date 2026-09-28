@@ -12,9 +12,9 @@ from agent_sync.external_resources.installer import (
 )
 from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
+from agent_sync.models.settings import Workspace
 from agent_sync.skills import locate_skill_by_name
 from agent_sync.utils import replace_tree, trees_differ
-from agent_sync.models.workspace import Workspace
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -61,12 +61,14 @@ def update_external_skill(
             if skill.skill_name_override is not None and skill.name != skill.local_name
             else None
         )
+
         if current is None:
             current = previous
         elif previous is not None and previous != current:
             raise RuntimeError(
                 f"Both '{skill.name}' and '{skill.local_name}' exist; resolve the old skill before syncing"
             )
+
         if current is not None:
             if current.is_symlink():
                 raise RuntimeError(f"Skill directory is a link, not a managed installation: {current}")
@@ -78,6 +80,7 @@ def update_external_skill(
             )
             if (front_matter.metadata or {}).get("source") != f"https://github.com/{skill.repo}":
                 raise RuntimeError(f"Skill directory is not managed by {skill.repo}: {current}")
+
         changed = current not in (None, destination) or trees_differ(installed, destination)
 
         if changed and not dry_run:
@@ -126,11 +129,14 @@ def normalize_skill_metadata(installed: Path, skill: ExternalSkill) -> None:
     )
 
     provider_metadata = installed / "agents"
+
     if provider_metadata.is_symlink():
         raise RuntimeError(f"Skill provider metadata directory is a link: {provider_metadata}")
 
     forbidden_metadata = provider_metadata / "openai.yaml"
+
     if forbidden_metadata.is_symlink() or forbidden_metadata.is_file():
         forbidden_metadata.unlink()
+
         if not any(provider_metadata.iterdir()):
             provider_metadata.rmdir()

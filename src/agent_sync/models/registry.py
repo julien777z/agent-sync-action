@@ -3,8 +3,7 @@ from typing import Literal, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from agent_sync.utils import SAFE_SLUG_PATTERN
-from agent_sync.utils import escapes_base_directory
+from agent_sync.utils import SAFE_SLUG_PATTERN, escapes_base_directory
 
 
 class ExternalSkill(BaseModel):
@@ -135,14 +134,17 @@ class ResourcesRegistry(BaseModel):
             resource.local_name for resource in self.resources if isinstance(resource, ExternalSkill)
         ]
         duplicate_skills = sorted({name for name in skill_names if skill_names.count(name) > 1})
+
         if duplicate_skills:
             raise ValueError(f"External skill names must be unique: {', '.join(duplicate_skills)}")
+
         if duplicates:
             raise ValueError(f"External resource names must be unique: {', '.join(duplicates)}")
 
         skill_paths = [
             resource.relative_path for resource in self.resources if isinstance(resource, ExternalSkill)
         ]
+
         for index, path in enumerate(skill_paths):
             for other in skill_paths[:index]:
                 if path == other or path in other.parents or other in path.parents:

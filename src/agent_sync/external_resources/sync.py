@@ -6,7 +6,7 @@ from agent_sync.config import ActionConfig
 from agent_sync.external_resources.directories import update_external_directory
 from agent_sync.external_resources.skills import update_external_skill
 from agent_sync.models.registry import ExternalSkill, ResourcesRegistry
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.utils import load_json_model
 from agent_sync.workspace import agents_dir
 
@@ -32,9 +32,15 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
         logger.info("No external-resource registry at %s; nothing to update.", registry_path)
         return
 
-    for resource in registry.resources:
-        if not resource.update_on_sync:
-            continue
+    updatable_resources = [resource for resource in registry.resources if resource.update_on_sync]
+
+    if not updatable_resources:
+        logger.info("No external resources are enabled for sync; nothing to update.")
+        return
+
+    changed_count = 0
+
+    for resource in updatable_resources:
 
         if isinstance(resource, ExternalSkill):
             changed = update_external_skill(
@@ -47,6 +53,12 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
 
         status = ResourceUpdateStatus.UNCHANGED
         if changed:
+            changed_count += 1
             status = ResourceUpdateStatus.WOULD_UPDATE if dry_run else ResourceUpdateStatus.UPDATED
 
         logger.info("  %s (%s): %s", name, resource.repo, status.name.lower().replace("_", " "))
+
+    if dry_run:
+        logger.info("%d of %d external resource(s) would change.", changed_count, len(updatable_resources))
+    else:
+        logger.info("%d of %d external resource(s) changed.", changed_count, len(updatable_resources))

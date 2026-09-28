@@ -1,7 +1,7 @@
 import os
 
 from agent_sync.reconciliation import mirror_providers
-from agent_sync.models.workspace import Workspace
+from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir, output_root, settings_dir
 from tests.factories import (
     RuleFrontMatterFactory,
