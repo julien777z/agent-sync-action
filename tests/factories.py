@@ -31,10 +31,11 @@ def load_context(workspace: Workspace) -> GenerationContext:
     return load_generation_context(workspace, load_source_config(workspace))
 
 
-def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
+def stub_root_level_upstream(monkeypatch: pytest.MonkeyPatch, upstream_document: str | None = None) -> None:
     """Serve a synthetic upstream repository whose root is the skill."""
 
-    upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
+    if upstream_document is None:
+        upstream_document = "---\nname: upstream-skill\ndescription: A skill.\n---\n\nContent.\n"
 
     def fake_resolve(repository: str) -> str:
         """Return a stable synthetic revision."""
