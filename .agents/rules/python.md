@@ -66,7 +66,7 @@ class Report(BaseModel):
         return cls(lines=[_format_row(row) for row in rows])
 ```
 
-- Prefer string enums for string-valued domains instead of loose string constants.
+- Use `Enum` for named internal states. Use `StrEnum` when the string values themselves are part of a persisted, serialized, or external contract; format presentation text at the output boundary.
 
 ## Imports and Modules
 

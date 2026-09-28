@@ -1,5 +1,5 @@
 import logging
-from enum import StrEnum
+from enum import Enum, auto
 from typing import Final
 
 from agent_sync.config import ActionConfig
@@ -15,12 +15,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 EXTERNAL_RESOURCES_FILENAME: Final[str] = "external_resources.json"
 
 
-class ResourceUpdateStatus(StrEnum):
+class ResourceUpdateStatus(Enum):
     """Describe the result of syncing one external resource."""
 
-    WOULD_UPDATE = "would update"
-    UPDATED = "updated"
-    UNCHANGED = "unchanged"
+    WOULD_UPDATE = auto()
+    UPDATED = auto()
+    UNCHANGED = auto()
 
 
 def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionConfig) -> None:
@@ -49,4 +49,4 @@ def sync_external_resources(workspace: Workspace, dry_run: bool, config: ActionC
         if changed:
             status = ResourceUpdateStatus.WOULD_UPDATE if dry_run else ResourceUpdateStatus.UPDATED
 
-        logger.info("  %s (%s): %s", name, resource.repo, status)
+        logger.info("  %s (%s): %s", name, resource.repo, status.name.lower().replace("_", " "))
