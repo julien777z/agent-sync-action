@@ -117,7 +117,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
                 sys.executable,
                 "-m",
                 "agent_sync",
-                "vendor-resources",
+                "refresh-external-resources",
                 "--root",
                 ".",
                 "--agents-dir",

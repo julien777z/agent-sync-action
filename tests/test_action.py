@@ -169,7 +169,7 @@ class TestAction:
         persistence_text = Path(".github/scripts/persist_changes.py").read_text(encoding="utf-8")
 
         assert "python -m agent_sync mirror-providers" in action_text
-        assert "python -m agent_sync vendor-resources" in action_text
+        assert "python -m agent_sync refresh-external-resources" in action_text
         assert "vendor-skills" not in action_text + persistence_text
         assert "external_skills.json" not in action_text + persistence_text
         assert "refresh-external-skills" not in action_text + persistence_text

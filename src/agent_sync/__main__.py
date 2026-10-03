@@ -40,7 +40,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="agent-sync",
-        description="Mirror canonical agent sources and vendor registered skills and resources.",
+        description="Mirror canonical agent sources and refresh registered external skills and resources.",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
@@ -62,8 +62,8 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     resource_parser = commands.add_parser(
-        "vendor-resources",
-        help="Vendor registered external skills and reference directories into canonical sources.",
+        "refresh-external-resources",
+        help="Download registered external skills and reference directories into canonical sources.",
     )
     add_workspace_arguments(resource_parser)
 
