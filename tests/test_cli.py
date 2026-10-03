@@ -40,7 +40,7 @@ class TestCli:
     def test_vendor_command_accepts_an_absent_registry(self, workspace: Workspace) -> None:
         """Test that the vendor command treats an absent registry as a clean no-op."""
 
-        result = run_cli(["vendor-resources", "--root", str(workspace.root), "--dry-run"])
+        result = run_cli(["refresh-external-resources", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 0
 
@@ -56,7 +56,7 @@ class TestCli:
 
         (agents_dir(workspace) / "external_skills.json").write_text("{invalid")
 
-        assert run_cli(["vendor-resources", "--root", str(workspace.root)]).returncode == 0
+        assert run_cli(["refresh-external-resources", "--root", str(workspace.root)]).returncode == 0
 
     def test_vendor_dry_run_updates_are_informational(
         self,
@@ -77,7 +77,7 @@ class TestCli:
         monkeypatch.setattr(
             sys,
             "argv",
-            ["agent-sync", "vendor-resources", "--root", str(workspace.root), "--dry-run"],
+            ["agent-sync", "refresh-external-resources", "--root", str(workspace.root), "--dry-run"],
         )
 
         with pytest.raises(SystemExit) as exit_result:
@@ -109,7 +109,9 @@ class TestCli:
     def test_vendor_command_rejects_an_output_directory(self, workspace: Workspace) -> None:
         """Test that the command writing no provider trees does not accept their location."""
 
-        result = run_cli(["vendor-resources", "--root", str(workspace.root), "--output-dir", "generated"])
+        result = run_cli(
+            ["refresh-external-resources", "--root", str(workspace.root), "--output-dir", "generated"]
+        )
 
         assert result.returncode == 2
 

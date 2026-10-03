@@ -70,13 +70,13 @@ runs:
       shell: bash
       run: python -m pip install --disable-pip-version-check "$GITHUB_ACTION_PATH"
 
-    - name: Vendor external resources
+    - name: Refresh external resources
       if: ${{ steps.refresh.outputs.enabled == 'true' }}
       shell: bash
       env:
         AGENT_SYNC_SKILLS_CLI_VERSION: ${{ inputs.skills-cli-version }}
         AGENTS_DIR: ${{ inputs.agents-dir }}
-      run: python -m agent_sync vendor-resources --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+      run: python -m agent_sync refresh-external-resources --root . --agents-dir "$AGENTS_DIR" ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Run agent sync
       shell: bash

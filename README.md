@@ -241,7 +241,7 @@ Installed skills record their source URL and keep the upstream license files fro
 
 ```bash
 poetry install --extras dev
-poetry run python -m agent_sync vendor-resources --root .
+poetry run python -m agent_sync refresh-external-resources --root .
 poetry run python -m agent_sync mirror-providers --root .
 poetry run pytest -q
 ```
