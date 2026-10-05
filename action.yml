@@ -33,7 +33,7 @@ runs:
   using: composite
   steps:
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version-file: ${{ github.action_path }}/.python-version
 
@@ -62,7 +62,7 @@ runs:
 
     - name: Set up Node
       if: ${{ steps.refresh.outputs.enabled == 'true' || inputs.mode == 'commit' }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ steps.node.outputs.version }}
 
