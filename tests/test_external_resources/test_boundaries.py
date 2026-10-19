@@ -240,6 +240,12 @@ class TestExternalSkillBoundaries:
             "---\nname: sample\ndescription: Inspect: artifacts\nmetadata: [\n---\n\nBody.\n",
             "---\nname: sample\ndescription: Inspect: artifacts\n",
         ],
+        ids=[
+            "quoted-scalar",
+            "literal-block",
+            "unrecoverable-yaml",
+            "unterminated-front-matter",
+        ],
     )
     def test_preserves_other_upstream_documents(self, tmp_path: Path, content: str) -> None:
         """Test that valid or unrecoverable metadata remains byte-for-byte unchanged."""
