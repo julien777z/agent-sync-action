@@ -81,10 +81,14 @@ def normalize_upstream_front_matter(source_root: Path) -> None:
         if not content.startswith("---\n"):
             continue
 
-        header, delimiter, body = content[4:].partition("\n---\n")
+        front_matter = content[4:]
+        delimiter = re.search(r"\n---(?:\n|$)", front_matter)
 
-        if not delimiter:
+        if delimiter is None:
             continue
+
+        header = front_matter[: delimiter.start()]
+        body = front_matter[delimiter.end() :]
 
         try:
             yaml.safe_load(header)
@@ -97,7 +101,7 @@ def normalize_upstream_front_matter(source_root: Path) -> None:
             if repaired == header:
                 continue
 
-            normalized = f"---\n{repaired}\n---\n{body}"
+            normalized = f"---\n{repaired}{delimiter.group()}{body}"
 
             try:
                 yaml.safe_load(repaired)

@@ -257,6 +257,19 @@ class TestExternalSkillBoundaries:
 
         assert document.read_text() == content
 
+    def test_normalizes_end_of_file_front_matter(self, tmp_path: Path) -> None:
+        """Test that malformed front matter closed at end of file is normalized."""
+
+        document = tmp_path / "SKILL.md"
+        document.write_text("---\nname: sample\ndescription: Inspect: artifacts\n---")
+
+        installer.normalize_upstream_front_matter(tmp_path)
+
+        metadata, body = parse_markdown(document.read_text(), SkillFrontMatter, str(document))
+
+        assert metadata.description == "Inspect: artifacts"
+        assert body == ""
+
     def test_skips_linked_upstream_documents(self, tmp_path: Path) -> None:
         """Test that description normalization never writes through upstream symlinks."""
 
