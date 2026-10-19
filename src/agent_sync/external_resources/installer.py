@@ -14,7 +14,7 @@ from agent_sync.models.registry import ExternalSkill
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
 UNQUOTED_DESCRIPTION: Final[re.Pattern[str]] = re.compile(
-    r"^(description|short_description):[ \t]+([^\s\"'|>{\[\]&*!#].*:[ \t].*)$",
+    r"^(description|short_description):[ \t]+([^\s\"'|>{\[\]&*!#].*:[ \t].*?)(?=\r?$)",
     re.MULTILINE,
 )
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
@@ -76,13 +76,16 @@ def normalize_upstream_front_matter(source_root: Path) -> None:
         if document.is_symlink():
             continue
 
-        content = document.read_text(encoding="utf-8")
+        with document.open(encoding="utf-8", newline="") as source:
+            content = source.read()
 
-        if not content.startswith("---\n"):
+        opening_delimiter = re.match(r"---\r?\n", content)
+
+        if opening_delimiter is None:
             continue
 
-        front_matter = content[4:]
-        delimiter = re.search(r"\n---(?:\n|$)", front_matter)
+        front_matter = content[opening_delimiter.end() :]
+        delimiter = re.search(r"(?:^|\r?\n)---(?:\r?\n|$)", front_matter)
 
         if delimiter is None:
             continue
@@ -94,21 +97,30 @@ def normalize_upstream_front_matter(source_root: Path) -> None:
             yaml.safe_load(header)
         except yaml.YAMLError:
             repaired = UNQUOTED_DESCRIPTION.sub(
-                lambda match: f"{match[1]}: {json.dumps(match[2], ensure_ascii=False)}",
+                quote_malformed_description,
                 header,
             )
 
             if repaired == header:
                 continue
 
-            normalized = f"---\n{repaired}{delimiter.group()}{body}"
+            normalized = f"{opening_delimiter.group()}{repaired}{delimiter.group()}{body}"
 
             try:
                 yaml.safe_load(repaired)
             except yaml.YAMLError:
                 continue
 
-            document.write_text(normalized, encoding="utf-8")
+            with document.open("w", encoding="utf-8", newline="") as destination:
+                destination.write(normalized)
+
+
+def quote_malformed_description(match: re.Match[str]) -> str:
+    """Quote one malformed description value without absorbing its YAML comment."""
+
+    value, *comment = re.split(r"(?=[ \t]#)", match[2], maxsplit=1)
+
+    return f"{match[1]}: {json.dumps(value, ensure_ascii=False)}{''.join(comment)}"
 
 
 def locate_skill_directory(

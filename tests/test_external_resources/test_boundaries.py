@@ -270,6 +270,34 @@ class TestExternalSkillBoundaries:
         assert metadata.description == "Inspect: artifacts"
         assert body == ""
 
+    def test_preserves_crlf_document_bytes(self, tmp_path: Path) -> None:
+        """Test that normalization keeps CRLF document content unchanged outside metadata."""
+
+        document = tmp_path / "SKILL.md"
+        document.write_bytes(
+            b"---\r\nname: sample\r\ndescription: Inspect: artifacts\r\n---\r\n\r\nBody.\r\n"
+        )
+
+        installer.normalize_upstream_front_matter(tmp_path)
+
+        assert document.read_bytes() == (
+            b'---\r\nname: sample\r\ndescription: "Inspect: artifacts"\r\n---\r\n\r\nBody.\r\n'
+        )
+
+    def test_preserves_description_comment(self, tmp_path: Path) -> None:
+        """Test that normalization preserves an inline YAML comment outside the description."""
+
+        document = tmp_path / "SKILL.md"
+        document.write_text("---\nname: sample\ndescription: Repair: parser # explanation\n---\n")
+
+        installer.normalize_upstream_front_matter(tmp_path)
+
+        content = document.read_text()
+        metadata, _ = parse_markdown(content, SkillFrontMatter, str(document))
+
+        assert metadata.description == "Repair: parser"
+        assert 'description: "Repair: parser" # explanation' in content
+
     def test_skips_linked_upstream_documents(self, tmp_path: Path) -> None:
         """Test that description normalization never writes through upstream symlinks."""
 
