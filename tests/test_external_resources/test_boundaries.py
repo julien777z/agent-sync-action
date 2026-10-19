@@ -5,10 +5,12 @@ from typing import Literal
 import pytest
 
 from agent_sync.config import ActionConfig
+from agent_sync.document import parse_markdown
 from agent_sync.external_resources import installer, skills
 from agent_sync.external_resources.github import copy_legal_files, download_snapshot, resolve_revision
 from agent_sync.external_resources.skills import normalize_skill_metadata, update_external_skill
 from agent_sync.models.registry import ExternalSkill
+from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 from tests.conftest import GitHubUpstream
@@ -167,15 +169,32 @@ class TestExternalSkillBoundaries:
         with pytest.raises(RuntimeError, match="fetch"):
             download_snapshot(github_upstream.repository, "b" * 40, tmp_path / "source")
 
+    @pytest.mark.parametrize("field", ["description", "short_description"])
     def test_installer_uses_downloaded_snapshot(
         self,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
+        field: str,
     ) -> None:
         """Test that the installer receives the local immutable source directory."""
 
         source_root = tmp_path / "source"
+        metadata = SkillFrontMatterFactory.build(description="Inspect artifacts: preserve evidence.")
+        document = source_root / "skills" / metadata.name / "SKILL.md"
+        materialize_skill(document, metadata)
+        original = document.read_text()
+        _, expected_body = parse_markdown(original, SkillFrontMatter, str(document))
+        document.write_text(
+            original.replace(
+                f"description: '{metadata.description}'",
+                f"description: {metadata.description}",
+            )
+            if field == "description"
+            else original.replace("\n---\n", f"\nshort_description: {metadata.description}\n---\n")
+        )
+
         captured: list[str] = []
+        captured_documents: list[str] = []
 
         def fake_run(
             command: list[str],
@@ -188,6 +207,8 @@ class TestExternalSkillBoundaries:
             """Capture one installer invocation."""
 
             captured.extend(command)
+            captured_documents.append(document.read_text())
+
             return subprocess.CompletedProcess(command, 0, "", "")
 
         monkeypatch.setattr(installer.subprocess, "run", fake_run)
@@ -201,9 +222,50 @@ class TestExternalSkillBoundaries:
         config = ActionConfig(skills_cli_version="0.0.0")
         installer.install_skill(skill, tmp_path, source_root, config=config)
 
+        installed_metadata, installed_body = parse_markdown(
+            captured_documents[0], SkillFrontMatter, str(document)
+        )
+
+        assert getattr(installed_metadata, field) == metadata.description
+        assert installed_body == expected_body
         assert str(source_root) in captured
         assert "skills@0.0.0" in captured
         assert captured[captured.index("-a") + 1] == installer.SKILLS_CLI_AGENT
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            '---\nname: sample\ndescription: "Inspect: artifacts"\n---\n\nBody.\n',
+            "---\nname: sample\ndescription: |\n  Inspect: artifacts\n---\n\nBody.\n",
+            "---\nname: sample\ndescription: Inspect: artifacts\nmetadata: [\n---\n\nBody.\n",
+            "---\nname: sample\ndescription: Inspect: artifacts\n",
+        ],
+    )
+    def test_preserves_other_upstream_documents(self, tmp_path: Path, content: str) -> None:
+        """Test that valid or unrecoverable metadata remains byte-for-byte unchanged."""
+
+        document = tmp_path / "SKILL.md"
+        document.write_text(content)
+
+        installer.normalize_upstream_front_matter(tmp_path)
+
+        assert document.read_text() == content
+
+    def test_skips_linked_upstream_documents(self, tmp_path: Path) -> None:
+        """Test that description normalization never writes through upstream symlinks."""
+
+        metadata = SkillFrontMatterFactory.build(description="Inspect artifacts: preserve evidence.")
+        target = tmp_path / "target.md"
+        materialize_skill(target, metadata)
+        original = target.read_text().replace(
+            f"description: '{metadata.description}'", f"description: {metadata.description}"
+        )
+        target.write_text(original)
+        (tmp_path / "SKILL.md").symlink_to(target)
+
+        installer.normalize_upstream_front_matter(tmp_path)
+
+        assert target.read_text() == original
 
     def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
         """Test that staging discovery does not depend on one provider directory."""

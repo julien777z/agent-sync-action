@@ -1,7 +1,11 @@
+import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Final
+
+import yaml
 
 from agent_sync.config import ActionConfig
 from agent_sync.document import parse_markdown
@@ -9,6 +13,10 @@ from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
+UNQUOTED_DESCRIPTION: Final[re.Pattern[str]] = re.compile(
+    r"^(description|short_description):[ \t]+([^\s\"'|>{\[\]&*!#].*:[ \t].*)$",
+    re.MULTILINE,
+)
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "node_modules",
@@ -29,6 +37,8 @@ def install_skill(
     skill: ExternalSkill, working_directory: Path, source_root: Path, config: ActionConfig
 ) -> None:
     """Install one skill from a downloaded repository snapshot."""
+
+    normalize_upstream_front_matter(source_root)
 
     command = [
         "npx",
@@ -57,6 +67,44 @@ def install_skill(
             f"`skills add {skill.repo} --skill {skill.upstream_skill}` failed "
             f"(exit {result.returncode}):\n{result.stdout}\n{result.stderr}"
         )
+
+
+def normalize_upstream_front_matter(source_root: Path) -> None:
+    """Quote malformed plain-text descriptions before upstream skill discovery."""
+
+    for document in source_root.rglob("SKILL.md"):
+        if document.is_symlink():
+            continue
+
+        content = document.read_text(encoding="utf-8")
+
+        if not content.startswith("---\n"):
+            continue
+
+        header, delimiter, body = content[4:].partition("\n---\n")
+
+        if not delimiter:
+            continue
+
+        try:
+            yaml.safe_load(header)
+        except yaml.YAMLError:
+            repaired = UNQUOTED_DESCRIPTION.sub(
+                lambda match: f"{match[1]}: {json.dumps(match[2], ensure_ascii=False)}",
+                header,
+            )
+
+            if repaired == header:
+                continue
+
+            normalized = f"---\n{repaired}\n---\n{body}"
+
+            try:
+                yaml.safe_load(repaired)
+            except yaml.YAMLError:
+                continue
+
+            document.write_text(normalized, encoding="utf-8")
 
 
 def locate_skill_directory(
