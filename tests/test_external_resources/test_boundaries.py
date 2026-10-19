@@ -169,12 +169,16 @@ class TestExternalSkillBoundaries:
         with pytest.raises(RuntimeError, match="fetch"):
             download_snapshot(github_upstream.repository, "b" * 40, tmp_path / "source")
 
-    @pytest.mark.parametrize("field", ["description", "short_description"])
+    @pytest.mark.parametrize(
+        "field",
+        ["description", "short_description"],
+        ids=["description", "short-description"],
+    )
     def test_installer_uses_downloaded_snapshot(
         self,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
-        field: str,
+        field: Literal["description", "short_description"],
     ) -> None:
         """Test that the installer receives the local immutable source directory."""
 
@@ -182,6 +186,7 @@ class TestExternalSkillBoundaries:
         metadata = SkillFrontMatterFactory.build(description="Inspect artifacts: preserve evidence.")
         document = source_root / "skills" / metadata.name / "SKILL.md"
         materialize_skill(document, metadata)
+
         original = document.read_text()
         _, expected_body = parse_markdown(original, SkillFrontMatter, str(document))
         document.write_text(
@@ -304,6 +309,7 @@ class TestExternalSkillBoundaries:
         metadata = SkillFrontMatterFactory.build(description="Inspect artifacts: preserve evidence.")
         target = tmp_path / "target.md"
         materialize_skill(target, metadata)
+
         original = target.read_text().replace(
             f"description: '{metadata.description}'", f"description: {metadata.description}"
         )
