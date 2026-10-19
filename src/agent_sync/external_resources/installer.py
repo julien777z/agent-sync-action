@@ -1,7 +1,11 @@
+import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Final
+
+import yaml
 
 from agent_sync.config import ActionConfig
 from agent_sync.document import parse_markdown
@@ -9,6 +13,10 @@ from agent_sync.models.document import SkillFrontMatter
 from agent_sync.models.registry import ExternalSkill
 
 SKILLS_CLI_AGENT: Final[str] = "universal"
+UNQUOTED_DESCRIPTION: Final[re.Pattern[str]] = re.compile(
+    r"^(description|short_description):[ \t]+([^\s\"'|>{\[\]&*!#].*:[ \t].*?)(?=\r?$)",
+    re.MULTILINE,
+)
 TARBALL_EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "node_modules",
@@ -29,6 +37,8 @@ def install_skill(
     skill: ExternalSkill, working_directory: Path, source_root: Path, config: ActionConfig
 ) -> None:
     """Install one skill from a downloaded repository snapshot."""
+
+    normalize_upstream_front_matter(source_root)
 
     command = [
         "npx",
@@ -57,6 +67,60 @@ def install_skill(
             f"`skills add {skill.repo} --skill {skill.upstream_skill}` failed "
             f"(exit {result.returncode}):\n{result.stdout}\n{result.stderr}"
         )
+
+
+def normalize_upstream_front_matter(source_root: Path) -> None:
+    """Quote malformed plain-text descriptions before upstream skill discovery."""
+
+    for document in source_root.rglob("SKILL.md"):
+        if document.is_symlink():
+            continue
+
+        with document.open(encoding="utf-8", newline="") as source:
+            content = source.read()
+
+        opening_delimiter = re.match(r"---\r?\n", content)
+
+        if opening_delimiter is None:
+            continue
+
+        front_matter = content[opening_delimiter.end() :]
+        delimiter = re.search(r"(?:^|\r?\n)---(?:\r?\n|$)", front_matter)
+
+        if delimiter is None:
+            continue
+
+        header = front_matter[: delimiter.start()]
+        body = front_matter[delimiter.end() :]
+
+        try:
+            yaml.safe_load(header)
+        except yaml.YAMLError:
+            repaired = UNQUOTED_DESCRIPTION.sub(
+                quote_malformed_description,
+                header,
+            )
+
+            if repaired == header:
+                continue
+
+            normalized = f"{opening_delimiter.group()}{repaired}{delimiter.group()}{body}"
+
+            try:
+                yaml.safe_load(repaired)
+            except yaml.YAMLError:
+                continue
+
+            with document.open("w", encoding="utf-8", newline="") as destination:
+                destination.write(normalized)
+
+
+def quote_malformed_description(match: re.Match[str]) -> str:
+    """Quote one malformed description value without absorbing its YAML comment."""
+
+    value, *comment = re.split(r"(?=[ \t]#)", match[2], maxsplit=1)
+
+    return f"{match[1]}: {json.dumps(value, ensure_ascii=False)}{''.join(comment)}"
 
 
 def locate_skill_directory(
