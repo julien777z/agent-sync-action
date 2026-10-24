@@ -162,8 +162,9 @@ supported harness. A capability is complete only when its generated output inclu
 needed for discovery and use. Do not rely on manually maintained harness configuration or assumed
 harness behavior to supply missing wiring. Preserve native trust and approval requirements.
 
-For example, copying hook scripts alone is incomplete: their event registrations must also be
-configured canonically and generated for each supported harness.
+For example, hook scripts require canonical event registrations in `.agents/hooks/hooks.json`,
+which Agent Sync generates for each supported harness. Copying scripts without their registrations
+is incomplete configuration.
 
 ## Skill Metadata
 
