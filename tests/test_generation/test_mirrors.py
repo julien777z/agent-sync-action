@@ -168,6 +168,7 @@ class TestMirrorIntegration:
                 }[event]: [
                     {
                         "command": config.hooks[event][0].hooks[0].command,
+                        "timeout": config.hooks[event][0].hooks[0].timeout,
                     }
                 ],
             },
@@ -217,8 +218,8 @@ class TestMirrorIntegration:
         assert all(not (harness.root(generated) / "hooks/session").exists() for harness in Harness)
         assert mirror_harnesses(workspace, dry_run=True) is False
 
-    async def test_cursor_registration_preserves_matchers(self, workspace: Workspace) -> None:
-        """Test that Cursor receives each portable command and matcher."""
+    async def test_cursor_registration_preserves_handler_fields(self, workspace: Workspace) -> None:
+        """Test that Cursor receives each portable command handler field."""
 
         config = HooksConfigFactory.build()
         config.hooks["SessionStart"][0].matcher = "Read|Write"
@@ -232,7 +233,17 @@ class TestMirrorIntegration:
         assert handler == {
             "command": config.hooks["SessionStart"][0].hooks[0].command,
             "matcher": "Read|Write",
+            "timeout": 10,
         }
+
+        config.hooks["SessionStart"][0].hooks[0].timeout = None
+        materialize_hooks(workspace, config)
+
+        mirror_harnesses(workspace, dry_run=False)
+
+        cursor = json.loads((workspace.root / ".cursor/hooks.json").read_text())
+        handler = cursor["hooks"]["sessionStart"][0]
+
         assert "timeout" not in handler
 
     @pytest.mark.parametrize(

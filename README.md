@@ -232,11 +232,10 @@ they do not run `sessionStart` or `sessionEnd`; self-hosted workers do.
 
 Command handlers accept `type: "command"`, `command`, and an optional positive integer `timeout` in
 seconds. A top-level `description` and group-level `matcher` are optional. The command selects the
-entrypoint and may include its interpreter and arguments. Cursor's native schema preserves commands
-and matchers but has no matching `timeout` or description field, so its generated registration omits
-those values. The canonical schema accepts only these documented shared events and fields; unknown
-or harness-specific options fail validation before outputs change. Harness-only settings retain their
-native contracts.
+entrypoint and may include its interpreter and arguments. Cursor's native schema preserves commands,
+matchers, and timeouts; it omits the unsupported description field. The canonical schema accepts only
+these documented shared events and fields; unknown or harness-specific options fail validation before
+outputs change. Harness-only settings retain their native contracts.
 
 When hook sources exist, `hooks.json` is required. Each top-level file or folder under `hooks/`
 needs at least one command registration referencing that file or an entrypoint inside that folder.

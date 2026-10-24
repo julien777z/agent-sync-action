@@ -94,6 +94,7 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
                                         for key, value in {
                                             "command": handler.command,
                                             "matcher": group.matcher,
+                                            "timeout": handler.timeout,
                                         }.items()
                                         if value is not None
                                     }
