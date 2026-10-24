@@ -291,7 +291,7 @@ class TestReconciliation:
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that deleting a blocked harness root still recreates its rule links."""
+        """Test that deleting a blocked harness root still recreates its rule files."""
 
         materialize_rule(
             agents_dir(workspace) / "rules/sample.md",
@@ -306,7 +306,7 @@ class TestReconciliation:
 
         assert mirror_harnesses(workspace, dry_run=False) is False
         assert (harness_root / "rules/sample.md").is_file()
-        assert (harness_root / "rules/sample.md").is_symlink()
+        assert not (harness_root / "rules/sample.md").is_symlink()
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
         """Test that harness settings cannot outlive their source configuration."""

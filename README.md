@@ -148,20 +148,18 @@ Claude Code to read `AGENTS.md` independently.
 
 ### Rule Scope
 
-A rule applies to every task by default. Give it file patterns and set `alwaysApply: false` to load
-its Claude Code and Cursor mirrors only while matching files are in play. Cursor reads `globs`; Claude Code
-reads `paths`. When both keys are present, they must describe the same patterns, and both mirrors
-are symlinks to the canonical rule. If only one key is present, that harness gets a symlink and
-Agent Sync generates a file for the other harness with only its scope key. Without either key, both
-mirrors are symlinks and Claude Code loads the rule unconditionally. See the
+A rule applies to every task by default. Give it `paths` and set `alwaysApply: false` to load
+its Claude Code and Cursor mirrors only while matching files are in play. `paths` is the canonical
+file-scope key. Agent Sync generates each harness's rule file with its native scope metadata, and
+Codex gets the same patterns in its `AGENTS.md` pointers. Without `paths`, a scoped rule is selected
+by topic in `AGENTS.md`, and Claude Code loads its mirror unconditionally. See the
 [Claude Code rules](https://code.claude.com/docs/en/memory) and
-[Cursor rules](https://docs.cursor.com/context/rules) documentation for project rule symlinks and
+[Cursor rules](https://docs.cursor.com/context/rules) documentation for project rule files and
 scope keys.
 
 ```markdown
 ---
 description: Python conventions.
-globs: "**/*.py"
 paths: "**/*.py"
 alwaysApply: false
 ---

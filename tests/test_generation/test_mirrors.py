@@ -309,18 +309,20 @@ class TestMirrorIntegration:
 
         assert mirror_harnesses(workspace, dry_run=False) is False
 
-        assert (workspace.root / ".claude/rules/python.md").is_symlink()
-        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
+        assert (workspace.root / ".claude/rules/python.md").is_file()
+        assert not (workspace.root / ".claude/rules/python.md").is_symlink()
+        assert (workspace.root / ".cursor/rules/python.mdc").is_file()
+        assert not (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
         assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
-        """Leave repository formatting in the source while adding only the missing scope."""
+        """Keep canonical formatting intact while translating scope for Cursor."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
         original = (
-            '---\ndescription: "Python guidance"\nalwaysApply: false\nglobs:\n'
+            '---\ndescription: "Python guidance"\nalwaysApply: false\npaths:\n'
             '    - "**/*.py"\n---\n\n# Python\n\nUse typed values.\n'
         )
         source.write_text(original)
@@ -332,26 +334,35 @@ class TestMirrorIntegration:
         assert claude_code.is_file() and not claude_code.is_symlink()
         assert "paths:\n- '**/*.py'" in claude_code.read_text()
         assert "globs:" not in claude_code.read_text()
-        assert "Use typed values." in claude_code.read_text()
-        assert cursor.is_symlink()
-        assert cursor.resolve() == source
+        assert cursor.is_file() and not cursor.is_symlink()
+        assert "globs:\n- '**/*.py'" in cursor.read_text()
+        assert "paths:" not in cursor.read_text()
+        assert "Use typed values." in cursor.read_text()
         assert mirror_harnesses(workspace, dry_run=True) is False
 
-    def test_existing_files_become_links_when_both_scopes_are_authored(self, workspace: Workspace) -> None:
-        """Test that adding the second scope replaces a generated file with a link."""
+    def test_rule_scope_changes_reconcile_native_mirrors(self, workspace: Workspace) -> None:
+        """Update native patterns and remove scope metadata from both mirrors."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
-        source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        source.write_text('---\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
+        assert mirror_harnesses(workspace, dry_run=False) is False
+        cursor = workspace.root / ".cursor/rules/python.mdc"
+        assert cursor.is_file() and not cursor.is_symlink()
+
+        source.write_text('---\npaths: "**/*.ts"\nalwaysApply: false\n---\n\n# Rule\n')
+        assert mirror_harnesses(workspace, dry_run=True) is True
+        assert mirror_harnesses(workspace, dry_run=False) is False
+        assert "globs:\n- '**/*.ts'" in cursor.read_text()
+        assert "**/*.py" not in cursor.read_text()
+
+        source.write_text("---\nalwaysApply: false\n---\n\n# Rule\n")
+        original = source.read_bytes()
+
         assert mirror_harnesses(workspace, dry_run=False) is False
         claude_code = workspace.root / ".claude/rules/python.md"
-        assert claude_code.is_file() and not claude_code.is_symlink()
-
-        source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
-        original = source.read_bytes()
-        assert mirror_harnesses(workspace, dry_run=False) is False
-        assert claude_code.is_symlink() and claude_code.resolve() == source
-        assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
+        assert "paths:" not in claude_code.read_text()
+        assert "globs:" not in cursor.read_text()
         assert source.read_bytes() == original
         assert mirror_harnesses(workspace, dry_run=True) is False
 
@@ -391,10 +402,10 @@ class TestMirrorIntegration:
         generated_root = output_root(relocated_workspace)
 
         assert (generated_root / ".claude/skills/review").is_symlink()
-        assert (generated_root / ".claude/rules/python.md").is_symlink()
-        assert (generated_root / ".claude/rules/python.md").resolve() == (
-            agents_dir(relocated_workspace) / "rules/python.md"
-        )
+        assert (generated_root / ".claude/rules/python.md").is_file()
+        assert not (generated_root / ".claude/rules/python.md").is_symlink()
+        assert (generated_root / ".cursor/rules/python.mdc").is_file()
+        assert not (generated_root / ".cursor/rules/python.mdc").is_symlink()
         assert (generated_root / ".codex/rules/typescript.rules").is_file()
         assert (generated_root / ".claude/agents/review.md").is_file()
         assert (generated_root / ".claude/hooks/session/start.py").is_file()

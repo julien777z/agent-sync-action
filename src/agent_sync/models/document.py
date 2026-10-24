@@ -1,5 +1,7 @@
 from typing import NotRequired, Self, TypedDict
+
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -64,21 +66,16 @@ class RuleFrontMatter(BaseModel):
     model_config = ConfigDict(extra="allow", strict=True, populate_by_name=True)
 
     description: str | None = None
-    globs: str | list[str] | None = None
-    paths: str | list[str] | None = None
+    paths: str | list[str] | None = Field(default=None, validation_alias=AliasChoices("paths", "globs"))
     always_apply: bool = Field(default=True, alias="alwaysApply")
     starlark: str | None = None
 
     @model_validator(mode="after")
-    def validate_matching_scopes(self) -> Self:
-        """Reject differing Claude Code and Cursor scopes."""
+    def normalize_scope_alias(self) -> Self:
+        """Keep only canonical scope metadata when both input names are supplied."""
 
-        if self.globs is not None and self.paths is not None:
-            globs = [self.globs] if isinstance(self.globs, str) else self.globs
-            paths = [self.paths] if isinstance(self.paths, str) else self.paths
-
-            if globs != paths:
-                raise ValueError("globs and paths must describe the same patterns")
+        if self.model_extra is not None:
+            self.model_extra.pop("globs", None)
 
         return self
 
@@ -86,9 +83,7 @@ class RuleFrontMatter(BaseModel):
     def scope_patterns(self) -> list[str]:
         """Return the file patterns this rule is scoped to."""
 
-        scope = self.globs if self.globs is not None else self.paths
-
-        if scope is None:
+        if self.paths is None:
             return []
 
-        return [scope] if isinstance(scope, str) else scope
+        return [self.paths] if isinstance(self.paths, str) else self.paths

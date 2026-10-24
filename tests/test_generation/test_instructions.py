@@ -11,9 +11,10 @@ from agent_sync.workspace import agents_dir, output_root, settings_dir
 class TestInstructions:
     """Exercise generated root guidance and its ownership boundary."""
 
+    @pytest.mark.parametrize("scope_key", ["paths", "globs"], ids=["canonical", "alias"])
     @pytest.mark.parametrize("output_dirname", ["", ".generated"], ids=["root", "relocated"])
     def test_orders_sources_and_keeps_scoped_bodies_in_mirrors(
-        self, workspace: Workspace, output_dirname: str
+        self, workspace: Workspace, output_dirname: str, scope_key: str
     ) -> None:
         """Keep global, always-on, project, and pointers in that order."""
 
@@ -23,7 +24,7 @@ class TestInstructions:
         rules.mkdir()
         (rules / "always.md").write_text("---\nalwaysApply: true\n---\n\nAlways text.\n")
         (rules / "scoped.md").write_text(
-            "---\ndescription: Work on Python.\nglobs: '**/*.py'\nalwaysApply: false\n---\n\nScoped text.\n"
+            f"---\ndescription: Work on Python.\n{scope_key}: '**/*.py'\nalwaysApply: false\n---\n\nScoped text.\n"
         )
         (rules / "topic.md").write_text(
             "---\ndescription: working on deployments\nalwaysApply: false\n---\n\nTopic text.\n"
@@ -44,6 +45,8 @@ class TestInstructions:
         assert "Read `.agents/rules/topic.md` when its topic is relevant: working on deployments" in content
         assert (output_root(workspace) / ".claude/rules/scoped.md").is_file()
         assert not (output_root(workspace) / ".claude/rules/scoped.md").is_symlink()
+        assert (output_root(workspace) / ".cursor/rules/scoped.mdc").is_file()
+        assert not (output_root(workspace) / ".cursor/rules/scoped.mdc").is_symlink()
         assert (output_root(workspace) / ".cursor/rules/topic.mdc").is_file()
         assert not (output_root(workspace) / ".claude/rules/always.md").exists()
         assert (workspace.root / "CLAUDE.md").read_text() == "Claude Code instructions.\n"

@@ -1,8 +1,4 @@
 ---
-globs:
-- '**/tests/**'
-- '**/test_*.py'
-- '**/conftest.py'
 alwaysApply: false
 paths:
 - '**/tests/**'

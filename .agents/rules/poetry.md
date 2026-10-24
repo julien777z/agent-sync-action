@@ -1,8 +1,4 @@
 ---
-globs:
-- pyproject.toml
-- poetry.lock
-- '**/*.py'
 alwaysApply: false
 paths:
 - pyproject.toml

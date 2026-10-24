@@ -29,14 +29,6 @@ def escapes_base_directory(value: Path) -> bool:
     return value.is_absolute() or ".." in value.parts
 
 
-def serialized_field_names(model: type[BaseModel]) -> tuple[str, ...]:
-    """Return a model's serialized keys, declared fields first then computed ones."""
-
-    return tuple(
-        field.serialization_alias or field.alias or name for name, field in model.model_fields.items()
-    ) + tuple(model.model_computed_fields)
-
-
 def load_json_model[T: BaseModel](
     path: Path,
     model: type[T],

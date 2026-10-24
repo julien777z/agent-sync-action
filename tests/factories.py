@@ -137,7 +137,6 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
     __model__ = RuleFrontMatter
 
     description = "A rule."
-    globs = None
     paths = None
     always_apply = True
     starlark = None

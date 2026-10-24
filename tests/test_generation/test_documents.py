@@ -1,14 +1,15 @@
 import pytest
 
+from agent_sync.document import parse_markdown
+from agent_sync.models.document import FrontMatterValues
 from agent_sync.generation.artifact import generate_agents, generate_hooks
 from agent_sync.generation.rule import (
     generate_codex_rules,
     generate_rule_mirrors,
     generate_shared_rule_outputs,
 )
-from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, Harness
+from agent_sync.models.output import ArtifactKind, GeneratedFile, Harness
 from agent_sync.models.settings import Workspace
-from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, models_dir, settings_dir
 from tests.factories import HooksConfigFactory, RuleFrontMatterFactory, materialize_rule, load_context
 
@@ -49,11 +50,11 @@ class TestDocumentGeneration:
             for content in files.values()
         )
 
-    def test_unscoped_rules_link_harness_mirrors_without_changing_sources(
+    def test_unscoped_rules_render_harness_mirrors_without_changing_sources(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that unscoped harness mirrors point to canonical text."""
+        """Render native rule files while preserving canonical source text."""
 
         source = agents_dir(workspace) / "rules/python.md"
         materialize_rule(source, RuleFrontMatterFactory.build(name="removed", always_apply=False))
@@ -67,13 +68,13 @@ class TestDocumentGeneration:
         mirrors = [
             output
             for output in outputs
-            if isinstance(output, GeneratedLink) and output.artifact is ArtifactKind.RULE
+            if isinstance(output, GeneratedFile) and output.artifact is ArtifactKind.RULE
         ]
 
         assert source.read_text() == original
         assert len(mirrors) == 2
         assert {mirror.target_path.suffix for mirror in mirrors} == {".md", ".mdc"}
-        assert all(mirror.link_target == source for mirror in mirrors)
+        assert all(source.read_text().split("---", 2)[2].strip() in mirror.content for mirror in mirrors)
 
     def test_codex_rules_render_starlark_without_markdown_body(
         self,
@@ -107,66 +108,62 @@ class TestDocumentGeneration:
         assert not generate_rule_mirrors(context, Harness.CURSOR)
 
     @pytest.mark.parametrize(
-        ("authored_key", "linked_harness", "generated_harness", "missing_key"),
+        ("scope", "patterns"),
         [
-            ("globs", Harness.CURSOR, Harness.CLAUDE_CODE, "paths"),
-            ("paths", Harness.CLAUDE_CODE, Harness.CURSOR, "globs"),
+            ('paths: "**/*.py"', ["**/*.py"]),
+            ('paths: ["**/*.py"]', ["**/*.py"]),
+            ('globs: "**/*.py"', ["**/*.py"]),
+            ('globs: ["**/*.py"]', ["**/*.py"]),
+            ('globs: "**/*.py"\npaths: "**/*.py"', ["**/*.py"]),
+            ('globs: "**/*.ts"\npaths: "**/*.py"', ["**/*.py"]),
+            ('globs: "**/*.ts"\npaths: null', []),
+            ("globs: null", []),
+        ],
+        ids=[
+            "string",
+            "list",
+            "alias-string",
+            "alias-list",
+            "both",
+            "paths-priority",
+            "null-priority",
+            "null-alias",
         ],
     )
-    def test_rules_generate_only_the_missing_harness_scope(
-        self,
-        workspace: Workspace,
-        authored_key: str,
-        linked_harness: Harness,
-        generated_harness: Harness,
-        missing_key: str,
+    def test_rule_scope_inputs_render_native_metadata(
+        self, workspace: Workspace, scope: str, patterns: list[str]
     ) -> None:
-        """Test that one missing scope key requires one generated file."""
+        """Resolve accepted scope inputs once before rendering either harness."""
 
         source = agents_dir(workspace) / "rules/python.md"
-        source.parent.mkdir(parents=True)
-        source.write_text(f'---\n{authored_key}: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
-
+        source.parent.mkdir()
+        source.write_text(f"---\n{scope}\nalwaysApply: false\n---\n\n# Rule\n")
+        original = source.read_bytes()
         context = load_context(workspace)
-        linked = generate_rule_mirrors(context, linked_harness)
-        generated = generate_rule_mirrors(context, generated_harness)
 
-        assert len(linked) == len(generated) == 1
-        assert isinstance(linked[0], GeneratedLink)
-        assert linked[0].link_target == source
-        assert isinstance(generated[0], GeneratedFile)
-        assert f"{missing_key}:\n- '**/*.py'\n" in generated[0].content
-        assert f"{authored_key}:" not in generated[0].content
+        for harness, scope_key, other_key in (
+            (Harness.CLAUDE_CODE, "paths", "globs"),
+            (Harness.CURSOR, "globs", "paths"),
+        ):
+            outputs = generate_rule_mirrors(context, harness)
 
-    def test_matching_scope_keys_link_both_mirrors(self, workspace: Workspace) -> None:
-        """Test that fully authored scopes need no generated rule body."""
+            assert len(outputs) == 1
+            assert isinstance(outputs[0], GeneratedFile)
+            metadata, body = parse_markdown(
+                outputs[0].content, FrontMatterValues, str(outputs[0].target_path)
+            )
+            assert metadata.root.get(scope_key, []) == patterns
+            assert other_key not in metadata.root
+            assert metadata.root["alwaysApply"] is False
+            assert body.endswith("# Rule")
 
-        source = agents_dir(workspace) / "rules/python.md"
-        source.parent.mkdir(parents=True)
-        source.write_text('---\nglobs: "**/*.py"\npaths: ["**/*.py"]\nalwaysApply: false\n---\n\n# Rule\n')
+        assert source.read_bytes() == original
 
-        context = load_context(workspace)
-        for harness in (Harness.CLAUDE_CODE, Harness.CURSOR):
-            mirrors = generate_rule_mirrors(context, harness)
-            assert len(mirrors) == 1
-            assert isinstance(mirrors[0], GeneratedLink)
-            assert mirrors[0].link_target == source
-
-    def test_mismatched_scope_keys_are_rejected(self, workspace: Workspace) -> None:
-        """Test that harnesses cannot silently use different file scopes."""
-
-        source = agents_dir(workspace) / "rules/python.md"
-        source.parent.mkdir(parents=True)
-        source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.ts"\nalwaysApply: false\n---\n\n# Rule\n')
-
-        with pytest.raises(AgentSyncError, match="globs and paths must describe the same patterns"):
-            load_context(workspace)
-
-    def test_rules_scope_annotation_reads_a_paths_only_rule(
+    def test_rule_paths_annotate_root_instructions(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that a Claude Code-style paths scope annotates the root instructions."""
+        """Use the canonical scope to tell Codex when to read a rule."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)
