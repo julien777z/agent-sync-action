@@ -26,15 +26,15 @@ def stage_generated_paths(action_path: Path, agents_dir: str, output_dir: str) -
     )
 
 
-def mirror_providers(agents_dir: str, output_dir: str) -> None:
-    """Regenerate provider files after incorporating remote commits."""
+def mirror_harnesses(agents_dir: str, output_dir: str) -> None:
+    """Regenerate harness files after incorporating remote commits."""
 
     subprocess.run(
         [
             sys.executable,
             "-m",
             "agent_sync",
-            "mirror-providers",
+            "mirror-harnesses",
             "--root",
             ".",
             "--agents-dir",
@@ -95,7 +95,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
                     "--title",
                     "chore: agent sync",
                     "--body",
-                    "Automated provider mirroring and resource vendoring update.",
+                    "Automated harness mirroring and resource vendoring update.",
                 ],
                 check=True,
             )
@@ -128,7 +128,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
     elif changed.returncode != 0:
         raise RuntimeError("Unable to compare external-resource registry revisions")
 
-    mirror_providers(agents_dir, output_dir)
+    mirror_harnesses(agents_dir, output_dir)
 
     stage_generated_paths(action_path, agents_dir, output_dir)
 

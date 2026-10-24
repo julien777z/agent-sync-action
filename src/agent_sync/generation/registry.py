@@ -20,7 +20,7 @@ from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
     Manifest,
-    Provider,
+    Harness,
 )
 from agent_sync.models.settings import SourceConfig, Workspace
 
@@ -29,46 +29,46 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="skills",
         owned_files={},
         handlers={
-            Provider.CLAUDE: generate_skills,
-            Provider.CURSOR: generate_skills,
-            Provider.CODEX: generate_skills,
+            Harness.CLAUDE: generate_skills,
+            Harness.CURSOR: generate_skills,
+            Harness.CODEX: generate_skills,
         },
     ),
     ArtifactKind.AGENT: ArtifactRegistration(
         owned_directory="agents",
         owned_files={},
         handlers={
-            Provider.CLAUDE: generate_agents,
-            Provider.CURSOR: generate_agents,
+            Harness.CLAUDE: generate_agents,
+            Harness.CURSOR: generate_agents,
         },
     ),
     ArtifactKind.RULE: ArtifactRegistration(
         owned_directory="rules",
         owned_files={},
         handlers={
-            Provider.CLAUDE: generate_rule_mirrors,
-            Provider.CURSOR: generate_rule_mirrors,
-            Provider.CODEX: generate_codex_rules,
+            Harness.CLAUDE: generate_rule_mirrors,
+            Harness.CURSOR: generate_rule_mirrors,
+            Harness.CODEX: generate_codex_rules,
         },
     ),
     ArtifactKind.HOOK: ArtifactRegistration(
         owned_directory="hooks",
-        owned_files={Provider.CODEX: ("hooks.json",)},
+        owned_files={Harness.CODEX: ("hooks.json",)},
         handlers={
-            Provider.CLAUDE: generate_hooks,
-            Provider.CURSOR: generate_hooks,
-            Provider.CODEX: generate_hooks,
+            Harness.CLAUDE: generate_hooks,
+            Harness.CURSOR: generate_hooks,
+            Harness.CODEX: generate_hooks,
         },
     ),
     ArtifactKind.SETTING: ArtifactRegistration(
         owned_directory=None,
         owned_files={
-            Provider.CLAUDE: ("settings.json",),
-            Provider.CODEX: ("config.toml",),
+            Harness.CLAUDE: ("settings.json",),
+            Harness.CODEX: ("config.toml",),
         },
         handlers={
-            Provider.CLAUDE: generate_claude_settings,
-            Provider.CODEX: generate_codex_settings,
+            Harness.CLAUDE: generate_claude_settings,
+            Harness.CODEX: generate_codex_settings,
         },
     ),
 }
@@ -78,7 +78,7 @@ def generate_manifest(
     workspace: Workspace,
     source_config: SourceConfig,
 ) -> Manifest:
-    """Generate the complete desired provider-output manifest."""
+    """Generate the complete desired harness-output manifest."""
 
     context = load_generation_context(workspace, source_config)
     shared_outputs = generate_shared_rule_outputs(context)
@@ -95,23 +95,23 @@ def generate_manifest(
     if instructions is not None:
         context = context.model_copy(update={"instructions": instructions.content})
 
-    provider_outputs = [
+    harness_outputs = [
         output
         for registration in ARTIFACT_REGISTRY.values()
-        for provider, handler in registration["handlers"].items()
-        for output in handler(context, provider)
+        for harness, handler in registration["handlers"].items()
+        for output in handler(context, harness)
     ]
 
-    return Manifest(outputs=[*shared_outputs, *provider_outputs])
+    return Manifest(outputs=[*shared_outputs, *harness_outputs])
 
 
-def owned_provider_directories() -> tuple[tuple[Provider, str], ...]:
-    """Return every provider directory fully owned by the registry."""
+def owned_harness_directories() -> tuple[tuple[Harness, str], ...]:
+    """Return every harness directory fully owned by the registry."""
 
     return tuple(
-        (provider, directory)
+        (harness, directory)
         for registration in ARTIFACT_REGISTRY.values()
         for directory in (registration["owned_directory"],)
         if directory is not None
-        for provider in registration["handlers"]
+        for harness in registration["handlers"]
     )

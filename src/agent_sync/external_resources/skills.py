@@ -171,15 +171,15 @@ def normalize_skill_metadata(
         encoding="utf-8",
     )
 
-    provider_metadata = installed / "agents"
+    harness_metadata = installed / "agents"
 
-    if provider_metadata.is_symlink():
-        raise RuntimeError(f"Skill provider metadata directory is a link: {provider_metadata}")
+    if harness_metadata.is_symlink():
+        raise RuntimeError(f"Skill harness metadata directory is a link: {harness_metadata}")
 
-    forbidden_metadata = provider_metadata / "openai.yaml"
+    forbidden_metadata = harness_metadata / "openai.yaml"
 
     if forbidden_metadata.is_symlink() or forbidden_metadata.is_file():
         forbidden_metadata.unlink()
 
-        if not any(provider_metadata.iterdir()):
-            provider_metadata.rmdir()
+        if not any(harness_metadata.iterdir()):
+            harness_metadata.rmdir()

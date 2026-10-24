@@ -6,8 +6,8 @@ from typing import Annotated, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class Provider(StrEnum):
-    """Identify a generated provider layout."""
+class Harness(StrEnum):
+    """Identify a generated harness layout."""
 
     rule_extension: str
 
@@ -15,8 +15,8 @@ class Provider(StrEnum):
     CURSOR = ("cursor", ".mdc")
     CODEX = ("codex", ".rules")
 
-    def __new__(cls, name: str, rule_extension: str) -> "Provider":
-        """Store each provider's rule extension with its enum member."""
+    def __new__(cls, name: str, rule_extension: str) -> "Harness":
+        """Store each harness's rule extension with its enum member."""
 
         member = str.__new__(cls, name)
         member._value_ = name
@@ -26,12 +26,12 @@ class Provider(StrEnum):
 
     @property
     def directory(self) -> str:
-        """Return this provider's output directory."""
+        """Return this harness's output directory."""
 
         return f".{self.value}"
 
     def root(self, output_root: Path) -> Path:
-        """Return this provider's configuration root."""
+        """Return this harness's configuration root."""
 
         return output_root / self.directory
 
@@ -57,7 +57,7 @@ class GeneratedFile(BaseModel):
     content: str
     artifact: ArtifactKind
     source_path: Path
-    provider: Provider | None = None
+    harness: Harness | None = None
     executable: bool = False
 
 
@@ -71,7 +71,7 @@ class GeneratedLink(BaseModel):
     link_target: Path
     artifact: ArtifactKind
     source_path: Path
-    provider: Provider
+    harness: Harness
 
 
 GeneratedOutput = Annotated[GeneratedFile | GeneratedLink, Field(discriminator="output_type")]

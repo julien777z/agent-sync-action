@@ -34,7 +34,7 @@ class HookMatcher(BaseModel):
 
 
 class HooksConfig(BaseModel):
-    """Validate shared lifecycle registration for Claude, Cursor and Codex."""
+    """Validate shared lifecycle registration for Claude Code, Cursor and Codex."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 

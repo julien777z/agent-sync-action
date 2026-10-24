@@ -5,9 +5,9 @@ from typing import get_args
 
 import pytest
 
-from agent_sync.reconciliation import mirror_providers
+from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.models.settings import Workspace
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 from agent_sync.models.hooks import HookEvent
 from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, output_root, settings_dir
@@ -22,7 +22,7 @@ from tests.factories import (
 
 
 class TestMirrorIntegration:
-    """Test that complete mirroring converges on provider outputs."""
+    """Test that complete mirroring converges on harness outputs."""
 
     @pytest.mark.parametrize("output_dirname", ["", ".generated"], ids=["root", "relocated"])
     @pytest.mark.parametrize("event", get_args(HookEvent.__value__))
@@ -40,9 +40,9 @@ class TestMirrorIntegration:
         original = canonical.read_bytes()
         generated = output_root(workspace)
 
-        assert mirror_providers(workspace, dry_run=True) is True
+        assert mirror_harnesses(workspace, dry_run=True) is True
         assert not (generated / ".codex").exists()
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
 
         expected = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
         codex = json.loads((generated / ".codex/hooks.json").read_text())
@@ -55,9 +55,9 @@ class TestMirrorIntegration:
         assert not (generated / ".claude/hooks/hooks.json").exists()
         assert not (generated / ".codex/hooks/hooks.json").exists()
 
-        for provider in Provider:
-            target = provider.root(generated) / "hooks/session/start.py"
-            support = provider.root(generated) / "hooks/session/resources/context.md"
+        for harness in Harness:
+            target = harness.root(generated) / "hooks/session/start.py"
+            support = harness.root(generated) / "hooks/session/resources/context.md"
 
             assert target.read_bytes() == (canonical.parent / "session/start.py").read_bytes()
             assert target.stat().st_mode & 0o111
@@ -84,19 +84,19 @@ class TestMirrorIntegration:
         assert not (generated / ".cursor/hooks.json").exists()
 
         assert canonical.read_bytes() == original
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
         canonical.unlink()
         (canonical.parent / "session/start.py").unlink()
         (canonical.parent / "session/helpers.py").unlink()
         (canonical.parent / "session/resources/context.md").unlink()
 
-        assert mirror_providers(workspace, dry_run=True) is True
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=True) is True
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert not (generated / ".codex/hooks.json").exists()
         assert not (generated / ".claude/settings.json").exists()
-        assert all(not (provider.root(generated) / "hooks/session").exists() for provider in Provider)
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert all(not (harness.root(generated) / "hooks/session").exists() for harness in Harness)
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
     @pytest.mark.parametrize(
         ("field", "value"),
@@ -140,7 +140,7 @@ class TestMirrorIntegration:
 
         config = HooksConfigFactory.build()
         materialize_hooks(workspace, config)
-        mirror_providers(workspace, dry_run=False)
+        mirror_harnesses(workspace, dry_run=False)
         target = workspace.root / ".codex/hooks.json"
         original = target.read_bytes()
         canonical = agents_dir(workspace) / "hooks/hooks.json"
@@ -162,7 +162,7 @@ class TestMirrorIntegration:
         canonical.write_text("{invalid" if field == "malformed" else json.dumps(document))
 
         with pytest.raises(AgentSyncError, match="Invalid JSON|Invalid source"):
-            mirror_providers(workspace, dry_run=False)
+            mirror_harnesses(workspace, dry_run=False)
 
         assert target.read_bytes() == original
 
@@ -186,7 +186,7 @@ class TestMirrorIntegration:
             (hooks / "linked").symlink_to(target, target_is_directory=kind == "directory")
 
         with pytest.raises(AgentSyncError, match="not symlinks"):
-            mirror_providers(workspace, dry_run=False)
+            mirror_harnesses(workspace, dry_run=False)
 
         assert not (workspace.root / ".codex").exists()
 
@@ -207,12 +207,12 @@ class TestMirrorIntegration:
             skill_front_matter,
         )
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
 
         assert (workspace.root / ".claude/rules/python.md").is_symlink()
         assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert os.readlink(workspace.root / ".codex/skills/review") == ("../../.agents/skills/review")
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
         """Leave repository formatting in the source while adding only the missing scope."""
@@ -225,7 +225,7 @@ class TestMirrorIntegration:
         )
         source.write_text(original)
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert source.read_text() == original
         claude = workspace.root / ".claude/rules/python.md"
         cursor = workspace.root / ".cursor/rules/python.mdc"
@@ -235,7 +235,7 @@ class TestMirrorIntegration:
         assert "Use typed values." in claude.read_text()
         assert cursor.is_symlink()
         assert cursor.resolve() == source
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_existing_files_become_links_when_both_scopes_are_authored(self, workspace: Workspace) -> None:
         """Test that adding the second scope replaces a generated file with a link."""
@@ -243,23 +243,23 @@ class TestMirrorIntegration:
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
         source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         claude = workspace.root / ".claude/rules/python.md"
         assert claude.is_file() and not claude.is_symlink()
 
         source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
         original = source.read_bytes()
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert claude.is_symlink() and claude.resolve() == source
         assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert source.read_bytes() == original
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
-    def test_output_directory_holds_every_generated_provider_tree(
+    def test_output_directory_holds_every_generated_harness_tree(
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that a configured output directory receives every provider artifact."""
+        """Test that a configured output directory receives every harness artifact."""
 
         materialize_skill(
             agents_dir(relocated_workspace) / "skills/review/SKILL.md",
@@ -288,7 +288,7 @@ class TestMirrorIntegration:
             '{"model":"gpt-5","project_doc_max_bytes":1}'
         )
 
-        assert mirror_providers(relocated_workspace, dry_run=False) is False
+        assert mirror_harnesses(relocated_workspace, dry_run=False) is False
 
         generated_root = output_root(relocated_workspace)
 
@@ -304,16 +304,16 @@ class TestMirrorIntegration:
         assert (generated_root / ".codex/config.toml").is_file()
         assert (relocated_workspace.root / "AGENTS.md").is_file()
         assert not (relocated_workspace.root / ".claude").exists()
-        assert mirror_providers(relocated_workspace, dry_run=True) is False
+        assert mirror_harnesses(relocated_workspace, dry_run=True) is False
 
     def test_explicit_skill_remains_a_canonical_link(self, workspace: Workspace) -> None:
         source = agents_dir(workspace) / "skills/review/SKILL.md"
         front_matter = SkillFrontMatterFactory.build(name="review", disable_model_invocation=True)
         materialize_skill(source, front_matter)
 
-        assert mirror_providers(workspace, dry_run=False) is False
-        for provider in (".claude", ".codex", ".cursor"):
-            skill = workspace.root / provider / "skills/review"
+        assert mirror_harnesses(workspace, dry_run=False) is False
+        for harness in (".claude", ".codex", ".cursor"):
+            skill = workspace.root / harness / "skills/review"
             assert skill.is_symlink()
             assert "disable-model-invocation: true" in (skill / "SKILL.md").read_text()
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False

@@ -9,7 +9,7 @@ from agent_sync.generation.artifact import has_generated_notice
 from agent_sync.generation.registry import (
     ARTIFACT_REGISTRY,
     generate_manifest,
-    owned_provider_directories,
+    owned_harness_directories,
 )
 from agent_sync.models.output import (
     Change,
@@ -48,7 +48,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 MAX_DIFF_LINES: Final[int] = 20
 
 
-def mirror_providers(workspace: Workspace, dry_run: bool) -> bool:
+def mirror_harnesses(workspace: Workspace, dry_run: bool) -> bool:
     """Mirror agent sources and report whether a dry run found differences."""
 
     if not agents_dir(workspace).exists():
@@ -145,11 +145,11 @@ def find_abandoned_outputs(workspace: Workspace, manifest: Manifest) -> set[Path
     }
     abandoned = {path for path in relocated if path.is_symlink() or path.exists()}
 
-    for provider in {output.provider for output in manifest.outputs if output.provider is not None}:
-        provider_root = provider.root(workspace.root)
+    for harness in {output.harness for output in manifest.outputs if output.harness is not None}:
+        harness_root = harness.root(workspace.root)
 
-        if provider_root.is_dir() and not provider_root.is_symlink() and holds_only(provider_root, relocated):
-            abandoned.add(provider_root)
+        if harness_root.is_dir() and not harness_root.is_symlink() and holds_only(harness_root, relocated):
+            abandoned.add(harness_root)
 
     return abandoned
 
@@ -176,8 +176,8 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
         for blocker in find_parent_blockers(workspace, output.target_path)
     )
 
-    for provider, directory_name in owned_provider_directories():
-        directory = provider.root(output_root(workspace)) / directory_name
+    for harness, directory_name in owned_harness_directories():
+        directory = harness.root(output_root(workspace)) / directory_name
 
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             stale.add(directory)
@@ -201,8 +201,8 @@ def find_stale_paths(workspace: Workspace, manifest: Manifest) -> list[Path]:
                         directories.append(path)
 
     for registration in ARTIFACT_REGISTRY.values():
-        for provider, filenames in registration["owned_files"].items():
-            root = provider.root(output_root(workspace))
+        for harness, filenames in registration["owned_files"].items():
+            root = harness.root(output_root(workspace))
 
             stale.update(
                 path

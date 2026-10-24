@@ -10,7 +10,7 @@ from agent_sync.models.output import (
     GeneratedFile,
     GeneratedLink,
     GeneratedOutput,
-    Provider,
+    Harness,
 )
 from agent_sync.utils import ensure_trailing_newline, serialized_field_names
 from agent_sync.workspace import agents_dir, output_root
@@ -72,21 +72,19 @@ def generate_shared_rule_outputs(context: GenerationContext) -> list[GeneratedOu
 
 def generate_rule_mirrors(
     context: GenerationContext,
-    provider: Provider,
+    harness: Harness,
 ) -> list[GeneratedOutput]:
-    """Link scoped rules when their provider metadata is already canonical."""
+    """Link scoped rules when their harness metadata is already canonical."""
 
-    scope_key = "paths" if provider is Provider.CLAUDE else "globs"
-    other_scope_key = "globs" if provider is Provider.CLAUDE else "paths"
+    scope_key = "paths" if harness is Harness.CLAUDE else "globs"
+    other_scope_key = "globs" if harness is Harness.CLAUDE else "paths"
     outputs: list[GeneratedOutput] = []
     for source in context.rules:
         if not source.body or source.front_matter.always_apply:
             continue
 
         target = (
-            provider.root(output_root(context.workspace))
-            / "rules"
-            / f"{source.slug}{provider.rule_extension}"
+            harness.root(output_root(context.workspace)) / "rules" / f"{source.slug}{harness.rule_extension}"
         )
         scope = getattr(source.front_matter, scope_key)
 
@@ -97,7 +95,7 @@ def generate_rule_mirrors(
                     link_target=source.path,
                     artifact=ArtifactKind.RULE,
                     source_path=source.path,
-                    provider=provider,
+                    harness=harness,
                 )
             )
             continue
@@ -116,7 +114,7 @@ def generate_rule_mirrors(
                 ),
                 artifact=ArtifactKind.RULE,
                 source_path=source.path,
-                provider=provider,
+                harness=harness,
             )
         )
 
@@ -125,11 +123,11 @@ def generate_rule_mirrors(
 
 def generate_codex_rules(
     context: GenerationContext,
-    provider: Provider,
+    harness: Harness,
 ) -> list[GeneratedOutput]:
     """Generate Codex Starlark rule files."""
 
-    root = provider.root(output_root(context.workspace))
+    root = harness.root(output_root(context.workspace))
 
     return [
         GeneratedFile(
@@ -141,7 +139,7 @@ def generate_codex_rules(
             ),
             artifact=ArtifactKind.RULE,
             source_path=source.path,
-            provider=provider,
+            harness=harness,
         )
         for source in context.rules
         if source.front_matter.starlark and source.front_matter.starlark.strip()

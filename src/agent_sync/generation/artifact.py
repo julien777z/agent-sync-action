@@ -3,7 +3,7 @@ from typing import Final
 
 from agent_sync.document import render_front_matter
 from agent_sync.models.generation import GenerationContext
-from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput, Provider
+from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput, Harness
 from agent_sync.source import resolve_agent_model
 from agent_sync.utils import ensure_trailing_newline
 from agent_sync.workspace import agents_dir, output_root
@@ -20,15 +20,15 @@ def has_generated_notice(content: str) -> bool:
     return GENERATED_FILE_NOTICE in content.splitlines()[:5]
 
 
-def generate_agents(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Generate one provider's agent files with resolved models."""
+def generate_agents(context: GenerationContext, harness: Harness) -> list[GeneratedOutput]:
+    """Generate one harness's agent files with resolved models."""
 
     outputs: list[GeneratedOutput] = []
-    root = provider.root(output_root(context.workspace))
+    root = harness.root(output_root(context.workspace))
 
     for source in context.agents:
         front_matter = source.front_matter.model_copy(
-            update={"model": resolve_agent_model(source.slug, provider, context.source_config)}
+            update={"model": resolve_agent_model(source.slug, harness, context.source_config)}
         )
 
         generated_body = "\n\n".join(
@@ -41,17 +41,17 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
                 content=render_front_matter(front_matter, generated_body),
                 artifact=ArtifactKind.AGENT,
                 source_path=source.path,
-                provider=provider,
+                harness=harness,
             )
         )
 
     return outputs
 
 
-def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Generate one provider's hook files and standalone registration."""
+def generate_hooks(context: GenerationContext, harness: Harness) -> list[GeneratedOutput]:
+    """Generate one harness's hook files and standalone registration."""
 
-    root = provider.root(output_root(context.workspace))
+    root = harness.root(output_root(context.workspace))
 
     outputs: list[GeneratedOutput] = [
         GeneratedFile(
@@ -59,13 +59,13 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
             content=ensure_trailing_newline(source.content),
             artifact=ArtifactKind.HOOK,
             source_path=source.path,
-            provider=provider,
+            harness=harness,
             executable=source.executable,
         )
         for source in context.hooks
     ]
 
-    if provider is not Provider.CODEX or context.hook_config is None:
+    if harness is not Harness.CODEX or context.hook_config is None:
         return outputs
 
     values = context.hook_config.model_dump(by_alias=True, exclude_none=True)
@@ -78,17 +78,17 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
             content=ensure_trailing_newline(json.dumps(values, indent=2)),
             artifact=ArtifactKind.HOOK,
             source_path=agents_dir(context.workspace) / "hooks/hooks.json",
-            provider=provider,
+            harness=harness,
         )
     )
 
     return outputs
 
 
-def generate_skills(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Link each provider skill to its canonical directory."""
+def generate_skills(context: GenerationContext, harness: Harness) -> list[GeneratedOutput]:
+    """Link each harness skill to its canonical directory."""
 
-    root = provider.root(output_root(context.workspace))
+    root = harness.root(output_root(context.workspace))
 
     return [
         GeneratedLink(
@@ -96,7 +96,7 @@ def generate_skills(context: GenerationContext, provider: Provider) -> list[Gene
             link_target=source.directory,
             artifact=ArtifactKind.SKILL,
             source_path=source.path,
-            provider=provider,
+            harness=harness,
         )
         for source in context.skills
     ]

@@ -71,7 +71,7 @@ class RuleFrontMatter(BaseModel):
 
     @model_validator(mode="after")
     def validate_matching_scopes(self) -> Self:
-        """Reject differing Claude and Cursor scopes."""
+        """Reject differing Claude Code and Cursor scopes."""
 
         if self.globs is not None and self.paths is not None:
             globs = [self.globs] if isinstance(self.globs, str) else self.globs

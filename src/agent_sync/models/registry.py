@@ -64,7 +64,7 @@ class ExternalSkill(BaseModel):
 
     @property
     def local_name(self) -> str:
-        """Return the canonical name used in the vendored skill and provider mirrors."""
+        """Return the canonical name used in the vendored skill and harness mirrors."""
 
         return self.skill_name_override or self.name
 

@@ -284,7 +284,7 @@ def materialize_tree(base: Path, files: dict[str, str]) -> None:
 
 
 def materialize_every_source_kind(workspace: Workspace, explicit_invocation: bool = False) -> None:
-    """Write one canonical source of every kind a provider tree mirrors."""
+    """Write one canonical source of every kind a harness tree mirrors."""
 
     materialize_rule(
         agents_dir(workspace) / "rules/sample.md",

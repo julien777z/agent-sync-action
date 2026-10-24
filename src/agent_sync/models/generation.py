@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from agent_sync.models.document import AgentFrontMatter, RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.hooks import HooksConfig
-from agent_sync.models.output import GeneratedOutput, Provider
+from agent_sync.models.output import GeneratedOutput, Harness
 from agent_sync.models.settings import SourceConfig, Workspace
 
 
@@ -71,12 +71,12 @@ class GenerationContext(BaseModel):
     instructions: str = ""
 
 
-type GenerationHandler = Callable[[GenerationContext, Provider], list[GeneratedOutput]]
+type GenerationHandler = Callable[[GenerationContext, Harness], list[GeneratedOutput]]
 
 
 class ArtifactRegistration(TypedDict):
     """Describe generation and ownership for one artifact kind."""
 
     owned_directory: str | None
-    owned_files: dict[Provider, tuple[str, ...]]
-    handlers: dict[Provider, GenerationHandler]
+    owned_files: dict[Harness, tuple[str, ...]]
+    handlers: dict[Harness, GenerationHandler]

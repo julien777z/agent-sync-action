@@ -1,4 +1,4 @@
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 from agent_sync.models.settings import (
     AgentModelOverride,
     CodexSettings,
@@ -11,22 +11,22 @@ from agent_sync.workspace import models_dir, settings_dir
 
 
 def load_source_config(workspace: Workspace) -> SourceConfig:
-    """Load all provider settings and agent model overrides."""
+    """Load all harness settings and agent model overrides."""
 
-    settings: dict[Provider, PlatformSettings | CodexSettings] = {}
+    settings: dict[Harness, PlatformSettings | CodexSettings] = {}
 
     if settings_dir(workspace).exists():
         for path in sorted(settings_dir(workspace).glob("*.json")):
             try:
-                provider = Provider(path.stem)
+                harness = Harness(path.stem)
             except ValueError as exc:
-                raise AgentSyncError(f"Unsupported provider settings file: {path}") from exc
+                raise AgentSyncError(f"Unsupported harness settings file: {path}") from exc
 
-            model = CodexSettings if provider is Provider.CODEX else PlatformSettings
+            model = CodexSettings if harness is Harness.CODEX else PlatformSettings
             loaded = load_json_model(path, model)
 
             if loaded is not None:
-                settings[provider] = loaded
+                settings[harness] = loaded
 
     overrides: dict[str, AgentModelOverride] = {}
 
@@ -43,14 +43,14 @@ def load_source_config(workspace: Workspace) -> SourceConfig:
 
 def resolve_agent_model(
     agent_slug: str,
-    provider: Provider,
+    harness: Harness,
     source_config: SourceConfig,
 ) -> str | None:
-    """Resolve a per-agent override before the provider default model."""
+    """Resolve a per-agent override before the harness default model."""
 
     override = source_config.model_overrides.get(agent_slug)
-    resolved_override = override.for_provider(provider) if override is not None else None
-    provider_settings = source_config.settings.get(provider)
-    default = provider_settings.model if provider_settings is not None else None
+    resolved_override = override.for_harness(harness) if override is not None else None
+    harness_settings = source_config.settings.get(harness)
+    default = harness_settings.model if harness_settings is not None else None
 
     return resolved_override or default
