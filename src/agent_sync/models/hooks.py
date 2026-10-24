@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 type HookEvent = Literal[
     "SessionStart",
@@ -40,3 +40,14 @@ class HooksConfig(BaseModel):
 
     description: str | None = None
     hooks: dict[HookEvent, list[HookMatcher]]
+
+    @model_validator(mode="after")
+    def validate_codex_session_end_timeout(self) -> Self:
+        """Keep SessionEnd handlers within Codex's supported timeout."""
+
+        for group in self.hooks.get("SessionEnd", []):
+            for handler in group.hooks:
+                if handler.timeout is not None and handler.timeout > 3:
+                    raise ValueError("SessionEnd hook timeouts cannot exceed 3 seconds")
+
+        return self

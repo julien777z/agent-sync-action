@@ -235,7 +235,8 @@ seconds. A top-level `description` and group-level `matcher` are optional. The c
 entrypoint and may include its interpreter and arguments. Cursor's native schema preserves commands,
 matchers, and timeouts; it omits the unsupported description field. The canonical schema accepts only
 these documented shared events and fields; unknown or harness-specific options fail validation before
-outputs change. Harness-only settings retain their native contracts.
+outputs change. `SessionEnd` timeouts cannot exceed three seconds because Codex enforces that limit.
+Harness-only settings retain their native contracts.
 
 When hook sources exist, `hooks.json` is required. Each top-level file or folder under `hooks/`
 needs at least one command registration referencing that file or an entrypoint inside that folder.

@@ -233,7 +233,7 @@ class TestMirrorIntegration:
         assert handler == {
             "command": config.hooks["SessionStart"][0].hooks[0].command,
             "matcher": "Read|Write",
-            "timeout": 10,
+            "timeout": 3,
         }
 
         config.hooks["SessionStart"][0].hooks[0].timeout = None
@@ -245,6 +245,39 @@ class TestMirrorIntegration:
         handler = cursor["hooks"]["sessionStart"][0]
 
         assert "timeout" not in handler
+
+    async def test_session_end_timeout_uses_codex_limit(self, workspace: Workspace) -> None:
+        """Test that SessionEnd handlers use Codex's supported timeout range."""
+
+        config = HooksConfigFactory.build()
+        config.hooks = {"SessionEnd": config.hooks["SessionStart"]}
+        handler = config.hooks["SessionEnd"][0].hooks[0]
+        materialize_hooks(workspace, config)
+
+        mirror_harnesses(workspace, dry_run=False)
+
+        target = workspace.root / ".codex/hooks.json"
+        codex = json.loads(target.read_text())
+
+        assert codex["hooks"]["SessionEnd"][0]["hooks"][0]["timeout"] == 3
+
+        handler.timeout = None
+        materialize_hooks(workspace, config)
+
+        mirror_harnesses(workspace, dry_run=False)
+
+        codex = json.loads(target.read_text())
+
+        assert "timeout" not in codex["hooks"]["SessionEnd"][0]["hooks"][0]
+
+        handler.timeout = 4
+        materialize_hooks(workspace, config)
+        original = target.read_bytes()
+
+        with pytest.raises(AgentSyncError, match="Invalid source"):
+            mirror_harnesses(workspace, dry_run=False)
+
+        assert target.read_bytes() == original
 
     @pytest.mark.parametrize(
         ("field", "value"),

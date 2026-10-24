@@ -160,7 +160,7 @@ class HooksConfigFactory(ModelFactory[HooksConfig]):
                         CommandHook(
                             type="command",
                             command='python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"',
-                            timeout=10,
+                            timeout=3,
                         )
                     ]
                 )
