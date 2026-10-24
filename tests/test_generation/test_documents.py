@@ -54,7 +54,7 @@ class TestDocumentGeneration:
         self,
         workspace: Workspace,
     ) -> None:
-        """Render native rule files while preserving canonical source text."""
+        """Test that native rule files preserve canonical source text."""
 
         source = agents_dir(workspace) / "rules/python.md"
         materialize_rule(source, RuleFrontMatterFactory.build(name="removed", always_apply=False))
@@ -133,7 +133,7 @@ class TestDocumentGeneration:
     def test_rule_scope_inputs_render_native_metadata(
         self, workspace: Workspace, scope: str, patterns: list[str]
     ) -> None:
-        """Resolve accepted scope inputs once before rendering either harness."""
+        """Test that accepted scope inputs produce consistent native metadata."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
@@ -163,7 +163,7 @@ class TestDocumentGeneration:
         self,
         workspace: Workspace,
     ) -> None:
-        """Use the canonical scope to tell Codex when to read a rule."""
+        """Test that canonical scope tells Codex when to read a rule."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir(parents=True)

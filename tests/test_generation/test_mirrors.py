@@ -317,7 +317,7 @@ class TestMirrorIntegration:
         assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_mirroring_preserves_canonical_rule_format(self, workspace: Workspace) -> None:
-        """Keep canonical formatting intact while translating scope for Cursor."""
+        """Test that scope translation preserves canonical formatting."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
@@ -341,7 +341,7 @@ class TestMirrorIntegration:
         assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_rule_scope_changes_reconcile_native_mirrors(self, workspace: Workspace) -> None:
-        """Update native patterns and remove scope metadata from both mirrors."""
+        """Test that both mirrors track pattern changes and scope removal."""
 
         source = agents_dir(workspace) / "rules/python.md"
         source.parent.mkdir()
