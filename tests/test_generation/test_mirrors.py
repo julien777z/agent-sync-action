@@ -41,6 +41,7 @@ class TestMirrorIntegration:
         claude = json.loads((generated / ".claude/settings.json").read_text())
 
         assert codex["hooks"] == claude["hooks"] == expected
+        assert type(codex["hooks"]["SessionStart"][0]["hooks"][0]["timeout"]) is int
         assert config.description in codex["description"]
         assert not (generated / ".cursor/hooks/hooks.json").exists()
         assert not (generated / ".claude/hooks/hooks.json").exists()
@@ -77,6 +78,8 @@ class TestMirrorIntegration:
             '{"hooks":{"Stop":[{"hooks":[{"type":"prompt","prompt":"Check"}]}]}}',
             '{"hooks":{"Stop":[{"hooks":[{"type":"command"}]}]}}',
             '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","timeout":0}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","timeout":1.5}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","timeout":18446744073709551616}]}]}}',
             '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","extra":true}]}]}}',
             '{"hooks":{"Stop":[{"hooks":[]}]}}',
         ],
@@ -86,6 +89,8 @@ class TestMirrorIntegration:
             "unsupported-handler",
             "missing-command",
             "timeout",
+            "fractional-timeout",
+            "timeout-overflow",
             "extra",
             "empty",
         ],

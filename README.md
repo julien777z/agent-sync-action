@@ -216,7 +216,7 @@ provider settings retain their existing behavior. Cursor receives the scripts on
 
 The shared events are `SessionStart`, `SessionEnd`, `PreToolUse`, `PermissionRequest`, `PostToolUse`,
 `PreCompact`, `PostCompact`, `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, and `Stop`. Command handlers accept
-`command`, a positive `timeout` in seconds, `statusMessage`, and `async`. A top-level `description`
+`command`, a positive integer `timeout` in seconds, `statusMessage`, and `async`. A top-level `description`
 and group-level `matcher` are optional. Unknown fields, events, and handler types fail validation
 before outputs change. Commands and matchers are preserved; scripts must handle each runtime's
 [hook input and output contract](https://learn.chatgpt.com/docs/hooks).

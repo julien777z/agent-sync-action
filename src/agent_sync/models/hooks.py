@@ -24,7 +24,7 @@ class CommandHook(BaseModel):
 
     type: Literal["command"]
     command: str = Field(min_length=1)
-    timeout: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    timeout: int | None = Field(default=None, gt=0, le=2**64 - 1)
     status_message: str | None = Field(default=None, alias="statusMessage")
     run_async: bool | None = Field(default=None, alias="async")
 
