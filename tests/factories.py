@@ -291,9 +291,7 @@ def materialize_every_source_kind(workspace: Workspace, explicit_invocation: boo
         RuleFrontMatterFactory.build(name="sample", always_apply=False),
     )
 
-    hook = agents_dir(workspace) / "hooks/setup.sh"
-    hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
+    materialize_hooks(workspace, HooksConfigFactory.build())
 
     materialize_skill(
         agents_dir(workspace) / "skills/sample/SKILL.md",

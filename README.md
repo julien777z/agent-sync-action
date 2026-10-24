@@ -70,7 +70,7 @@ jobs:
 | Path | Purpose |
 |---|---|
 | `agents/` | Agent definitions mirrored to supported harnesses. |
-| `hooks/` | Hook scripts and supporting text files mirrored recursively, plus optional shared event registration in `hooks.json`. |
+| `hooks/` | Hook scripts and supporting text files mirrored recursively, with required event registration in `hooks.json`. |
 | `models/` | Per-agent harness model overrides. |
 | `global.md` | Optional guidance placed first in `AGENTS.md`. |
 | `project.md` | Optional project guidance placed after always-on rules in `AGENTS.md`. |
@@ -209,9 +209,9 @@ Register shared command hooks for the supported harnesses in `.agents/hooks/hook
 ```
 
 Agent Sync writes these registrations to `.codex/hooks.json` and the `hooks` field in
-`.claude/settings.json`. Other Claude Code settings come from `.agents/settings/claude.json`; when
-shared registration exists, that settings source must omit `hooks`. Without shared registration,
-harness settings retain their existing behavior.
+`.claude/settings.json`. Other Claude Code settings come from `.agents/settings/claude.json`;
+that settings source must omit `hooks`. Hook registration belongs in the shared event map.
+Other harness settings remain independent of hook registration.
 
 The canonical event names and their harness events are:
 
@@ -237,6 +237,15 @@ seconds. A top-level `description` and group-level `matcher` are optional. The c
 entrypoint and may include its interpreter and arguments. The canonical schema accepts only these
 documented shared events and fields; unknown or harness-specific options fail validation before
 outputs change. Harness-only settings retain their native contracts.
+
+When hook sources exist, `hooks.json` is required. Each top-level file or folder under `hooks/`
+needs at least one command registration referencing that file or an entrypoint inside that folder.
+Helpers and resources inside a registered folder need no separate registration. Missing registration
+fails before generated files change, including in dry runs.
+
+Commands must reference an existing canonical file using its repository-relative path, absolute
+path, or the quoted Git-root form shown above. Dynamic path variables and indirect launcher names
+cannot establish registration coverage. Commands and matchers are emitted without rewriting.
 
 A hook folder can contain its entrypoint, imported modules and resources:
 

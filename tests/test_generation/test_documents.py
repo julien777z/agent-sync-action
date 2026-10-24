@@ -10,7 +10,7 @@ from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink,
 from agent_sync.models.settings import Workspace
 from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, models_dir, settings_dir
-from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
+from tests.factories import HooksConfigFactory, RuleFrontMatterFactory, materialize_rule, load_context
 
 
 class TestDocumentGeneration:
@@ -208,13 +208,18 @@ class TestDocumentGeneration:
         source.parent.mkdir(parents=True)
         source.write_text(content)
         source.chmod(mode)
+        config = HooksConfigFactory.build()
+        config.hooks["SessionStart"][0].hooks[0].command = f'python3 ".agents/hooks/{filename}"'
+        (hooks_dir / "hooks.json").write_text(config.model_dump_json(exclude_none=True))
 
         context = load_context(workspace)
         outputs = generate_hooks(context, harness)
 
-        assert len(outputs) == 1
-
-        output = outputs[0]
+        output = next(
+            output
+            for output in outputs
+            if output.target_path == harness.root(workspace.root) / "hooks" / filename
+        )
 
         assert isinstance(output, GeneratedFile)
         assert output.target_path == harness.root(workspace.root) / "hooks" / filename

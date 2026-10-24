@@ -1,4 +1,5 @@
 from pathlib import Path
+from shlex import shlex
 
 from pydantic import BaseModel
 
@@ -28,6 +29,8 @@ def load_generation_context(
 ) -> GenerationContext:
     """Read and validate every generation source once."""
 
+    hooks, hook_config = load_hooks(workspace)
+
     return GenerationContext(
         workspace=workspace,
         source_config=source_config,
@@ -36,8 +39,8 @@ def load_generation_context(
         rules=tuple(load_rules(workspace)),
         global_instructions=load_root_instructions(workspace, "global.md"),
         project_instructions=load_root_instructions(workspace, "project.md"),
-        hooks=tuple(load_hooks(workspace)),
-        hook_config=load_json_model(agents_dir(workspace) / "hooks/hooks.json", HooksConfig),
+        hooks=tuple(hooks),
+        hook_config=hook_config,
     )
 
 
@@ -129,8 +132,8 @@ def load_rules(workspace: Workspace) -> list[RuleSource]:
     ]
 
 
-def load_hooks(workspace: Workspace) -> list[HookSource]:
-    """Load hook files and executable intent."""
+def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | None]:
+    """Load hook files and require canonical registration for every hook."""
 
     hooks_dir = agents_dir(workspace) / "hooks"
 
@@ -138,7 +141,7 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
         raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {hooks_dir}")
 
     if not hooks_dir.exists():
-        return []
+        return [], None
 
     sources: list[HookSource] = []
 
@@ -171,7 +174,50 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
                 )
             )
 
-    return sources
+    registration = hooks_dir / "hooks.json"
+    config = load_json_model(registration, HooksConfig)
+
+    if sources and config is None:
+        raise AgentSyncError(f"Hook sources require canonical event registration in {registration}")
+
+    if config is not None and sources:
+        tokens: set[str] = set()
+
+        for groups in config.hooks.values():
+            for group in groups:
+                for handler in group.hooks:
+                    lexer = shlex(handler.command, posix=True, punctuation_chars=True)
+                    lexer.whitespace_split = True
+
+                    try:
+                        tokens.update(lexer)
+                    except ValueError as exc:
+                        raise AgentSyncError(f"Invalid hook command in {registration}: {exc}") from exc
+
+        registered: set[str] = set()
+
+        for source in sources:
+            canonical_path = source.path.relative_to(workspace.root).as_posix()
+
+            references = {
+                canonical_path,
+                f"./{canonical_path}",
+                str(source.path),
+                f"$(git rev-parse --show-toplevel)/{canonical_path}",
+            }
+
+            if tokens & references:
+                registered.add(source.relative_path.parts[0])
+
+        missing = sorted({source.relative_path.parts[0] for source in sources} - registered)
+
+        if missing:
+            raise AgentSyncError(
+                f"Unregistered hooks in {registration}: {', '.join(missing)}. "
+                "Register a command referencing an entrypoint in each canonical hook file or folder."
+            )
+
+    return sources, config
 
 
 def load_markdown_sources[T: BaseModel](

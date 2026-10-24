@@ -1,3 +1,4 @@
+from shutil import rmtree
 import json
 import tomllib
 
@@ -21,9 +22,9 @@ from tests.factories import (
 class TestSettingsGeneration:
     """Test that synchronized settings fully own generated harness files."""
 
-    @pytest.mark.parametrize("shared", [False, True], ids=["harness-only", "shared"])
+    @pytest.mark.parametrize("shared", [False, True], ids=["settings-only", "shared"])
     async def test_hook_settings_preserve_other_keys(self, workspace: Workspace, shared: bool) -> None:
-        """Test that shared registration preserves other settings and harness-only hooks still work."""
+        """Test that settings remain independent of shared hook registration."""
 
         config = HooksConfigFactory.build()
         hooks = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
@@ -31,8 +32,6 @@ class TestSettingsGeneration:
 
         if shared:
             materialize_hooks(workspace, config)
-        else:
-            values["hooks"] = hooks
 
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "claude.json").write_text(json.dumps(values))
@@ -40,11 +39,11 @@ class TestSettingsGeneration:
         target = workspace.root / ".claude/settings.json"
         rendered = json.loads(target.read_text())
 
-        assert rendered["hooks"] == hooks
+        assert rendered.get("hooks") == (hooks if shared else None)
         assert rendered["model"] == values["model"]
 
         if shared:
-            (agents_dir(workspace) / "hooks/hooks.json").unlink()
+            rmtree(agents_dir(workspace) / "hooks")
             mirror_harnesses(workspace, dry_run=False)
 
             assert "hooks" not in json.loads(target.read_text())
@@ -52,17 +51,21 @@ class TestSettingsGeneration:
         else:
             assert not (workspace.root / ".codex/hooks.json").exists()
 
-    async def test_conflicting_hook_sources_fail(self, workspace: Workspace) -> None:
+    @pytest.mark.parametrize("shared", [False, True])
+    async def test_conflicting_hook_sources_fail(self, workspace: Workspace, shared: bool) -> None:
         """Test that competing canonical registrations fail without writing harness settings."""
 
         config = HooksConfigFactory.build()
-        materialize_hooks(workspace, config)
+
+        if shared:
+            materialize_hooks(workspace, config)
+
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "claude.json").write_text(
             json.dumps({"hooks": config.model_dump(by_alias=True, exclude_none=True)["hooks"]})
         )
 
-        with pytest.raises(AgentSyncError, match="Define hooks.*not both"):
+        with pytest.raises(AgentSyncError, match="Define hooks.*must omit hooks"):
             mirror_harnesses(workspace, dry_run=False)
 
         assert not (workspace.root / ".claude").exists()

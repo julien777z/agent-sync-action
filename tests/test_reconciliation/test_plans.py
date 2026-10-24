@@ -161,7 +161,7 @@ class TestReconciliation:
 
     @pytest.mark.parametrize(
         "relative_path",
-        [".claude/rules/sample.md", ".claude/hooks/setup.sh"],
+        [".claude/rules/sample.md", ".claude/hooks/session/start.py"],
         ids=["rule", "hook"],
     )
     def test_relocated_output_reclaims_every_kind_it_writes(

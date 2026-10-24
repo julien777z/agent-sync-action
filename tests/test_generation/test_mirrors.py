@@ -24,6 +24,106 @@ from tests.factories import (
 class TestMirrorIntegration:
     """Test that complete mirroring converges on harness outputs."""
 
+    @pytest.mark.parametrize(
+        "fault",
+        [
+            "missing-file",
+            "empty-map",
+            "unregistered-file",
+            "unregistered-folder",
+            "comment-only",
+            "path-prefix",
+            "missing-entrypoint",
+            "foreign-root",
+            "malformed-command",
+        ],
+    )
+    async def test_registration_coverage_preserves_outputs(self, workspace: Workspace, fault: str) -> None:
+        """Reject incomplete registration before replacing any previously generated hook."""
+
+        config = HooksConfigFactory.build()
+        materialize_hooks(workspace, config)
+        mirror_harnesses(workspace, dry_run=False)
+        canonical = agents_dir(workspace) / "hooks/hooks.json"
+        targets = [
+            *(harness.root(workspace.root) / "hooks/session/start.py" for harness in Harness),
+            workspace.root / ".codex/hooks.json",
+            workspace.root / ".claude/settings.json",
+        ]
+        original = {target: target.read_bytes() for target in targets}
+        handler = config.hooks["SessionStart"][0].hooks[0]
+
+        if fault == "missing-file":
+            canonical.unlink()
+        elif fault == "empty-map":
+            config.hooks = {}
+        elif fault == "unregistered-file":
+            (canonical.parent / "unregistered.py").write_text("print('unregistered')\n")
+        elif fault == "unregistered-folder":
+            folder = canonical.parent / "unregistered"
+            folder.mkdir()
+            (folder / "main.py").write_text("print('unregistered')\n")
+        elif fault == "comment-only":
+            handler.command = f"echo ignored # {handler.command}"
+        elif fault == "path-prefix":
+            handler.command = handler.command.replace("start.py", "start.py.extra")
+        elif fault == "missing-entrypoint":
+            handler.command = handler.command.replace("start.py", "missing.py")
+        elif fault == "foreign-root":
+            handler.command = 'python3 "/elsewhere/.agents/hooks/session/start.py"'
+        else:
+            handler.command = "python3 '"
+
+        if fault != "missing-file":
+            canonical.write_text(config.model_dump_json(exclude_none=True))
+
+        (canonical.parent / "session/start.py").write_text("print('changed')\n")
+
+        for dry_run in (True, False):
+            with pytest.raises(
+                AgentSyncError, match="require canonical|Unregistered hooks|Invalid hook command"
+            ):
+                mirror_harnesses(workspace, dry_run=dry_run)
+
+            assert {target: target.read_bytes() for target in targets} == original
+            assert all(
+                not (harness.root(workspace.root) / "hooks/unregistered").exists() for harness in Harness
+            )
+
+    @pytest.mark.parametrize("filename", ["check.py", "hook folder/main.py"])
+    @pytest.mark.parametrize("path_form", ["relative", "absolute", "git-root"])
+    async def test_registered_entrypoint_paths(
+        self, workspace: Workspace, filename: str, path_form: str
+    ) -> None:
+        """Register standalone scripts and folder entrypoints from custom canonical paths."""
+
+        workspace = Workspace(root=workspace.root, agents_dirname=".config/agent settings")
+        subprocess.run(["git", "init", "--quiet", str(workspace.root)], check=True)
+        source = agents_dir(workspace) / "hooks" / filename
+        source.parent.mkdir(parents=True)
+        source.write_text("print('registered')\n")
+        relative = source.relative_to(workspace.root).as_posix()
+        reference = (
+            str(source)
+            if path_form == "absolute"
+            else f"$(git rev-parse --show-toplevel)/{relative}" if path_form == "git-root" else relative
+        )
+        config = HooksConfigFactory.build()
+        command = f'python3 "{reference}"'
+        config.hooks["SessionStart"][0].hooks[0].command = command
+        (agents_dir(workspace) / "hooks/hooks.json").write_text(config.model_dump_json(exclude_none=True))
+
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        registered = json.loads((workspace.root / ".codex/hooks.json").read_text())
+        assert registered["hooks"]["SessionStart"][0]["hooks"][0]["command"] == command
+        execution = subprocess.run(
+            command, shell=True, cwd=workspace.root, check=True, text=True, capture_output=True
+        )
+
+        assert execution.stdout.strip() == "registered"
+        assert mirror_harnesses(workspace, dry_run=True) is False
+
     @pytest.mark.parametrize("output_dirname", ["", ".generated"], ids=["root", "relocated"])
     @pytest.mark.parametrize("event", get_args(HookEvent.__value__))
     async def test_shared_hook_lifecycle(
@@ -278,9 +378,7 @@ class TestMirrorIntegration:
         agent_sources.mkdir()
         (agent_sources / "review.md").write_text("---\nname: review\n---\n\nReview.\n")
 
-        hooks_dir = agents_dir(relocated_workspace) / "hooks"
-        hooks_dir.mkdir()
-        (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
+        materialize_hooks(relocated_workspace, HooksConfigFactory.build())
 
         settings_dir(relocated_workspace).mkdir()
         (settings_dir(relocated_workspace) / "claude.json").write_text('{"model":"default"}')
@@ -299,7 +397,7 @@ class TestMirrorIntegration:
         )
         assert (generated_root / ".codex/rules/typescript.rules").is_file()
         assert (generated_root / ".claude/agents/review.md").is_file()
-        assert (generated_root / ".claude/hooks/check").is_file()
+        assert (generated_root / ".claude/hooks/session/start.py").is_file()
         assert (generated_root / ".claude/settings.json").is_file()
         assert (generated_root / ".codex/config.toml").is_file()
         assert (relocated_workspace.root / "AGENTS.md").is_file()

@@ -24,13 +24,13 @@ def generate_claude_settings(
 
     values = settings.model_dump(exclude_none=True, exclude={"$comment"})
 
-    if context.hook_config is not None:
-        if "hooks" in (settings.model_extra or {}):
-            raise AgentSyncError(
-                f"Define hooks in {agents_dir(context.workspace) / 'hooks/hooks.json'} or "
-                f"{settings_dir(context.workspace) / 'claude.json'}, not both"
-            )
+    if "hooks" in (settings.model_extra or {}):
+        raise AgentSyncError(
+            f"Define hooks in {agents_dir(context.workspace) / 'hooks/hooks.json'}; "
+            f"{settings_dir(context.workspace) / 'claude.json'} must omit hooks"
+        )
 
+    if context.hook_config is not None:
         values["hooks"] = context.hook_config.model_dump(by_alias=True, exclude_none=True)["hooks"]
 
     return [
