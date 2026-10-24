@@ -2,7 +2,6 @@ from typing import Final
 
 from agent_sync.generation.artifact import (
     generate_agents,
-    generate_codex_hooks,
     generate_hooks,
     generate_skills,
 )
@@ -58,7 +57,7 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         handlers={
             Provider.CLAUDE: generate_hooks,
             Provider.CURSOR: generate_hooks,
-            Provider.CODEX: generate_codex_hooks,
+            Provider.CODEX: generate_hooks,
         },
     ),
     ArtifactKind.SETTING: ArtifactRegistration(

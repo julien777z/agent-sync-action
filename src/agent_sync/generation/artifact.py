@@ -49,11 +49,11 @@ def generate_agents(context: GenerationContext, provider: Provider) -> list[Gene
 
 
 def generate_hooks(context: GenerationContext, provider: Provider) -> list[GeneratedOutput]:
-    """Generate one provider's hook files."""
+    """Generate one provider's hook files and standalone registration."""
 
     root = provider.root(output_root(context.workspace))
 
-    return [
+    outputs: list[GeneratedOutput] = [
         GeneratedFile(
             target_path=root / "hooks" / source.relative_path,
             content=ensure_trailing_newline(source.content),
@@ -65,16 +65,7 @@ def generate_hooks(context: GenerationContext, provider: Provider) -> list[Gener
         for source in context.hooks
     ]
 
-
-def generate_codex_hooks(
-    context: GenerationContext,
-    provider: Provider,
-) -> list[GeneratedOutput]:
-    """Generate Codex hook scripts and native lifecycle registration."""
-
-    outputs = generate_hooks(context, provider)
-
-    if context.hook_config is None:
+    if provider is not Provider.CODEX or context.hook_config is None:
         return outputs
 
     values = context.hook_config.model_dump(by_alias=True, exclude_none=True)
@@ -83,7 +74,7 @@ def generate_codex_hooks(
 
     outputs.append(
         GeneratedFile(
-            target_path=provider.root(output_root(context.workspace)) / "hooks.json",
+            target_path=root / "hooks.json",
             content=ensure_trailing_newline(json.dumps(values, indent=2)),
             artifact=ArtifactKind.HOOK,
             source_path=agents_dir(context.workspace) / "hooks/hooks.json",
