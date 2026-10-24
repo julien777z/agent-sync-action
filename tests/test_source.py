@@ -1,6 +1,6 @@
 import pytest
 
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 from agent_sync.models.settings import Workspace
 from agent_sync.source import load_source_config
 from agent_sync.utils import AgentSyncError
@@ -30,13 +30,13 @@ class TestCanonicalSources:
         with pytest.raises(AgentSyncError, match="Invalid JSON"):
             load_source_config(workspace)
 
-    def test_unknown_provider_settings_fail(self, workspace: Workspace) -> None:
-        """Test that settings for an unsupported provider are rejected."""
+    def test_unknown_harness_settings_fail(self, workspace: Workspace) -> None:
+        """Test that settings for an unsupported harness are rejected."""
 
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "unknown.json").write_text("{}")
 
-        with pytest.raises(AgentSyncError, match="Unsupported provider"):
+        with pytest.raises(AgentSyncError, match="Unsupported harness"):
             load_source_config(workspace)
 
     def test_unused_codex_agent_override_fails(self, workspace: Workspace) -> None:
@@ -48,15 +48,15 @@ class TestCanonicalSources:
         with pytest.raises(AgentSyncError, match="codex"):
             load_source_config(workspace)
 
-    def test_provider_settings_are_typed(self, workspace: Workspace) -> None:
-        """Test that supported provider files are indexed by provider enum."""
+    def test_harness_settings_are_typed(self, workspace: Workspace) -> None:
+        """Test that supported harness files are indexed by harness enum."""
 
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "cursor.json").write_text('{"model":"cursor-model"}')
 
         source_config = load_source_config(workspace)
 
-        assert source_config.settings[Provider.CURSOR].model == "cursor-model"
+        assert source_config.settings[Harness.CURSOR].model == "cursor-model"
 
     @pytest.mark.parametrize("slug", ["Bad Name", "UPPER", "-leading"])
     def test_invalid_model_slug_fails(self, workspace: Workspace, slug: str) -> None:

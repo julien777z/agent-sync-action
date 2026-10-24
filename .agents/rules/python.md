@@ -1,7 +1,5 @@
 ---
 description: Follow modern Python typing, import, formatting, error handling, and maintainability conventions.
-globs:
-- '**/*.py'
 alwaysApply: false
 paths:
 - '**/*.py'

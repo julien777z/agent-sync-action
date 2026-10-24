@@ -2,26 +2,26 @@ import pytest
 
 from agent_sync.utils import AgentSyncError
 from agent_sync.generation.artifact import generate_skills
-from agent_sync.models.output import GeneratedLink, Provider
+from agent_sync.models.output import GeneratedLink, Harness
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 from tests.factories import SkillFrontMatterFactory, load_context, materialize_skill
 
 
 class TestSkillGeneration:
-    """Test that canonical skills become provider directory links."""
+    """Test that canonical skills become harness directory links."""
 
-    def test_links_every_provider_to_the_canonical_directory(
+    def test_links_every_harness_to_the_canonical_directory(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that all provider skill paths link to one canonical directory."""
+        """Test that all harness skill paths link to one canonical directory."""
 
         front_matter = SkillFrontMatterFactory.build()
         source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         context = load_context(workspace)
-        outputs = [output for provider in Provider for output in generate_skills(context, provider)]
+        outputs = [output for harness in Harness for output in generate_skills(context, harness)]
         links = {
             output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
         }
@@ -36,13 +36,13 @@ class TestSkillGeneration:
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that a skill inside a grouping folder links from the flat provider path."""
+        """Test that a skill inside a grouping folder links from the flat harness path."""
 
         front_matter = SkillFrontMatterFactory.build()
         source = agents_dir(workspace) / "skills" / "doctors" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
         context = load_context(workspace)
-        outputs = [output for provider in Provider for output in generate_skills(context, provider)]
+        outputs = [output for harness in Harness for output in generate_skills(context, harness)]
         links = {
             output.target_path: output.link_target for output in outputs if isinstance(output, GeneratedLink)
         }
@@ -84,16 +84,16 @@ class TestSkillGeneration:
         materialize_skill(source, front_matter)
 
         outputs = [
-            output for provider in Provider for output in generate_skills(load_context(workspace), provider)
+            output for harness in Harness for output in generate_skills(load_context(workspace), harness)
         ]
         assert all(isinstance(output, GeneratedLink) for output in outputs)
         assert {output.link_target for output in outputs if isinstance(output, GeneratedLink)} == {
             source.parent
         }
-        assert {output.provider for output in outputs} == set(Provider)
+        assert {output.harness for output in outputs} == set(Harness)
 
     @pytest.mark.parametrize("as_symlink", [False, True], ids=["file", "symlink"])
-    def test_rejects_provider_metadata_in_canonical_skill(
+    def test_rejects_harness_metadata_in_canonical_skill(
         self, workspace: Workspace, as_symlink: bool
     ) -> None:
         front_matter = SkillFrontMatterFactory.build()

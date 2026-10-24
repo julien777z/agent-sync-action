@@ -5,12 +5,12 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 from agent_sync.utils import AgentSyncError, ensure_trailing_newline, escapes_base_directory
 
 
 class PlatformSettings(BaseModel):
-    """Validate provider settings whose extra keys are mirrored unchanged."""
+    """Validate harness settings whose extra keys are mirrored unchanged."""
 
     model_config = ConfigDict(extra="allow", strict=True)
 
@@ -56,22 +56,22 @@ class CodexSettings(BaseModel):
 
 
 class AgentModelOverride(BaseModel):
-    """Validate supported per-provider model overrides for one agent."""
+    """Validate supported per-harness model overrides for one agent."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    claude: str | None = None
+    claude_code: str | None = None
     cursor: str | None = None
 
-    def for_provider(self, provider: Provider) -> str | None:
-        """Return the configured model override for a supported provider."""
+    def for_harness(self, harness: Harness) -> str | None:
+        """Return the configured model override for a supported harness."""
 
-        match provider:
-            case Provider.CLAUDE:
-                return self.claude
-            case Provider.CURSOR:
+        match harness:
+            case Harness.CLAUDE_CODE:
+                return self.claude_code
+            case Harness.CURSOR:
                 return self.cursor
-            case Provider.CODEX:
+            case Harness.CODEX:
                 return None
 
 
@@ -80,7 +80,7 @@ class SourceConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    settings: dict[Provider, PlatformSettings | CodexSettings]
+    settings: dict[Harness, PlatformSettings | CodexSettings]
     model_overrides: dict[str, AgentModelOverride]
 
 
@@ -96,7 +96,7 @@ class Workspace(BaseModel):
     @field_validator("output_dirname")
     @classmethod
     def validate_output_dirname(cls, value: str) -> str:
-        """Require generated provider trees to stay inside the repository."""
+        """Require generated harness trees to stay inside the repository."""
 
         if escapes_base_directory(Path(value)):
             raise ValueError("Generated output directory must be a relative path inside the repository")
@@ -105,7 +105,7 @@ class Workspace(BaseModel):
 
     @model_validator(mode="after")
     def validate_output_avoids_read_sources(self) -> Self:
-        """Require generated provider trees to sit outside every directory the run reads."""
+        """Require generated harness trees to sit outside every directory the run reads."""
 
         if not self.output_dirname:
             return self

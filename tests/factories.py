@@ -11,6 +11,7 @@ from agent_sync.document import render_front_matter
 from agent_sync.external_resources import directories, skills
 from agent_sync.generation.context import load_generation_context
 from agent_sync.models.generation import GenerationContext
+from agent_sync.models.hooks import CommandHook, HookMatcher, HooksConfig
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
@@ -136,10 +137,52 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
     __model__ = RuleFrontMatter
 
     description = "A rule."
-    globs = None
     paths = None
     always_apply = True
     starlark = None
+
+
+class HooksConfigFactory(ModelFactory[HooksConfig]):
+    """Build shared lifecycle registration with deterministic matcher groups."""
+
+    __model__ = HooksConfig
+
+    description = "Workspace initialization"
+
+    @classmethod
+    def hooks(cls) -> dict[str, list[HookMatcher]]:
+        """Register one command for session startup and resume."""
+
+        return {
+            "SessionStart": [
+                HookMatcher(
+                    hooks=[
+                        CommandHook(
+                            type="command",
+                            command='python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"',
+                            timeout=3,
+                        )
+                    ]
+                )
+            ]
+        }
+
+
+def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:
+    """Write shared lifecycle registration and its nested script resources."""
+
+    materialize_tree(
+        agents_dir(workspace) / "hooks",
+        {
+            "hooks.json": config.model_dump_json(by_alias=True, exclude_none=True),
+            "session/start.py": "#!/usr/bin/env python3\nfrom helpers import context\nprint(context())\n",
+            "session/helpers.py": (
+                "from pathlib import Path\n\ndef context():\n"
+                "    return (Path(__file__).parent / 'resources/context.md').read_text().strip()\n"
+            ),
+            "session/resources/context.md": "Workspace context.\n",
+        },
+    )
 
 
 class ExternalSkillFactory(ModelFactory[ExternalSkill]):
@@ -240,16 +283,14 @@ def materialize_tree(base: Path, files: dict[str, str]) -> None:
 
 
 def materialize_every_source_kind(workspace: Workspace, explicit_invocation: bool = False) -> None:
-    """Write one canonical source of every kind a provider tree mirrors."""
+    """Write one canonical source of every kind a harness tree mirrors."""
 
     materialize_rule(
         agents_dir(workspace) / "rules/sample.md",
         RuleFrontMatterFactory.build(name="sample", always_apply=False),
     )
 
-    hook = agents_dir(workspace) / "hooks/setup.sh"
-    hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text("#!/usr/bin/env bash\necho ready\n", encoding="utf-8")
+    materialize_hooks(workspace, HooksConfigFactory.build())
 
     materialize_skill(
         agents_dir(workspace) / "skills/sample/SKILL.md",

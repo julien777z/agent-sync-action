@@ -26,7 +26,7 @@ def workspace(tmp_path: Path) -> Workspace:
 
 @pytest.fixture
 def relocated_workspace(tmp_path: Path) -> Workspace:
-    """Create a workspace whose generated provider trees live under a nested directory."""
+    """Create a workspace whose generated harness trees live under a nested directory."""
 
     return create_workspace(tmp_path, ".agents/.auto_generated")
 

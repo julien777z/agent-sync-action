@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 
 from agent_sync.generation.artifact import has_generated_notice
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 
 
 def stage_generated_paths(agents_dir: str, output_dir: str) -> None:
@@ -11,12 +11,12 @@ def stage_generated_paths(agents_dir: str, output_dir: str) -> None:
 
     relocated = output_dir not in ("", ".")
     output_root = Path(output_dir) if relocated else Path(".")
-    provider_directories = tuple(provider.directory for provider in Provider)
-    paths = [*(output_root / directory for directory in provider_directories), Path(agents_dir)]
+    harness_directories = tuple(harness.directory for harness in Harness)
+    paths = [*(output_root / directory for directory in harness_directories), Path(agents_dir)]
 
     if relocated:
         deleted = subprocess.run(
-            ["git", "ls-files", "--deleted", "-z", "--", *provider_directories],
+            ["git", "ls-files", "--deleted", "-z", "--", *harness_directories],
             capture_output=True,
             check=True,
         )

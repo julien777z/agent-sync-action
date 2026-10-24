@@ -1,19 +1,78 @@
+from shutil import rmtree
 import json
 import tomllib
 
-from agent_sync.generation.setting import generate_claude_settings
-from agent_sync.models.output import GeneratedFile, Provider
-from agent_sync.reconciliation import mirror_providers
+import pytest
+
+from agent_sync.generation.setting import generate_claude_code_settings
+from agent_sync.models.output import GeneratedFile, Harness
+from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.models.settings import Workspace
+from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, settings_dir
-from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
+from tests.factories import (
+    HooksConfigFactory,
+    RuleFrontMatterFactory,
+    materialize_hooks,
+    materialize_rule,
+    load_context,
+)
 
 
 class TestSettingsGeneration:
-    """Test that synchronized settings fully own generated provider files."""
+    """Test that synchronized settings fully own generated harness files."""
 
-    def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
-        """Test that Claude settings preserve validated provider keys."""
+    @pytest.mark.parametrize("shared", [False, True], ids=["settings-only", "shared"])
+    async def test_hook_settings_preserve_other_keys(self, workspace: Workspace, shared: bool) -> None:
+        """Test that settings remain independent of shared hook registration."""
+
+        config = HooksConfigFactory.build()
+        hooks = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        values = {"model": "example"}
+
+        if shared:
+            materialize_hooks(workspace, config)
+
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text(json.dumps(values))
+        mirror_harnesses(workspace, dry_run=False)
+        target = workspace.root / ".claude/settings.json"
+        rendered = json.loads(target.read_text())
+
+        assert rendered.get("hooks") == (hooks if shared else None)
+        assert rendered["model"] == values["model"]
+
+        if shared:
+            rmtree(agents_dir(workspace) / "hooks")
+            mirror_harnesses(workspace, dry_run=False)
+
+            assert "hooks" not in json.loads(target.read_text())
+            assert json.loads(target.read_text())["model"] == values["model"]
+        else:
+            assert not (workspace.root / ".codex/hooks.json").exists()
+
+    @pytest.mark.parametrize("shared", [False, True])
+    async def test_conflicting_hook_sources_fail(self, workspace: Workspace, shared: bool) -> None:
+        """Test that competing canonical registrations fail without writing harness settings."""
+
+        config = HooksConfigFactory.build()
+
+        if shared:
+            materialize_hooks(workspace, config)
+
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text(
+            json.dumps({"hooks": config.model_dump(by_alias=True, exclude_none=True)["hooks"]})
+        )
+
+        with pytest.raises(AgentSyncError, match="Define hooks.*must omit hooks"):
+            mirror_harnesses(workspace, dry_run=False)
+
+        assert not (workspace.root / ".claude").exists()
+        assert not (workspace.root / ".codex").exists()
+
+    def test_claude_code_settings_render_complete_json(self, workspace: Workspace) -> None:
+        """Test that Claude Code settings preserve validated harness keys."""
 
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "claude.json").write_text(
@@ -22,7 +81,7 @@ class TestSettingsGeneration:
             '"features":{"default_mode_request_user_input":true,"experimental-feature":false}}'
         )
 
-        outputs = generate_claude_settings(load_context(workspace), Provider.CLAUDE)
+        outputs = generate_claude_code_settings(load_context(workspace), Harness.CLAUDE_CODE)
 
         assert len(outputs) == 1
         assert isinstance(outputs[0], GeneratedFile)
@@ -63,7 +122,7 @@ class TestSettingsGeneration:
         config_path.parent.mkdir()
         config_path.write_text('model_reasoning_effort = "high"\n')
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
 
         instructions = (workspace.root / "AGENTS.md").read_text()
         capacity = len(instructions.encode("utf-8"))
@@ -84,7 +143,7 @@ class TestSettingsGeneration:
         )
         assert native == {**canonical, "project_doc_max_bytes": capacity}
         assert "model_reasoning_effort" not in native
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_codex_features_accept_arbitrary_names(self, workspace: Workspace) -> None:
         """Test that arbitrary Codex feature names are synchronized unchanged."""
@@ -96,7 +155,7 @@ class TestSettingsGeneration:
             '{"default_mode_request_user_input":true,"experimental-feature":false}}'
         )
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
 
         canonical = json.loads(settings_path.read_text())
         native = tomllib.loads((workspace.root / ".codex/config.toml").read_text())
@@ -106,7 +165,7 @@ class TestSettingsGeneration:
             "experimental-feature": False,
         }
         assert native["features"] == canonical["features"]
-        assert mirror_providers(workspace, dry_run=True) is False
+        assert mirror_harnesses(workspace, dry_run=True) is False
 
     def test_invalid_existing_toml_is_overwritten(self, workspace: Workspace) -> None:
         """Test that existing Codex content never affects generated settings."""
@@ -118,5 +177,5 @@ class TestSettingsGeneration:
         config_path.parent.mkdir()
         config_path.write_text("invalid = [\n")
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert tomllib.loads(config_path.read_text())["project_doc_max_bytes"] > 0

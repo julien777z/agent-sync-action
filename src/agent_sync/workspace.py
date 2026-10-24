@@ -13,13 +13,13 @@ def agents_dir(workspace: Workspace) -> Path:
 
 
 def output_root(workspace: Workspace) -> Path:
-    """Return the directory that holds every generated provider tree."""
+    """Return the directory that holds every generated harness tree."""
 
     return workspace.root / workspace.output_dirname if workspace.output_dirname else workspace.root
 
 
 def settings_dir(workspace: Workspace) -> Path:
-    """Return the canonical provider settings directory."""
+    """Return the canonical harness settings directory."""
 
     return agents_dir(workspace) / "settings"
 

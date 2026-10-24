@@ -6,7 +6,7 @@ import pytest
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources import sync
 from agent_sync.models.registry import ExternalSkill
-from agent_sync.reconciliation import mirror_providers
+from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir, output_root
 from tests.factories import (
@@ -26,10 +26,10 @@ class TestExternalSkillService:
 
         assert sync.sync_external_resources(workspace, dry_run=True, config=ActionConfig()) is None
 
-    def test_vendored_skill_reaches_provider_mirrors(
+    def test_vendored_skill_reaches_harness_mirrors(
         self, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test that an installed external skill reaches every supported provider."""
+        """Test that an installed external skill reaches every supported harness."""
 
         stub_skill_upstream(monkeypatch)
         materialize_registry(
@@ -38,10 +38,10 @@ class TestExternalSkillService:
         )
         sync.sync_external_resources(workspace, dry_run=False, config=ActionConfig())
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
 
-        for provider in (".claude", ".cursor", ".codex"):
-            document = output_root(workspace) / provider / "skills/local-skill/SKILL.md"
+        for harness in (".claude", ".cursor", ".codex"):
+            document = output_root(workspace) / harness / "skills/local-skill/SKILL.md"
             assert document.is_file()
             assert "name: local-skill" in document.read_text()
 

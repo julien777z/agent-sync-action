@@ -320,8 +320,8 @@ class TestExternalSkillBoundaries:
 
         assert target.read_text() == original
 
-    def test_installed_skill_discovery_is_provider_neutral(self, tmp_path: Path) -> None:
-        """Test that staging discovery does not depend on one provider directory."""
+    def test_installed_skill_discovery_is_harness_neutral(self, tmp_path: Path) -> None:
+        """Test that staging discovery does not depend on one harness directory."""
 
         source_root = tmp_path / "source/repository"
         source_root.mkdir(parents=True)
@@ -337,8 +337,8 @@ class TestExternalSkillBoundaries:
 
         assert installer.locate_skill_directory(tmp_path, "sample", excluded_root=source_root) == installed
 
-    def test_source_discovery_prefers_canonical_skill_over_provider_copies(self, tmp_path: Path) -> None:
-        """Test that source discovery selects the canonical copy over provider mirrors."""
+    def test_source_discovery_prefers_canonical_skill_over_harness_copies(self, tmp_path: Path) -> None:
+        """Test that source discovery selects the canonical copy over harness mirrors."""
 
         for prefix in (".agents", ".claude", ".cursor", "plugin"):
             directory = tmp_path / prefix / "skills/impeccable"
@@ -477,16 +477,16 @@ class TestExternalSkillBoundaries:
             "# React\n"
         )
 
-    def test_vendor_drops_provider_ui_metadata(self, tmp_path: Path) -> None:
+    def test_vendor_drops_harness_ui_metadata(self, tmp_path: Path) -> None:
         """Test that OpenAI metadata is removed without discarding other skill assets."""
 
         installed = tmp_path / "renamed-skill"
         installed.mkdir()
         (installed / "SKILL.md").write_text("---\nname: original\ndescription: A skill.\n---\n")
-        provider_file = installed / "agents/openai.yaml"
-        provider_file.parent.mkdir()
-        provider_file.write_text('display_name: "/original"\n')
-        other_asset = provider_file.parent / "guide.md"
+        harness_file = installed / "agents/openai.yaml"
+        harness_file.parent.mkdir()
+        harness_file.write_text('display_name: "/original"\n')
+        other_asset = harness_file.parent / "guide.md"
         other_asset.write_text("Skill reference.\n")
         skill = ExternalSkill(
             kind="skill",
@@ -499,7 +499,7 @@ class TestExternalSkillBoundaries:
         normalize_skill_metadata(installed, skill)
 
         assert "name: renamed-skill\n" in (installed / "SKILL.md").read_text()
-        assert not provider_file.exists()
+        assert not harness_file.exists()
         assert other_asset.read_text() == "Skill reference.\n"
 
     def test_root_assets_do_not_restore_upstream_metadata(

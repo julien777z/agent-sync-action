@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from agent_sync.config import ActionConfig
 from agent_sync.external_resources.sync import sync_external_resources
 from agent_sync.models.settings import Workspace
-from agent_sync.reconciliation import mirror_providers
+from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.utils import AgentSyncError
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -47,8 +47,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.set_defaults(output_dir=None)
 
     mirror_parser = commands.add_parser(
-        "mirror-providers",
-        help="Mirror canonical sources into provider configuration paths.",
+        "mirror-harnesses",
+        help="Mirror canonical sources into harness configuration paths.",
     )
     add_workspace_arguments(mirror_parser)
 
@@ -56,7 +56,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=None,
         help=(
-            "Directory that holds generated provider trees, relative to the root "
+            "Directory that holds generated harness trees, relative to the root "
             "(default: $AGENT_SYNC_OUTPUT_DIR or the root itself)."
         ),
     )
@@ -83,8 +83,8 @@ if __name__ == "__main__":
             output_dirname=parsed.output_dir or config.output_dir,
         )
 
-        if parsed.command == "mirror-providers":
-            differences_found = mirror_providers(workspace, parsed.dry_run)
+        if parsed.command == "mirror-harnesses":
+            differences_found = mirror_harnesses(workspace, parsed.dry_run)
         else:
             sync_external_resources(workspace, parsed.dry_run, config)
             differences_found = False

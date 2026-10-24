@@ -16,7 +16,7 @@ class TestCli:
     def test_mirror_command_returns_clean_after_generation(self, workspace: Workspace) -> None:
         """Test that the mirror command runs and reaches an idempotent workspace."""
 
-        arguments = ["mirror-providers", "--root", str(workspace.root)]
+        arguments = ["mirror-harnesses", "--root", str(workspace.root)]
 
         assert run_cli(arguments).returncode == 0
         assert run_cli([*arguments, "--dry-run"]).returncode == 0
@@ -29,7 +29,7 @@ class TestCli:
         monkeypatch.setenv("AGENT_SYNC_OUTPUT_DIR", ".generated")
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "codex.json").write_text('{"model":"example"}')
-        command = ["mirror-providers", "--root", str(workspace.root)]
+        command = ["mirror-harnesses", "--root", str(workspace.root)]
 
         assert run_cli(command).returncode == 0
         assert (workspace.root / ".generated/.codex/config.toml").exists()
@@ -92,7 +92,7 @@ class TestCli:
         """Test that the CLI maps detected differences to exit code one."""
 
         (agents_dir(workspace) / "project.md").write_text("# Project\n")
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--dry-run"])
+        result = run_cli(["mirror-harnesses", "--root", str(workspace.root), "--dry-run"])
 
         assert result.returncode == 1
 
@@ -102,12 +102,12 @@ class TestCli:
     ) -> None:
         """Test that a rejected output directory is reported with exit code two."""
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--output-dir", "../escape"])
+        result = run_cli(["mirror-harnesses", "--root", str(workspace.root), "--output-dir", "../escape"])
 
         assert result.returncode == 2
 
     def test_vendor_command_rejects_an_output_directory(self, workspace: Workspace) -> None:
-        """Test that the command writing no provider trees does not accept their location."""
+        """Test that the command writing no harness trees does not accept their location."""
 
         result = run_cli(
             ["refresh-external-resources", "--root", str(workspace.root), "--output-dir", "generated"]
@@ -121,12 +121,12 @@ class TestCli:
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "claude.json").write_text("{invalid")
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root)])
+        result = run_cli(["mirror-harnesses", "--root", str(workspace.root)])
 
         assert result.returncode == 2
 
     def test_removed_instruction_generation_flag_is_rejected(self, workspace: Workspace) -> None:
         """Test that the removed CLI option cannot silently change generation."""
 
-        result = run_cli(["mirror-providers", "--root", str(workspace.root), "--no-generate-agents-md"])
+        result = run_cli(["mirror-harnesses", "--root", str(workspace.root), "--no-generate-agents-md"])
         assert result.returncode == 2

@@ -1,5 +1,16 @@
 # Agent Sync Action
 
+## Canonical Configuration
+
+Agent Sync owns agent configuration in `.agents/` and generates usable configuration for each
+supported harness. A capability is complete only when its generated output includes the wiring
+needed for discovery and use. Do not rely on manually maintained harness configuration or assumed
+harness behavior to supply missing wiring. Preserve native trust and approval requirements.
+
+For example, hook scripts require canonical event registrations in `.agents/hooks/hooks.json`,
+which Agent Sync generates for each supported harness. Copying scripts without their registrations
+is incomplete configuration.
+
 ## Skill Metadata
 
 `short_description` is optional local metadata for skill indexes. Agent Sync records the last

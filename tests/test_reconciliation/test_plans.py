@@ -2,15 +2,15 @@ import os
 
 import pytest
 
-from agent_sync.generation.registry import generate_manifest, owned_provider_directories
+from agent_sync.generation.registry import generate_manifest, owned_harness_directories
 from agent_sync.models.output import (
     ArtifactKind,
     GeneratedFile,
     GeneratedLink,
     Manifest,
-    Provider,
+    Harness,
 )
-from agent_sync.reconciliation import apply_plan, build_plan, mirror_providers
+from agent_sync.reconciliation import apply_plan, build_plan, mirror_harnesses
 from agent_sync.source import load_source_config
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
@@ -49,14 +49,14 @@ class TestReconciliation:
                     link_target=source,
                     artifact=ArtifactKind.RULE,
                     source_path=source,
-                    provider=Provider.CLAUDE,
+                    harness=Harness.CLAUDE_CODE,
                 ),
                 GeneratedLink(
                     target_path=directory_target,
                     link_target=source.parent,
                     artifact=ArtifactKind.SKILL,
                     source_path=source,
-                    provider=Provider.CURSOR,
+                    harness=Harness.CURSOR,
                 ),
             ]
         )
@@ -90,7 +90,7 @@ class TestReconciliation:
             content="generated\n",
             artifact=ArtifactKind.SETTING,
             source_path=agents_dir(workspace) / "settings/claude.json",
-            provider=Provider.CLAUDE,
+            harness=Harness.CLAUDE_CODE,
         )
         plan = build_plan(workspace, Manifest(outputs=[output]))
 
@@ -102,22 +102,22 @@ class TestReconciliation:
         assert not target.is_symlink()
         assert target.read_text() == "generated\n"
 
-    def test_stale_provider_paths_are_removed(
+    def test_stale_harness_paths_are_removed(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that stale detection makes provider directories match the manifest."""
+        """Test that stale detection makes harness directories match the manifest."""
 
-        claude_rules = workspace.root / ".claude/rules"
-        claude_rules.mkdir(parents=True)
-        stale_rule = claude_rules / "orphan.md"
+        claude_code_rules = workspace.root / ".claude/rules"
+        claude_code_rules.mkdir(parents=True)
+        stale_rule = claude_code_rules / "orphan.md"
         stale_rule.write_text("stale\n")
 
-        stale_directory = claude_rules / "custom"
+        stale_directory = claude_code_rules / "custom"
         stale_directory.mkdir()
         (stale_directory / "rule.md").write_text("stale\n")
 
-        duplicate_rule = claude_rules / "orphan 2.md"
+        duplicate_rule = claude_code_rules / "orphan 2.md"
         duplicate_rule.write_text("duplicate\n")
 
         codex_rules = workspace.root / ".codex/rules"
@@ -139,7 +139,7 @@ class TestReconciliation:
         self,
         relocated_workspace: Workspace,
     ) -> None:
-        """Test that an obsolete provider skill directory is reclaimed without touching other files."""
+        """Test that an obsolete harness skill directory is reclaimed without touching other files."""
 
         materialize_every_source_kind(relocated_workspace, explicit_invocation=True)
 
@@ -161,7 +161,7 @@ class TestReconciliation:
 
     @pytest.mark.parametrize(
         "relative_path",
-        [".claude/rules/sample.md", ".claude/hooks/setup.sh"],
+        [".claude/rules/sample.md", ".claude/hooks/session/start.py"],
         ids=["rule", "hook"],
     )
     def test_relocated_output_reclaims_every_kind_it_writes(
@@ -210,18 +210,18 @@ class TestReconciliation:
         assert not any(stale_path in hand_authored.parents for stale_path in plan.stale_paths)
 
     @pytest.mark.parametrize(
-        ("provider", "directory_name"),
-        owned_provider_directories(),
+        ("harness", "directory_name"),
+        owned_harness_directories(),
     )
     def test_registry_directories_are_fully_owned(
         self,
         workspace: Workspace,
-        provider: Provider,
+        harness: Harness,
         directory_name: str,
     ) -> None:
         """Test that every registry-owned directory removes unknown entries."""
 
-        directory = provider.root(workspace.root) / directory_name
+        directory = harness.root(workspace.root) / directory_name
         directory.mkdir(parents=True)
         stale_path = directory / "unregistered"
         stale_path.write_text("stale\n")
@@ -258,16 +258,16 @@ class TestReconciliation:
             external.mkdir()
             directory.symlink_to(external, target_is_directory=True)
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert directory.is_dir()
         assert not directory.is_symlink()
         assert (directory / "sample.md").is_file()
 
-    def test_provider_root_symlinks_are_replaced_without_touching_their_target(
+    def test_harness_root_symlinks_are_replaced_without_touching_their_target(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that provider-root symlinks cannot redirect generated output externally."""
+        """Test that harness-root symlinks cannot redirect generated output externally."""
 
         materialize_rule(
             agents_dir(workspace) / "rules/sample.md",
@@ -278,20 +278,20 @@ class TestReconciliation:
         sentinel = external / "sentinel"
         sentinel.write_text("preserve\n")
 
-        provider_root = workspace.root / ".claude"
-        provider_root.symlink_to(external, target_is_directory=True)
+        harness_root = workspace.root / ".claude"
+        harness_root.symlink_to(external, target_is_directory=True)
 
-        assert mirror_providers(workspace, dry_run=False) is False
-        assert provider_root.is_dir()
-        assert not provider_root.is_symlink()
-        assert (provider_root / "rules/sample.md").is_file()
+        assert mirror_harnesses(workspace, dry_run=False) is False
+        assert harness_root.is_dir()
+        assert not harness_root.is_symlink()
+        assert (harness_root / "rules/sample.md").is_file()
         assert sentinel.read_text() == "preserve\n"
 
     def test_parent_blocker_recreates_a_rule_mirror(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that deleting a blocked provider root still recreates its rule links."""
+        """Test that deleting a blocked harness root still recreates its rule files."""
 
         materialize_rule(
             agents_dir(workspace) / "rules/sample.md",
@@ -301,15 +301,15 @@ class TestReconciliation:
         external_rules = external / "rules"
         external_rules.mkdir(parents=True)
         (external_rules / "sample.md").symlink_to("../../.agents/rules/sample.md")
-        provider_root = workspace.root / ".claude"
-        provider_root.symlink_to(external, target_is_directory=True)
+        harness_root = workspace.root / ".claude"
+        harness_root.symlink_to(external, target_is_directory=True)
 
-        assert mirror_providers(workspace, dry_run=False) is False
-        assert (provider_root / "rules/sample.md").is_file()
-        assert (provider_root / "rules/sample.md").is_symlink()
+        assert mirror_harnesses(workspace, dry_run=False) is False
+        assert (harness_root / "rules/sample.md").is_file()
+        assert not (harness_root / "rules/sample.md").is_symlink()
 
     def test_settings_without_sources_are_removed(self, workspace: Workspace) -> None:
-        """Test that provider settings cannot outlive their source configuration."""
+        """Test that harness settings cannot outlive their source configuration."""
 
         stale_settings = [
             workspace.root / ".claude/settings.json",
@@ -326,7 +326,7 @@ class TestReconciliation:
 
         assert set(stale_settings) <= set(plan.stale_paths)
 
-    def test_removed_sources_prune_provider_mirrors(
+    def test_removed_sources_prune_harness_mirrors(
         self,
         workspace: Workspace,
     ) -> None:
@@ -337,12 +337,12 @@ class TestReconciliation:
         source = rules_dir / "sample.md"
         source.write_text("---\nalwaysApply: false\n---\n\n# Sample\n")
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert (workspace.root / ".claude/rules/sample.md").is_file()
 
         source.unlink()
 
-        assert mirror_providers(workspace, dry_run=False) is False
+        assert mirror_harnesses(workspace, dry_run=False) is False
         assert not (workspace.root / ".claude/rules/sample.md").exists()
         assert not (workspace.root / ".cursor/rules/sample.mdc").exists()
 

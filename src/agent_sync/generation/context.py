@@ -1,4 +1,5 @@
 from pathlib import Path
+from shlex import shlex
 
 from pydantic import BaseModel
 
@@ -16,8 +17,9 @@ from agent_sync.models.generation import (
     SkillSource,
 )
 from agent_sync.models.settings import SourceConfig, Workspace
+from agent_sync.models.hooks import HooksConfig
 from agent_sync.skills import discover_skill_directories
-from agent_sync.utils import AgentSyncError, validate_slug
+from agent_sync.utils import AgentSyncError, load_json_model, validate_slug
 from agent_sync.workspace import agents_dir, read_optional_text
 
 
@@ -27,6 +29,8 @@ def load_generation_context(
 ) -> GenerationContext:
     """Read and validate every generation source once."""
 
+    hooks, hook_config = load_hooks(workspace)
+
     return GenerationContext(
         workspace=workspace,
         source_config=source_config,
@@ -35,7 +39,8 @@ def load_generation_context(
         rules=tuple(load_rules(workspace)),
         global_instructions=load_root_instructions(workspace, "global.md"),
         project_instructions=load_root_instructions(workspace, "project.md"),
-        hooks=tuple(load_hooks(workspace)),
+        hooks=tuple(hooks),
+        hook_config=hook_config,
     )
 
 
@@ -127,29 +132,106 @@ def load_rules(workspace: Workspace) -> list[RuleSource]:
     ]
 
 
-def load_hooks(workspace: Workspace) -> list[HookSource]:
-    """Load hook files and executable intent."""
+def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | None]:
+    """Load hook files and require canonical registration for every hook."""
 
     hooks_dir = agents_dir(workspace) / "hooks"
 
+    if hooks_dir.is_symlink():
+        raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {hooks_dir}")
+
     if not hooks_dir.exists():
-        return []
+        return [], None
+
+    if not hooks_dir.is_dir():
+        raise AgentSyncError(f"Hook sources must be a directory when present: {hooks_dir}")
 
     sources: list[HookSource] = []
 
-    for path in sorted(path for path in hooks_dir.iterdir() if path.is_file()):
+    for path in sorted(hooks_dir.rglob("*")):
+        if path.is_symlink():
+            raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {path}")
+
+        if path == hooks_dir / "hooks.json":
+            continue
+
+        relative_path = path.relative_to(hooks_dir)
+
+        if "__pycache__" in relative_path.parts or path.suffix in {".pyc", ".pyo"}:
+            continue
+
+        if not path.is_file():
+            continue
+
         content = read_optional_text(path)
 
         if content is not None:
             sources.append(
                 HookSource(
                     path=path,
+                    relative_path=relative_path,
                     content=content,
-                    executable=path.suffix == ".sh" or content.startswith("#!"),
+                    executable=bool(path.stat().st_mode & 0o111)
+                    or path.suffix == ".sh"
+                    or content.startswith("#!"),
                 )
             )
 
-    return sources
+    registration = hooks_dir / "hooks.json"
+    config = load_json_model(registration, HooksConfig)
+
+    if sources and config is None:
+        raise AgentSyncError(f"Hook sources require canonical event registration in {registration}")
+
+    if config is not None:
+        sources_by_hook: dict[str, set[str]] = {}
+
+        for source in sources:
+            canonical_path = source.path.relative_to(workspace.root).as_posix()
+            hook_name = source.relative_path.parts[0]
+
+            sources_by_hook.setdefault(hook_name, set()).update(
+                {
+                    canonical_path,
+                    f"./{canonical_path}",
+                    str(source.path),
+                    f"$(git rev-parse --show-toplevel)/{canonical_path}",
+                }
+            )
+
+        registered: set[str] = set()
+
+        for groups in config.hooks.values():
+            for group in groups:
+                for handler in group.hooks:
+                    lexer = shlex(handler.command, posix=True, punctuation_chars=True)
+                    lexer.whitespace_split = True
+
+                    try:
+                        tokens = set(lexer)
+                    except ValueError as exc:
+                        raise AgentSyncError(f"Invalid hook command in {registration}: {exc}") from exc
+
+                    matched_hooks = {
+                        hook_name for hook_name, references in sources_by_hook.items() if tokens & references
+                    }
+
+                    if not matched_hooks:
+                        raise AgentSyncError(
+                            f"Hook command in {registration} must reference an existing canonical hook file"
+                        )
+
+                    registered.update(matched_hooks)
+
+        missing = sorted(set(sources_by_hook) - registered)
+
+        if missing:
+            raise AgentSyncError(
+                f"Unregistered hooks in {registration}: {', '.join(missing)}. "
+                "Register a command referencing an entrypoint in each canonical hook file or folder."
+            )
+
+    return sources, config
 
 
 def load_markdown_sources[T: BaseModel](

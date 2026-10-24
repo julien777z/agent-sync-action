@@ -32,7 +32,7 @@ jobs:
       - name: Compile Python
         run: poetry run python -m compileall -q src tests
       - name: Prepare current-branch action validation
-        run: poetry run python -m agent_sync mirror-providers --root .
+        run: poetry run python -m agent_sync mirror-harnesses --root .
       - name: Test current-branch action
         uses: ./
         with:

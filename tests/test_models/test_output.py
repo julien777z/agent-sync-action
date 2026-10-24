@@ -1,21 +1,21 @@
 import pytest
 
-from agent_sync.models.output import Provider
+from agent_sync.models.output import Harness
 
 
-class TestProvider:
-    """Test that provider output contracts belong to their enum members."""
+class TestHarness:
+    """Test that harness output contracts belong to their enum members."""
 
     @pytest.mark.parametrize(
-        ("provider", "extension"),
+        ("harness", "extension"),
         [
-            (Provider.CLAUDE, ".md"),
-            (Provider.CURSOR, ".mdc"),
-            (Provider.CODEX, ".rules"),
+            (Harness.CLAUDE_CODE, ".md"),
+            (Harness.CURSOR, ".mdc"),
+            (Harness.CODEX, ".rules"),
         ],
-        ids=[provider.value for provider in Provider],
+        ids=[harness.value for harness in Harness],
     )
-    def test_rule_extension(self, provider: Provider, extension: str) -> None:
-        """Test that each provider exposes its own rule extension."""
+    def test_rule_extension(self, harness: Harness, extension: str) -> None:
+        """Test that each harness exposes its own rule extension."""
 
-        assert provider.rule_extension == extension
+        assert harness.rule_extension == extension
