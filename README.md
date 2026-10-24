@@ -206,17 +206,17 @@ Register shared command hooks for the supported harnesses in `.agents/hooks/hook
 }
 ```
 
-Agent Sync writes these registrations to `.codex/hooks.json` and the `hooks` field in
-`.claude/settings.json`. Other Claude Code settings come from `.agents/settings/claude.json`;
-that settings source must omit `hooks`. Hook registration belongs in the shared event map.
-Other harness settings remain independent of hook registration.
+Agent Sync writes these registrations to `.codex/hooks.json`, `.cursor/hooks.json`, and the
+`hooks` field in `.claude/settings.json`. Other Claude Code settings come from
+`.agents/settings/claude.json`; that settings source must omit `hooks`. Hook registration belongs
+in the shared event map. Other harness settings remain independent of hook registration.
 
 The canonical event names and their harness events are:
 
 | Canonical Type | Purpose | Claude Code | Codex | Cursor |
 |---|---|---|---|---|
-| `SessionStart` | Initialize a session. | `SessionStart` | `SessionStart` | `sessionStart` |
-| `SessionEnd` | Clean up a session. | `SessionEnd` | `SessionEnd` | `sessionEnd` |
+| `SessionStart` | Initialize a session. | `SessionStart` | `SessionStart` | `sessionStart` (self-hosted workers) |
+| `SessionEnd` | Clean up a session. | `SessionEnd` | `SessionEnd` | `sessionEnd` (self-hosted workers) |
 | `PreToolUse` | Inspect a tool call before execution. | `PreToolUse` | `PreToolUse` | `preToolUse` |
 | `PostToolUse` | Observe a completed tool call. | `PostToolUse` | `PostToolUse` | `postToolUse` |
 | `PreCompact` | Observe context compaction. | `PreCompact` | `PreCompact` | `preCompact` |
@@ -224,17 +224,19 @@ The canonical event names and their harness events are:
 | `SubagentStop` | Observe a subagent completing. | `SubagentStop` | `SubagentStop` | `subagentStop` |
 | `Stop` | Check an agent turn as it ends. | `Stop` | `Stop` | `stop` |
 
-Cursor loads the generated Claude Code registration through its
-[third-party hooks support](https://cursor.com/docs/reference/third-party-hooks), which maps these
-events and compatible response fields. Its **Include Third-Party Plugins, Skills, and Other
-Configs** setting must be enabled (the default). Agent Sync uses that registration once rather
-than generating a second `.cursor/hooks.json`, since Cursor runs matching hooks from both sources.
+Cursor receives a native project registration because Cursor Cloud Agents load hooks from
+`.cursor/hooks.json`. Cursor also imports the generated Claude Code registration when **Include
+Third-Party Plugins, Skills, and Other Configs** is enabled, so disable that import to avoid running
+the same command twice. Managed Cursor Cloud Agents have no editor-lifetime session boundary, so
+they do not run `sessionStart` or `sessionEnd`; self-hosted workers do.
 
 Command handlers accept `type: "command"`, `command`, and an optional positive integer `timeout` in
 seconds. A top-level `description` and group-level `matcher` are optional. The command selects the
-entrypoint and may include its interpreter and arguments. The canonical schema accepts only these
-documented shared events and fields; unknown or harness-specific options fail validation before
-outputs change. Harness-only settings retain their native contracts.
+entrypoint and may include its interpreter and arguments. Cursor's native schema preserves commands
+and matchers but has no matching `timeout` or description field, so its generated registration omits
+those values. The canonical schema accepts only these documented shared events and fields; unknown
+or harness-specific options fail validation before outputs change. Harness-only settings retain their
+native contracts.
 
 When hook sources exist, `hooks.json` is required. Each top-level file or folder under `hooks/`
 needs at least one command registration referencing that file or an entrypoint inside that folder.

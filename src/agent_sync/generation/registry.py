@@ -53,7 +53,10 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
     ),
     ArtifactKind.HOOK: ArtifactRegistration(
         owned_directory="hooks",
-        owned_files={Harness.CODEX: ("hooks.json",)},
+        owned_files={
+            Harness.CODEX: ("hooks.json",),
+            Harness.CURSOR: ("hooks.json",),
+        },
         handlers={
             Harness.CLAUDE_CODE: generate_hooks,
             Harness.CURSOR: generate_hooks,

@@ -148,11 +148,30 @@ class TestMirrorIntegration:
         expected = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
         codex = json.loads((generated / ".codex/hooks.json").read_text())
         claude_code = json.loads((generated / ".claude/settings.json").read_text())
+        cursor = json.loads((generated / ".cursor/hooks.json").read_text())
 
         assert codex["hooks"] == claude_code["hooks"] == expected
         assert type(codex["hooks"][event][0]["hooks"][0]["timeout"]) is int
         assert config.description in codex["description"]
-        assert not (generated / ".cursor/hooks/hooks.json").exists()
+        assert cursor == {
+            "version": 1,
+            "hooks": {
+                {
+                    "SessionStart": "sessionStart",
+                    "SessionEnd": "sessionEnd",
+                    "PreToolUse": "preToolUse",
+                    "PostToolUse": "postToolUse",
+                    "PreCompact": "preCompact",
+                    "UserPromptSubmit": "beforeSubmitPrompt",
+                    "SubagentStop": "subagentStop",
+                    "Stop": "stop",
+                }[event]: [
+                    {
+                        "command": config.hooks[event][0].hooks[0].command,
+                    }
+                ],
+            },
+        }
         assert not (generated / ".claude/hooks/hooks.json").exists()
         assert not (generated / ".codex/hooks/hooks.json").exists()
 
@@ -182,7 +201,6 @@ class TestMirrorIntegration:
             execution.stdout.strip()
             == (canonical.parent / "session/resources/context.md").read_text().strip()
         )
-        assert not (generated / ".cursor/hooks.json").exists()
 
         assert canonical.read_bytes() == original
         assert mirror_harnesses(workspace, dry_run=True) is False
@@ -198,6 +216,24 @@ class TestMirrorIntegration:
         assert not (generated / ".claude/settings.json").exists()
         assert all(not (harness.root(generated) / "hooks/session").exists() for harness in Harness)
         assert mirror_harnesses(workspace, dry_run=True) is False
+
+    async def test_cursor_registration_preserves_matchers(self, workspace: Workspace) -> None:
+        """Test that Cursor receives each portable command and matcher."""
+
+        config = HooksConfigFactory.build()
+        config.hooks["SessionStart"][0].matcher = "Read|Write"
+        materialize_hooks(workspace, config)
+
+        mirror_harnesses(workspace, dry_run=False)
+
+        cursor = json.loads((workspace.root / ".cursor/hooks.json").read_text())
+        handler = cursor["hooks"]["sessionStart"][0]
+
+        assert handler == {
+            "command": config.hooks["SessionStart"][0].hooks[0].command,
+            "matcher": "Read|Write",
+        }
+        assert "timeout" not in handler
 
     @pytest.mark.parametrize(
         ("field", "value"),
