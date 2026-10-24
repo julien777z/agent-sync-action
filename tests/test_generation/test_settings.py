@@ -1,16 +1,72 @@
 import json
 import tomllib
 
+import pytest
+
 from agent_sync.generation.setting import generate_claude_settings
 from agent_sync.models.output import GeneratedFile, Provider
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.models.settings import Workspace
+from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, settings_dir
-from tests.factories import RuleFrontMatterFactory, materialize_rule, load_context
+from tests.factories import (
+    HooksConfigFactory,
+    RuleFrontMatterFactory,
+    materialize_hooks,
+    materialize_rule,
+    load_context,
+)
 
 
 class TestSettingsGeneration:
     """Test that synchronized settings fully own generated provider files."""
+
+    @pytest.mark.parametrize("shared", [False, True], ids=["provider-only", "shared"])
+    async def test_hook_settings_preserve_other_keys(self, workspace: Workspace, shared: bool) -> None:
+        """Test that shared registration preserves other settings and provider-only hooks still work."""
+
+        config = HooksConfigFactory.build()
+        hooks = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        values = {"model": "example"}
+
+        if shared:
+            materialize_hooks(workspace, config)
+        else:
+            values["hooks"] = hooks
+
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text(json.dumps(values))
+        mirror_providers(workspace, dry_run=False)
+        target = workspace.root / ".claude/settings.json"
+        rendered = json.loads(target.read_text())
+
+        assert rendered["hooks"] == hooks
+        assert rendered["model"] == values["model"]
+
+        if shared:
+            (agents_dir(workspace) / "hooks/hooks.json").unlink()
+            mirror_providers(workspace, dry_run=False)
+
+            assert "hooks" not in json.loads(target.read_text())
+            assert json.loads(target.read_text())["model"] == values["model"]
+        else:
+            assert not (workspace.root / ".codex/hooks.json").exists()
+
+    async def test_conflicting_hook_sources_fail(self, workspace: Workspace) -> None:
+        """Test that competing canonical registrations fail without writing provider settings."""
+
+        config = HooksConfigFactory.build()
+        materialize_hooks(workspace, config)
+        settings_dir(workspace).mkdir()
+        (settings_dir(workspace) / "claude.json").write_text(
+            json.dumps({"hooks": config.model_dump(by_alias=True, exclude_none=True)["hooks"]})
+        )
+
+        with pytest.raises(AgentSyncError, match="Define hooks.*not both"):
+            mirror_providers(workspace, dry_run=False)
+
+        assert not (workspace.root / ".claude").exists()
+        assert not (workspace.root / ".codex").exists()
 
     def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
         """Test that Claude settings preserve validated provider keys."""

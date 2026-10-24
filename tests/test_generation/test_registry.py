@@ -14,6 +14,6 @@ class TestArtifactRegistry:
             ArtifactKind.SKILL: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
             ArtifactKind.AGENT: {Provider.CLAUDE, Provider.CURSOR},
             ArtifactKind.RULE: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
-            ArtifactKind.HOOK: {Provider.CLAUDE, Provider.CURSOR},
+            ArtifactKind.HOOK: {Provider.CLAUDE, Provider.CURSOR, Provider.CODEX},
             ArtifactKind.SETTING: {Provider.CLAUDE, Provider.CODEX},
         }

@@ -5,6 +5,7 @@ from typing import TypedDict
 from pydantic import BaseModel, ConfigDict
 
 from agent_sync.models.document import AgentFrontMatter, RuleFrontMatter, SkillFrontMatter
+from agent_sync.models.hooks import HooksConfig
 from agent_sync.models.output import GeneratedOutput, Provider
 from agent_sync.models.settings import SourceConfig, Workspace
 
@@ -48,6 +49,7 @@ class HookSource(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     path: Path
+    relative_path: Path
     content: str
     executable: bool
 
@@ -65,6 +67,7 @@ class GenerationContext(BaseModel):
     global_instructions: str = ""
     project_instructions: str = ""
     hooks: tuple[HookSource, ...]
+    hook_config: HooksConfig | None = None
     instructions: str = ""
 
 

@@ -70,7 +70,7 @@ jobs:
 | Path | Purpose |
 |---|---|
 | `agents/` | Agent definitions mirrored to supported providers. |
-| `hooks/` | Hook scripts mirrored with their executable state. |
+| `hooks/` | Hook scripts and supporting text files mirrored recursively, plus optional shared event registration in `hooks.json`. |
 | `models/` | Per-agent provider model overrides. |
 | `global.md` | Optional guidance placed first in `AGENTS.md`. |
 | `project.md` | Optional project guidance placed after always-on rules in `AGENTS.md`. |
@@ -180,6 +180,51 @@ description: Deploy the application after explicit user approval.
 disable-model-invocation: true
 ---
 ```
+
+### Lifecycle Hooks
+
+Put scripts and their supporting text files in `.agents/hooks/`. Agent Sync mirrors this tree to
+`.claude/hooks/`, `.cursor/hooks/`, and `.codex/hooks/`, preserving relative paths and executable
+intent. Executable source files, shell scripts, and files with a shebang become executable outputs.
+Hook sources must be regular files or directories; symlinks are rejected.
+
+Register shared Claude and Codex command hooks in `.agents/hooks/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Agent Sync writes these registrations to `.codex/hooks.json` and the `hooks` field in
+`.claude/settings.json`. Other Claude settings come from `.agents/settings/claude.json`; when
+shared registration exists, that settings source must omit `hooks`. Without shared registration,
+provider settings retain their existing behavior. Cursor receives the scripts only.
+
+The shared events are `SessionStart`, `SessionEnd`, `PreToolUse`, `PermissionRequest`, `PostToolUse`,
+`PreCompact`, `PostCompact`, `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, and `Stop`. Command handlers accept
+`command`, a positive `timeout` in seconds, `statusMessage`, and `async`. A top-level `description`
+and group-level `matcher` are optional. Unknown fields, events, and handler types fail validation
+before outputs change. Commands and matchers are preserved; scripts must handle each runtime's
+[hook input and output contract](https://learn.chatgpt.com/docs/hooks).
+
+Pointing commands to canonical scripts through the Git root keeps them usable from subdirectories
+and with custom source or output directories. Adjust the canonical path when using `agents-dir`.
+Relocated outputs must be installed where the provider discovers them. Codex project hooks require
+a trusted project and review of the hook definition; Agent Sync leaves native trust review to Codex.
 
 ## External Skills
 

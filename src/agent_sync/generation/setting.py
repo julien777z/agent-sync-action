@@ -4,8 +4,8 @@ from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
 from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Provider
 from agent_sync.models.settings import CodexSettings, PlatformSettings
-from agent_sync.utils import ensure_trailing_newline
-from agent_sync.workspace import output_root, settings_dir
+from agent_sync.utils import AgentSyncError, ensure_trailing_newline
+from agent_sync.workspace import agents_dir, output_root, settings_dir
 
 
 def generate_claude_settings(
@@ -17,7 +17,21 @@ def generate_claude_settings(
     settings = context.source_config.settings.get(provider)
 
     if not isinstance(settings, PlatformSettings):
-        return []
+        if context.hook_config is None:
+            return []
+
+        settings = PlatformSettings()
+
+    values = settings.model_dump(exclude_none=True, exclude={"$comment"})
+
+    if context.hook_config is not None:
+        if "hooks" in (settings.model_extra or {}):
+            raise AgentSyncError(
+                f"Define hooks in {agents_dir(context.workspace) / 'hooks/hooks.json'} or "
+                f"{settings_dir(context.workspace) / 'claude.json'}, not both"
+            )
+
+        values["hooks"] = context.hook_config.model_dump(by_alias=True, exclude_none=True)["hooks"]
 
     return [
         GeneratedFile(
@@ -26,13 +40,17 @@ def generate_claude_settings(
                 json.dumps(
                     {
                         "$comment": GENERATED_FILE_NOTICE,
-                        **settings.model_dump(exclude_none=True, exclude={"$comment"}),
+                        **values,
                     },
                     indent=2,
                 )
             ),
             artifact=ArtifactKind.SETTING,
-            source_path=settings_dir(context.workspace) / f"{provider.value}.json",
+            source_path=(
+                agents_dir(context.workspace) / "hooks/hooks.json"
+                if context.hook_config is not None
+                else settings_dir(context.workspace) / f"{provider.value}.json"
+            ),
             provider=provider,
         )
     ]

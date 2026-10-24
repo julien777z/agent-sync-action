@@ -16,8 +16,9 @@ from agent_sync.models.generation import (
     SkillSource,
 )
 from agent_sync.models.settings import SourceConfig, Workspace
+from agent_sync.models.hooks import HooksConfig
 from agent_sync.skills import discover_skill_directories
-from agent_sync.utils import AgentSyncError, validate_slug
+from agent_sync.utils import AgentSyncError, load_json_model, validate_slug
 from agent_sync.workspace import agents_dir, read_optional_text
 
 
@@ -36,6 +37,7 @@ def load_generation_context(
         global_instructions=load_root_instructions(workspace, "global.md"),
         project_instructions=load_root_instructions(workspace, "project.md"),
         hooks=tuple(load_hooks(workspace)),
+        hook_config=load_json_model(agents_dir(workspace) / "hooks/hooks.json", HooksConfig),
     )
 
 
@@ -137,15 +139,27 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
 
     sources: list[HookSource] = []
 
-    for path in sorted(path for path in hooks_dir.iterdir() if path.is_file()):
+    for path in sorted(hooks_dir.rglob("*")):
+        if path == hooks_dir / "hooks.json":
+            continue
+
+        if path.is_symlink():
+            raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {path}")
+
+        if not path.is_file():
+            continue
+
         content = read_optional_text(path)
 
         if content is not None:
             sources.append(
                 HookSource(
                     path=path,
+                    relative_path=path.relative_to(hooks_dir),
                     content=content,
-                    executable=path.suffix == ".sh" or content.startswith("#!"),
+                    executable=bool(path.stat().st_mode & 0o111)
+                    or path.suffix == ".sh"
+                    or content.startswith("#!"),
                 )
             )
 

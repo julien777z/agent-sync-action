@@ -1,13 +1,21 @@
 from typing import Final
 
-from agent_sync.generation.artifact import generate_agents, generate_hooks, generate_skills
+from agent_sync.generation.artifact import (
+    generate_agents,
+    generate_codex_hooks,
+    generate_hooks,
+    generate_skills,
+)
 from agent_sync.generation.context import load_generation_context
 from agent_sync.generation.rule import (
     generate_codex_rules,
     generate_rule_mirrors,
     generate_shared_rule_outputs,
 )
-from agent_sync.generation.setting import generate_claude_settings, generate_codex_settings
+from agent_sync.generation.setting import (
+    generate_claude_settings,
+    generate_codex_settings,
+)
 from agent_sync.models.generation import ArtifactRegistration
 from agent_sync.models.output import (
     ArtifactKind,
@@ -46,10 +54,11 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
     ),
     ArtifactKind.HOOK: ArtifactRegistration(
         owned_directory="hooks",
-        owned_files={},
+        owned_files={Provider.CODEX: ("hooks.json",)},
         handlers={
             Provider.CLAUDE: generate_hooks,
             Provider.CURSOR: generate_hooks,
+            Provider.CODEX: generate_codex_hooks,
         },
     ),
     ArtifactKind.SETTING: ArtifactRegistration(

@@ -181,18 +181,41 @@ class TestDocumentGeneration:
             "Read `.agents/rules/python.md` for files matching `**/*.py`, `**/*.pyi`" in instructions.content
         )
 
-    def test_hooks_preserve_executable_intent(self, workspace: Workspace) -> None:
+    @pytest.mark.parametrize("provider", list(Provider))
+    @pytest.mark.parametrize(
+        ("filename", "content", "mode", "executable"),
+        [
+            ("check", "#!/usr/bin/env python3\nprint('ok')\n", 0o644, True),
+            ("scripts/check.sh", "echo ready\n", 0o644, True),
+            ("scripts/check", "echo ready\n", 0o755, True),
+            ("resources/context.md", "Context.\n", 0o644, False),
+        ],
+        ids=["shebang", "shell-extension", "source-mode", "supporting-text"],
+    )
+    def test_hooks_preserve_executable_intent(
+        self,
+        workspace: Workspace,
+        provider: Provider,
+        filename: str,
+        content: str,
+        mode: int,
+        executable: bool,
+    ) -> None:
         """Test that shell and shebang hooks are marked executable."""
 
         hooks_dir = agents_dir(workspace) / "hooks"
-        hooks_dir.mkdir()
-        (hooks_dir / "check").write_text("#!/usr/bin/env python3\nprint('ok')\n")
+        source = hooks_dir / filename
+        source.parent.mkdir(parents=True)
+        source.write_text(content)
+        source.chmod(mode)
 
         context = load_context(workspace)
-        outputs = [
-            *generate_hooks(context, Provider.CLAUDE),
-            *generate_hooks(context, Provider.CURSOR),
-        ]
+        outputs = generate_hooks(context, provider)
 
-        assert outputs
-        assert all(isinstance(output, GeneratedFile) and output.executable for output in outputs)
+        assert len(outputs) == 1
+        output = outputs[0]
+
+        assert isinstance(output, GeneratedFile)
+        assert output.target_path == provider.root(workspace.root) / "hooks" / filename
+        assert output.content == content
+        assert output.executable is executable

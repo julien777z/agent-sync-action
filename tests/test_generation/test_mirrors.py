@@ -1,11 +1,18 @@
 import os
+import json
+
+import pytest
 
 from agent_sync.reconciliation import mirror_providers
 from agent_sync.models.settings import Workspace
+from agent_sync.models.output import Provider
+from agent_sync.utils import AgentSyncError
 from agent_sync.workspace import agents_dir, output_root, settings_dir
 from tests.factories import (
     RuleFrontMatterFactory,
     SkillFrontMatterFactory,
+    HooksConfigFactory,
+    materialize_hooks,
     materialize_rule,
     materialize_skill,
 )
@@ -13,6 +20,104 @@ from tests.factories import (
 
 class TestMirrorIntegration:
     """Test that complete mirroring converges on provider outputs."""
+
+    @pytest.mark.parametrize("output_dirname", ["", ".generated"], ids=["root", "relocated"])
+    async def test_shared_hook_lifecycle(self, workspace: Workspace, output_dirname: str) -> None:
+        """Test that hook registration and nested resources converge and are removed with their sources."""
+
+        workspace = Workspace(root=workspace.root, output_dirname=output_dirname)
+        config = HooksConfigFactory.build()
+        materialize_hooks(workspace, config)
+        canonical = agents_dir(workspace) / "hooks/hooks.json"
+        original = canonical.read_bytes()
+        generated = output_root(workspace)
+
+        assert mirror_providers(workspace, dry_run=True) is True
+        assert not (generated / ".codex").exists()
+        assert mirror_providers(workspace, dry_run=False) is False
+
+        expected = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        codex = json.loads((generated / ".codex/hooks.json").read_text())
+        claude = json.loads((generated / ".claude/settings.json").read_text())
+
+        assert codex["hooks"] == claude["hooks"] == expected
+        assert config.description in codex["description"]
+        assert not (generated / ".cursor/hooks/hooks.json").exists()
+        assert not (generated / ".claude/hooks/hooks.json").exists()
+        assert not (generated / ".codex/hooks/hooks.json").exists()
+
+        for provider in Provider:
+            target = provider.root(generated) / "hooks/session/start.py"
+            support = provider.root(generated) / "hooks/session/resources/context.md"
+
+            assert target.read_bytes() == (canonical.parent / "session/start.py").read_bytes()
+            assert target.stat().st_mode & 0o111
+            assert support.read_bytes() == (canonical.parent / "session/resources/context.md").read_bytes()
+            assert not support.stat().st_mode & 0o111
+
+        assert canonical.read_bytes() == original
+        assert mirror_providers(workspace, dry_run=True) is False
+
+        canonical.unlink()
+        (canonical.parent / "session/start.py").unlink()
+        (canonical.parent / "session/resources/context.md").unlink()
+
+        assert mirror_providers(workspace, dry_run=True) is True
+        assert mirror_providers(workspace, dry_run=False) is False
+        assert not (generated / ".codex/hooks.json").exists()
+        assert not (generated / ".claude/settings.json").exists()
+        assert all(not (provider.root(generated) / "hooks/session").exists() for provider in Provider)
+        assert mirror_providers(workspace, dry_run=True) is False
+
+    @pytest.mark.parametrize(
+        "document",
+        [
+            "{invalid",
+            '{"hooks":{"UnknownEvent":[]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"prompt","prompt":"Check"}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command"}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","timeout":0}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"check","extra":true}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[]}]}}',
+        ],
+        ids=[
+            "malformed",
+            "unknown-event",
+            "unsupported-handler",
+            "missing-command",
+            "timeout",
+            "extra",
+            "empty",
+        ],
+    )
+    async def test_invalid_hooks_preserve_outputs(self, workspace: Workspace, document: str) -> None:
+        """Test that invalid shared definitions fail before changing existing generated outputs."""
+
+        materialize_hooks(workspace, HooksConfigFactory.build())
+        mirror_providers(workspace, dry_run=False)
+        target = workspace.root / ".codex/hooks.json"
+        original = target.read_bytes()
+        canonical = agents_dir(workspace) / "hooks/hooks.json"
+        canonical.write_text(document)
+
+        with pytest.raises(AgentSyncError, match="Invalid JSON|Invalid source"):
+            mirror_providers(workspace, dry_run=False)
+
+        assert target.read_bytes() == original
+
+    @pytest.mark.parametrize("directory", [False, True], ids=["file", "directory"])
+    async def test_hook_symlinks_fail(self, workspace: Workspace, directory: bool) -> None:
+        """Test that hook source links cannot read or traverse other trees."""
+
+        materialize_hooks(workspace, HooksConfigFactory.build())
+        hooks = agents_dir(workspace) / "hooks"
+        target = hooks / ("session" if directory else "session/start.py")
+        (hooks / "linked").symlink_to(target, target_is_directory=directory)
+
+        with pytest.raises(AgentSyncError, match="not symlinks"):
+            mirror_providers(workspace, dry_run=False)
+
+        assert not (workspace.root / ".codex").exists()
 
     def test_fresh_mirror_is_idempotent(
         self,

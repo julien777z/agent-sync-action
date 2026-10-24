@@ -11,6 +11,7 @@ from agent_sync.document import render_front_matter
 from agent_sync.external_resources import directories, skills
 from agent_sync.generation.context import load_generation_context
 from agent_sync.models.generation import GenerationContext
+from agent_sync.models.hooks import CommandHook, HookMatcher, HooksConfig
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
@@ -140,6 +141,45 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
     paths = None
     always_apply = True
     starlark = None
+
+
+class CommandHookFactory(ModelFactory[CommandHook]):
+    """Build shared command hooks with portable canonical paths."""
+
+    __model__ = CommandHook
+
+    type = "command"
+    command = 'python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"'
+    timeout = 10
+    status_message = "Loading workspace"
+    run_async = False
+
+
+class HooksConfigFactory(ModelFactory[HooksConfig]):
+    """Build shared lifecycle registration with deterministic matcher groups."""
+
+    __model__ = HooksConfig
+
+    description = "Workspace initialization"
+
+    @classmethod
+    def hooks(cls) -> dict[str, list[HookMatcher]]:
+        """Register one command for session startup and resume."""
+
+        return {"SessionStart": [HookMatcher(matcher="startup|resume", hooks=[CommandHookFactory.build()])]}
+
+
+def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:
+    """Write shared lifecycle registration and its nested script resources."""
+
+    materialize_tree(
+        agents_dir(workspace) / "hooks",
+        {
+            "hooks.json": config.model_dump_json(by_alias=True, exclude_none=True),
+            "session/start.py": "#!/usr/bin/env python3\nprint('ready')\n",
+            "session/resources/context.md": "Workspace context.\n",
+        },
+    )
 
 
 class ExternalSkillFactory(ModelFactory[ExternalSkill]):
