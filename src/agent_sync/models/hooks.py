@@ -6,27 +6,22 @@ type HookEvent = Literal[
     "SessionStart",
     "SessionEnd",
     "PreToolUse",
-    "PermissionRequest",
     "PostToolUse",
     "PreCompact",
-    "PostCompact",
     "UserPromptSubmit",
-    "SubagentStart",
     "SubagentStop",
     "Stop",
 ]
 
 
 class CommandHook(BaseModel):
-    """Validate a command handler supported by Claude and Codex."""
+    """Validate a portable command handler for the supported harnesses."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     type: Literal["command"]
     command: str = Field(min_length=1)
     timeout: int | None = Field(default=None, gt=0, le=2**64 - 1)
-    status_message: str | None = Field(default=None, alias="statusMessage")
-    run_async: bool | None = Field(default=None, alias="async")
 
 
 class HookMatcher(BaseModel):
@@ -39,7 +34,7 @@ class HookMatcher(BaseModel):
 
 
 class HooksConfig(BaseModel):
-    """Validate the shared lifecycle configuration for Claude and Codex."""
+    """Validate shared lifecycle registration for Claude, Cursor and Codex."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 

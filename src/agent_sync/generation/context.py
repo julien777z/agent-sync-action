@@ -149,6 +149,11 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
         if path == hooks_dir / "hooks.json":
             continue
 
+        relative_path = path.relative_to(hooks_dir)
+
+        if "__pycache__" in relative_path.parts or path.suffix in {".pyc", ".pyo"}:
+            continue
+
         if not path.is_file():
             continue
 
@@ -158,7 +163,7 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
             sources.append(
                 HookSource(
                     path=path,
-                    relative_path=path.relative_to(hooks_dir),
+                    relative_path=relative_path,
                     content=content,
                     executable=bool(path.stat().st_mode & 0o111)
                     or path.suffix == ".sh"

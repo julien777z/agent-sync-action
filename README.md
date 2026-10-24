@@ -188,14 +188,13 @@ Put scripts and their supporting text files in `.agents/hooks/`. Agent Sync mirr
 intent. Executable source files, shell scripts, and files with a shebang become executable outputs.
 Hook sources must be regular files or directories; symlinks are rejected.
 
-Register shared Claude and Codex command hooks in `.agents/hooks/hooks.json`:
+Register shared command hooks for the supported harnesses in `.agents/hooks/hooks.json`:
 
 ```json
 {
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
         "hooks": [
           {
             "type": "command",
@@ -212,14 +211,54 @@ Register shared Claude and Codex command hooks in `.agents/hooks/hooks.json`:
 Agent Sync writes these registrations to `.codex/hooks.json` and the `hooks` field in
 `.claude/settings.json`. Other Claude settings come from `.agents/settings/claude.json`; when
 shared registration exists, that settings source must omit `hooks`. Without shared registration,
-provider settings retain their existing behavior. Cursor receives the scripts only.
+provider settings retain their existing behavior.
 
-The shared events are `SessionStart`, `SessionEnd`, `PreToolUse`, `PermissionRequest`, `PostToolUse`,
-`PreCompact`, `PostCompact`, `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, and `Stop`. Command handlers accept
-`command`, a positive integer `timeout` in seconds, `statusMessage`, and `async`. A top-level `description`
-and group-level `matcher` are optional. Unknown fields, events, and handler types fail validation
-before outputs change. Commands and matchers are preserved; scripts must handle each runtime's
-[hook input and output contract](https://learn.chatgpt.com/docs/hooks).
+The canonical event names and their harness events are:
+
+| Canonical Type | Purpose | Claude | Codex | Cursor |
+|---|---|---|---|---|
+| `SessionStart` | Initialize a session. | `SessionStart` | `SessionStart` | `sessionStart` |
+| `SessionEnd` | Clean up a session. | `SessionEnd` | `SessionEnd` | `sessionEnd` |
+| `PreToolUse` | Inspect a tool call before execution. | `PreToolUse` | `PreToolUse` | `preToolUse` |
+| `PostToolUse` | Observe a completed tool call. | `PostToolUse` | `PostToolUse` | `postToolUse` |
+| `PreCompact` | Observe context compaction. | `PreCompact` | `PreCompact` | `preCompact` |
+| `UserPromptSubmit` | Inspect a submitted prompt. | `UserPromptSubmit` | `UserPromptSubmit` | `beforeSubmitPrompt` |
+| `SubagentStop` | Observe a subagent completing. | `SubagentStop` | `SubagentStop` | `subagentStop` |
+| `Stop` | Check an agent turn as it ends. | `Stop` | `Stop` | `stop` |
+
+Cursor loads the generated Claude registration through its
+[third-party hooks support](https://cursor.com/docs/reference/third-party-hooks), which maps these
+events and compatible response fields. Its **Include Third-Party Plugins, Skills, and Other
+Configs** setting must be enabled (the default). Agent Sync uses that registration once rather
+than generating a second `.cursor/hooks.json`, since Cursor runs matching hooks from both sources.
+
+Command handlers accept `type: "command"`, `command`, and an optional positive integer `timeout` in
+seconds. A top-level `description` and group-level `matcher` are optional. The command selects the
+entrypoint and may include its interpreter and arguments. The canonical schema accepts only these
+documented shared events and fields; unknown or harness-specific options fail validation before
+outputs change. Provider-only settings retain their native contracts.
+
+A hook folder can contain its entrypoint, imported modules and resources:
+
+```text
+.agents/hooks/session/
+├── start.py
+├── helpers.py
+└── resources/
+    └── context.md
+```
+
+The example command runs `session/start.py`, which can import `helpers.py` and locate resources
+relative to `__file__`. Choose any entrypoint filename in `command`; Agent Sync copies the whole
+folder without guessing which file to execute.
+Python bytecode caches are excluded from the source tree being mirrored.
+
+Registration is shared; input JSON, tool names, matcher semantics, outputs and lifecycle timing
+are owned by each harness. Write the entrypoint for the events it handles using the
+[Claude](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks), and
+[Cursor](https://cursor.com/docs/hooks) contracts. For example, Cursor session hooks apply to local
+IDE sessions, while its cloud agents do not expose that same session lifecycle. Agent Sync does
+not add a runtime wrapper or normalize hook payloads.
 
 Pointing commands to canonical scripts through the Git root keeps them usable from subdirectories
 and with custom source or output directories. Adjust the canonical path when using `agents-dir`.

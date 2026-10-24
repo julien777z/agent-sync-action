@@ -213,6 +213,7 @@ class TestDocumentGeneration:
         outputs = generate_hooks(context, provider)
 
         assert len(outputs) == 1
+
         output = outputs[0]
 
         assert isinstance(output, GeneratedFile)

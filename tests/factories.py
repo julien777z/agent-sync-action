@@ -143,18 +143,6 @@ class RuleFrontMatterFactory(ModelFactory[RuleFrontMatter]):
     starlark = None
 
 
-class CommandHookFactory(ModelFactory[CommandHook]):
-    """Build shared command hooks with portable canonical paths."""
-
-    __model__ = CommandHook
-
-    type = "command"
-    command = 'python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"'
-    timeout = 10
-    status_message = "Loading workspace"
-    run_async = False
-
-
 class HooksConfigFactory(ModelFactory[HooksConfig]):
     """Build shared lifecycle registration with deterministic matcher groups."""
 
@@ -166,7 +154,19 @@ class HooksConfigFactory(ModelFactory[HooksConfig]):
     def hooks(cls) -> dict[str, list[HookMatcher]]:
         """Register one command for session startup and resume."""
 
-        return {"SessionStart": [HookMatcher(matcher="startup|resume", hooks=[CommandHookFactory.build()])]}
+        return {
+            "SessionStart": [
+                HookMatcher(
+                    hooks=[
+                        CommandHook(
+                            type="command",
+                            command='python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"',
+                            timeout=10,
+                        )
+                    ]
+                )
+            ]
+        }
 
 
 def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:
@@ -176,7 +176,11 @@ def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:
         agents_dir(workspace) / "hooks",
         {
             "hooks.json": config.model_dump_json(by_alias=True, exclude_none=True),
-            "session/start.py": "#!/usr/bin/env python3\nprint('ready')\n",
+            "session/start.py": "#!/usr/bin/env python3\nfrom helpers import context\nprint(context())\n",
+            "session/helpers.py": (
+                "from pathlib import Path\n\ndef context():\n"
+                "    return (Path(__file__).parent / 'resources/context.md').read_text().strip()\n"
+            ),
             "session/resources/context.md": "Workspace context.\n",
         },
     )
