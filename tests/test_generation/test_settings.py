@@ -4,7 +4,7 @@ import tomllib
 
 import pytest
 
-from agent_sync.generation.setting import generate_claude_settings
+from agent_sync.generation.setting import generate_claude_code_settings
 from agent_sync.models.output import GeneratedFile, Harness
 from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.models.settings import Workspace
@@ -71,7 +71,7 @@ class TestSettingsGeneration:
         assert not (workspace.root / ".claude").exists()
         assert not (workspace.root / ".codex").exists()
 
-    def test_claude_settings_render_complete_json(self, workspace: Workspace) -> None:
+    def test_claude_code_settings_render_complete_json(self, workspace: Workspace) -> None:
         """Test that Claude Code settings preserve validated harness keys."""
 
         settings_dir(workspace).mkdir()
@@ -81,7 +81,7 @@ class TestSettingsGeneration:
             '"features":{"default_mode_request_user_input":true,"experimental-feature":false}}'
         )
 
-        outputs = generate_claude_settings(load_context(workspace), Harness.CLAUDE)
+        outputs = generate_claude_code_settings(load_context(workspace), Harness.CLAUDE_CODE)
 
         assert len(outputs) == 1
         assert isinstance(outputs[0], GeneratedFile)

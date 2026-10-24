@@ -11,7 +11,7 @@ class Harness(StrEnum):
 
     rule_extension: str
 
-    CLAUDE = ("claude", ".md")
+    CLAUDE_CODE = ("claude", ".md")
     CURSOR = ("cursor", ".mdc")
     CODEX = ("codex", ".rules")
 

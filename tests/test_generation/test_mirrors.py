@@ -146,9 +146,9 @@ class TestMirrorIntegration:
 
         expected = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
         codex = json.loads((generated / ".codex/hooks.json").read_text())
-        claude = json.loads((generated / ".claude/settings.json").read_text())
+        claude_code = json.loads((generated / ".claude/settings.json").read_text())
 
-        assert codex["hooks"] == claude["hooks"] == expected
+        assert codex["hooks"] == claude_code["hooks"] == expected
         assert type(codex["hooks"][event][0]["hooks"][0]["timeout"]) is int
         assert config.description in codex["description"]
         assert not (generated / ".cursor/hooks/hooks.json").exists()
@@ -327,12 +327,12 @@ class TestMirrorIntegration:
 
         assert mirror_harnesses(workspace, dry_run=False) is False
         assert source.read_text() == original
-        claude = workspace.root / ".claude/rules/python.md"
+        claude_code = workspace.root / ".claude/rules/python.md"
         cursor = workspace.root / ".cursor/rules/python.mdc"
-        assert claude.is_file() and not claude.is_symlink()
-        assert "paths:\n- '**/*.py'" in claude.read_text()
-        assert "globs:" not in claude.read_text()
-        assert "Use typed values." in claude.read_text()
+        assert claude_code.is_file() and not claude_code.is_symlink()
+        assert "paths:\n- '**/*.py'" in claude_code.read_text()
+        assert "globs:" not in claude_code.read_text()
+        assert "Use typed values." in claude_code.read_text()
         assert cursor.is_symlink()
         assert cursor.resolve() == source
         assert mirror_harnesses(workspace, dry_run=True) is False
@@ -344,13 +344,13 @@ class TestMirrorIntegration:
         source.parent.mkdir()
         source.write_text('---\nglobs: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
         assert mirror_harnesses(workspace, dry_run=False) is False
-        claude = workspace.root / ".claude/rules/python.md"
-        assert claude.is_file() and not claude.is_symlink()
+        claude_code = workspace.root / ".claude/rules/python.md"
+        assert claude_code.is_file() and not claude_code.is_symlink()
 
         source.write_text('---\nglobs: "**/*.py"\npaths: "**/*.py"\nalwaysApply: false\n---\n\n# Rule\n')
         original = source.read_bytes()
         assert mirror_harnesses(workspace, dry_run=False) is False
-        assert claude.is_symlink() and claude.resolve() == source
+        assert claude_code.is_symlink() and claude_code.resolve() == source
         assert (workspace.root / ".cursor/rules/python.mdc").is_symlink()
         assert source.read_bytes() == original
         assert mirror_harnesses(workspace, dry_run=True) is False

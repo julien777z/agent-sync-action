@@ -76,8 +76,8 @@ def generate_rule_mirrors(
 ) -> list[GeneratedOutput]:
     """Link scoped rules when their harness metadata is already canonical."""
 
-    scope_key = "paths" if harness is Harness.CLAUDE else "globs"
-    other_scope_key = "globs" if harness is Harness.CLAUDE else "paths"
+    scope_key = "paths" if harness is Harness.CLAUDE_CODE else "globs"
+    other_scope_key = "globs" if harness is Harness.CLAUDE_CODE else "paths"
     outputs: list[GeneratedOutput] = []
     for source in context.rules:
         if not source.body or source.front_matter.always_apply:

@@ -8,7 +8,7 @@ from agent_sync.utils import AgentSyncError, ensure_trailing_newline
 from agent_sync.workspace import agents_dir, output_root, settings_dir
 
 
-def generate_claude_settings(
+def generate_claude_code_settings(
     context: GenerationContext,
     harness: Harness,
 ) -> list[GeneratedOutput]:

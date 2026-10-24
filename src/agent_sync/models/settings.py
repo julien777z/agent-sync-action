@@ -60,15 +60,15 @@ class AgentModelOverride(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    claude: str | None = None
+    claude_code: str | None = None
     cursor: str | None = None
 
     def for_harness(self, harness: Harness) -> str | None:
         """Return the configured model override for a supported harness."""
 
         match harness:
-            case Harness.CLAUDE:
-                return self.claude
+            case Harness.CLAUDE_CODE:
+                return self.claude_code
             case Harness.CURSOR:
                 return self.cursor
             case Harness.CODEX:

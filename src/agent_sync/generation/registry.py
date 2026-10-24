@@ -12,7 +12,7 @@ from agent_sync.generation.rule import (
     generate_shared_rule_outputs,
 )
 from agent_sync.generation.setting import (
-    generate_claude_settings,
+    generate_claude_code_settings,
     generate_codex_settings,
 )
 from agent_sync.models.generation import ArtifactRegistration
@@ -29,7 +29,7 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="skills",
         owned_files={},
         handlers={
-            Harness.CLAUDE: generate_skills,
+            Harness.CLAUDE_CODE: generate_skills,
             Harness.CURSOR: generate_skills,
             Harness.CODEX: generate_skills,
         },
@@ -38,7 +38,7 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="agents",
         owned_files={},
         handlers={
-            Harness.CLAUDE: generate_agents,
+            Harness.CLAUDE_CODE: generate_agents,
             Harness.CURSOR: generate_agents,
         },
     ),
@@ -46,7 +46,7 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="rules",
         owned_files={},
         handlers={
-            Harness.CLAUDE: generate_rule_mirrors,
+            Harness.CLAUDE_CODE: generate_rule_mirrors,
             Harness.CURSOR: generate_rule_mirrors,
             Harness.CODEX: generate_codex_rules,
         },
@@ -55,7 +55,7 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
         owned_directory="hooks",
         owned_files={Harness.CODEX: ("hooks.json",)},
         handlers={
-            Harness.CLAUDE: generate_hooks,
+            Harness.CLAUDE_CODE: generate_hooks,
             Harness.CURSOR: generate_hooks,
             Harness.CODEX: generate_hooks,
         },
@@ -63,11 +63,11 @@ ARTIFACT_REGISTRY: Final[dict[ArtifactKind, ArtifactRegistration]] = {
     ArtifactKind.SETTING: ArtifactRegistration(
         owned_directory=None,
         owned_files={
-            Harness.CLAUDE: ("settings.json",),
+            Harness.CLAUDE_CODE: ("settings.json",),
             Harness.CODEX: ("config.toml",),
         },
         handlers={
-            Harness.CLAUDE: generate_claude_settings,
+            Harness.CLAUDE_CODE: generate_claude_code_settings,
             Harness.CODEX: generate_codex_settings,
         },
     ),

@@ -28,16 +28,18 @@ class TestDocumentGeneration:
         settings_dir(workspace).mkdir()
         (settings_dir(workspace) / "claude.json").write_text('{"model":"default"}')
         models_dir(workspace).mkdir()
-        (models_dir(workspace) / "review.json").write_text('{"claude":"override","cursor":"cursor-model"}')
+        (models_dir(workspace) / "review.json").write_text(
+            '{"claude_code":"override","cursor":"cursor-model"}'
+        )
 
         context = load_context(workspace)
         outputs = [
-            *generate_agents(context, Harness.CLAUDE),
+            *generate_agents(context, Harness.CLAUDE_CODE),
             *generate_agents(context, Harness.CURSOR),
         ]
         files = {output.harness: output.content for output in outputs if isinstance(output, GeneratedFile)}
 
-        assert "model: override" in files[Harness.CLAUDE]
+        assert "model: override" in files[Harness.CLAUDE_CODE]
         assert "model: cursor-model" in files[Harness.CURSOR]
 
         assert all(
@@ -59,7 +61,7 @@ class TestDocumentGeneration:
         context = load_context(workspace)
         outputs = [
             *generate_shared_rule_outputs(context),
-            *generate_rule_mirrors(context, Harness.CLAUDE),
+            *generate_rule_mirrors(context, Harness.CLAUDE_CODE),
             *generate_rule_mirrors(context, Harness.CURSOR),
         ]
         mirrors = [
@@ -101,14 +103,14 @@ class TestDocumentGeneration:
         shared_outputs = generate_shared_rule_outputs(context)
 
         assert not shared_outputs
-        assert not generate_rule_mirrors(context, Harness.CLAUDE)
+        assert not generate_rule_mirrors(context, Harness.CLAUDE_CODE)
         assert not generate_rule_mirrors(context, Harness.CURSOR)
 
     @pytest.mark.parametrize(
         ("authored_key", "linked_harness", "generated_harness", "missing_key"),
         [
-            ("globs", Harness.CURSOR, Harness.CLAUDE, "paths"),
-            ("paths", Harness.CLAUDE, Harness.CURSOR, "globs"),
+            ("globs", Harness.CURSOR, Harness.CLAUDE_CODE, "paths"),
+            ("paths", Harness.CLAUDE_CODE, Harness.CURSOR, "globs"),
         ],
     )
     def test_rules_generate_only_the_missing_harness_scope(
@@ -144,7 +146,7 @@ class TestDocumentGeneration:
         source.write_text('---\nglobs: "**/*.py"\npaths: ["**/*.py"]\nalwaysApply: false\n---\n\n# Rule\n')
 
         context = load_context(workspace)
-        for harness in (Harness.CLAUDE, Harness.CURSOR):
+        for harness in (Harness.CLAUDE_CODE, Harness.CURSOR):
             mirrors = generate_rule_mirrors(context, harness)
             assert len(mirrors) == 1
             assert isinstance(mirrors[0], GeneratedLink)

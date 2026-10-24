@@ -9,7 +9,7 @@ class TestHarness:
     @pytest.mark.parametrize(
         ("harness", "extension"),
         [
-            (Harness.CLAUDE, ".md"),
+            (Harness.CLAUDE_CODE, ".md"),
             (Harness.CURSOR, ".mdc"),
             (Harness.CODEX, ".rules"),
         ],

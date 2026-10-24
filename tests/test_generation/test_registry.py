@@ -11,9 +11,9 @@ class TestArtifactRegistry:
         assert {
             artifact: set(registration["handlers"]) for artifact, registration in ARTIFACT_REGISTRY.items()
         } == {
-            ArtifactKind.SKILL: {Harness.CLAUDE, Harness.CURSOR, Harness.CODEX},
-            ArtifactKind.AGENT: {Harness.CLAUDE, Harness.CURSOR},
-            ArtifactKind.RULE: {Harness.CLAUDE, Harness.CURSOR, Harness.CODEX},
-            ArtifactKind.HOOK: {Harness.CLAUDE, Harness.CURSOR, Harness.CODEX},
-            ArtifactKind.SETTING: {Harness.CLAUDE, Harness.CODEX},
+            ArtifactKind.SKILL: {Harness.CLAUDE_CODE, Harness.CURSOR, Harness.CODEX},
+            ArtifactKind.AGENT: {Harness.CLAUDE_CODE, Harness.CURSOR},
+            ArtifactKind.RULE: {Harness.CLAUDE_CODE, Harness.CURSOR, Harness.CODEX},
+            ArtifactKind.HOOK: {Harness.CLAUDE_CODE, Harness.CURSOR, Harness.CODEX},
+            ArtifactKind.SETTING: {Harness.CLAUDE_CODE, Harness.CODEX},
         }

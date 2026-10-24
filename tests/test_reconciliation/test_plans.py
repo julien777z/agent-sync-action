@@ -49,7 +49,7 @@ class TestReconciliation:
                     link_target=source,
                     artifact=ArtifactKind.RULE,
                     source_path=source,
-                    harness=Harness.CLAUDE,
+                    harness=Harness.CLAUDE_CODE,
                 ),
                 GeneratedLink(
                     target_path=directory_target,
@@ -90,7 +90,7 @@ class TestReconciliation:
             content="generated\n",
             artifact=ArtifactKind.SETTING,
             source_path=agents_dir(workspace) / "settings/claude.json",
-            harness=Harness.CLAUDE,
+            harness=Harness.CLAUDE_CODE,
         )
         plan = build_plan(workspace, Manifest(outputs=[output]))
 
@@ -108,16 +108,16 @@ class TestReconciliation:
     ) -> None:
         """Test that stale detection makes harness directories match the manifest."""
 
-        claude_rules = workspace.root / ".claude/rules"
-        claude_rules.mkdir(parents=True)
-        stale_rule = claude_rules / "orphan.md"
+        claude_code_rules = workspace.root / ".claude/rules"
+        claude_code_rules.mkdir(parents=True)
+        stale_rule = claude_code_rules / "orphan.md"
         stale_rule.write_text("stale\n")
 
-        stale_directory = claude_rules / "custom"
+        stale_directory = claude_code_rules / "custom"
         stale_directory.mkdir()
         (stale_directory / "rule.md").write_text("stale\n")
 
-        duplicate_rule = claude_rules / "orphan 2.md"
+        duplicate_rule = claude_code_rules / "orphan 2.md"
         duplicate_rule.write_text("duplicate\n")
 
         codex_rules = workspace.root / ".codex/rules"
