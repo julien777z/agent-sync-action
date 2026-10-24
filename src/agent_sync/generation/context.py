@@ -134,17 +134,20 @@ def load_hooks(workspace: Workspace) -> list[HookSource]:
 
     hooks_dir = agents_dir(workspace) / "hooks"
 
+    if hooks_dir.is_symlink():
+        raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {hooks_dir}")
+
     if not hooks_dir.exists():
         return []
 
     sources: list[HookSource] = []
 
     for path in sorted(hooks_dir.rglob("*")):
-        if path == hooks_dir / "hooks.json":
-            continue
-
         if path.is_symlink():
             raise AgentSyncError(f"Hook sources must be regular files or directories, not symlinks: {path}")
+
+        if path == hooks_dir / "hooks.json":
+            continue
 
         if not path.is_file():
             continue

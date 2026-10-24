@@ -105,14 +105,24 @@ class TestMirrorIntegration:
 
         assert target.read_bytes() == original
 
-    @pytest.mark.parametrize("directory", [False, True], ids=["file", "directory"])
-    async def test_hook_symlinks_fail(self, workspace: Workspace, directory: bool) -> None:
+    @pytest.mark.parametrize("kind", ["file", "directory", "registration", "root"])
+    async def test_hook_symlinks_fail(self, workspace: Workspace, kind: str) -> None:
         """Test that hook source links cannot read or traverse other trees."""
 
         materialize_hooks(workspace, HooksConfigFactory.build())
         hooks = agents_dir(workspace) / "hooks"
-        target = hooks / ("session" if directory else "session/start.py")
-        (hooks / "linked").symlink_to(target, target_is_directory=directory)
+
+        if kind == "root":
+            target = hooks.with_name("hook-sources")
+            hooks.rename(target)
+            hooks.symlink_to(target, target_is_directory=True)
+        elif kind == "registration":
+            target = hooks / "registration.json"
+            (hooks / "hooks.json").rename(target)
+            (hooks / "hooks.json").symlink_to(target)
+        else:
+            target = hooks / ("session" if kind == "directory" else "session/start.py")
+            (hooks / "linked").symlink_to(target, target_is_directory=kind == "directory")
 
         with pytest.raises(AgentSyncError, match="not symlinks"):
             mirror_providers(workspace, dry_run=False)
