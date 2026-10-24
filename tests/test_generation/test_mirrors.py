@@ -81,7 +81,8 @@ class TestMirrorIntegration:
 
         for dry_run in (True, False):
             with pytest.raises(
-                AgentSyncError, match="require canonical|Unregistered hooks|Invalid hook command"
+                AgentSyncError,
+                match="require canonical|Unregistered hooks|Invalid hook command|must reference",
             ):
                 mirror_harnesses(workspace, dry_run=dry_run)
 
@@ -263,6 +264,39 @@ class TestMirrorIntegration:
 
         with pytest.raises(AgentSyncError, match="Invalid JSON|Invalid source"):
             mirror_harnesses(workspace, dry_run=False)
+
+        assert target.read_bytes() == original
+
+    async def test_dangling_registration_fails_before_writing_outputs(self, workspace: Workspace) -> None:
+        """Test that every hook command names an existing canonical file."""
+
+        config = HooksConfigFactory.build()
+        registration = agents_dir(workspace) / "hooks/hooks.json"
+        registration.parent.mkdir(parents=True)
+        registration.write_text(config.model_dump_json(exclude_none=True))
+
+        with pytest.raises(AgentSyncError, match="must reference an existing canonical hook file"):
+            mirror_harnesses(workspace, dry_run=False)
+
+        assert not (workspace.root / ".claude").exists()
+        assert not (workspace.root / ".codex").exists()
+
+    @pytest.mark.parametrize("dry_run", [True, False], ids=["dry-run", "write"])
+    async def test_hook_file_source_fails_before_reconciliation(
+        self, workspace: Workspace, dry_run: bool
+    ) -> None:
+        """Test that a non-directory hook source cannot remove generated hooks."""
+
+        materialize_hooks(workspace, HooksConfigFactory.build())
+        mirror_harnesses(workspace, dry_run=False)
+        source = agents_dir(workspace) / "hooks"
+        source.rename(source.with_name("hook-sources"))
+        source.write_text("not a directory\n")
+        target = workspace.root / ".codex/hooks/session/start.py"
+        original = target.read_bytes()
+
+        with pytest.raises(AgentSyncError, match="must be a directory"):
+            mirror_harnesses(workspace, dry_run=dry_run)
 
         assert target.read_bytes() == original
 

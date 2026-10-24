@@ -143,6 +143,9 @@ def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | No
     if not hooks_dir.exists():
         return [], None
 
+    if not hooks_dir.is_dir():
+        raise AgentSyncError(f"Hook sources must be a directory when present: {hooks_dir}")
+
     sources: list[HookSource] = []
 
     for path in sorted(hooks_dir.rglob("*")):
@@ -180,8 +183,23 @@ def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | No
     if sources and config is None:
         raise AgentSyncError(f"Hook sources require canonical event registration in {registration}")
 
-    if config is not None and sources:
-        tokens: set[str] = set()
+    if config is not None:
+        sources_by_hook: dict[str, set[str]] = {}
+
+        for source in sources:
+            canonical_path = source.path.relative_to(workspace.root).as_posix()
+            hook_name = source.relative_path.parts[0]
+
+            sources_by_hook.setdefault(hook_name, set()).update(
+                {
+                    canonical_path,
+                    f"./{canonical_path}",
+                    str(source.path),
+                    f"$(git rev-parse --show-toplevel)/{canonical_path}",
+                }
+            )
+
+        registered: set[str] = set()
 
         for groups in config.hooks.values():
             for group in groups:
@@ -190,26 +208,22 @@ def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | No
                     lexer.whitespace_split = True
 
                     try:
-                        tokens.update(lexer)
+                        tokens = set(lexer)
                     except ValueError as exc:
                         raise AgentSyncError(f"Invalid hook command in {registration}: {exc}") from exc
 
-        registered: set[str] = set()
+                    matched_hooks = {
+                        hook_name for hook_name, references in sources_by_hook.items() if tokens & references
+                    }
 
-        for source in sources:
-            canonical_path = source.path.relative_to(workspace.root).as_posix()
+                    if not matched_hooks:
+                        raise AgentSyncError(
+                            f"Hook command in {registration} must reference an existing canonical hook file"
+                        )
 
-            references = {
-                canonical_path,
-                f"./{canonical_path}",
-                str(source.path),
-                f"$(git rev-parse --show-toplevel)/{canonical_path}",
-            }
+                    registered.update(matched_hooks)
 
-            if tokens & references:
-                registered.add(source.relative_path.parts[0])
-
-        missing = sorted({source.relative_path.parts[0] for source in sources} - registered)
+        missing = sorted(set(sources_by_hook) - registered)
 
         if missing:
             raise AgentSyncError(
