@@ -76,7 +76,7 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
         for source in context.hooks
     ]
 
-    if context.hook_config is None:
+    if context.hook_config is None or harness is Harness.CLAUDE_CODE:
         return outputs
 
     hook_config = context.hook_config.for_harness(harness)
@@ -115,7 +115,6 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
             )
         )
 
-    if harness is not Harness.CODEX:
         return outputs
 
     values = hook_config.model_dump(by_alias=True, exclude_none=True)
