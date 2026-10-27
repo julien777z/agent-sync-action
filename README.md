@@ -245,7 +245,10 @@ fails before generated files change, including in dry runs.
 
 Commands must reference an existing canonical file using its repository-relative path, absolute
 path, or the quoted Git-root form shown above. Dynamic path variables and indirect launcher names
-cannot establish registration coverage. Commands and matchers are emitted without rewriting.
+cannot establish registration coverage. Use `{{harness}}` in a command when its entrypoint needs the calling harness name. Agent Sync
+substitutes `claude`, `codex`, or `cursor` into that placeholder for the corresponding output;
+for example, `python3 ".agents/hooks/session/start.py" {{harness}}`. Commands without the
+placeholder and all matchers retain their exact contents.
 
 A hook folder can contain its entrypoint, imported modules and resources:
 
