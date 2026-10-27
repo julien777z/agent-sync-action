@@ -2,6 +2,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from agent_sync.models.output import Harness
+
 type HookEvent = Literal[
     "SessionStart",
     "SessionEnd",
@@ -40,6 +42,32 @@ class HooksConfig(BaseModel):
 
     description: str | None = None
     hooks: dict[HookEvent, list[HookMatcher]]
+
+    def for_harness(self, harness: Harness) -> Self:
+        """Resolve the command's explicit harness placeholder without changing the source."""
+
+        return self.model_copy(
+            update={
+                "hooks": {
+                    event: [
+                        group.model_copy(
+                            update={
+                                "hooks": [
+                                    handler.model_copy(
+                                        update={
+                                            "command": handler.command.replace("{{harness}}", harness.value),
+                                        }
+                                    )
+                                    for handler in group.hooks
+                                ],
+                            }
+                        )
+                        for group in groups
+                    ]
+                    for event, groups in self.hooks.items()
+                },
+            }
+        )
 
     @model_validator(mode="after")
     def validate_codex_session_end_timeout(self) -> Self:

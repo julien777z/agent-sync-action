@@ -79,6 +79,8 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
     if context.hook_config is None:
         return outputs
 
+    hook_config = context.hook_config.for_harness(harness)
+
     if harness is Harness.CURSOR:
         outputs.append(
             GeneratedFile(
@@ -101,7 +103,7 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
                                     for group in groups
                                     for handler in group.hooks
                                 ]
-                                for event, groups in context.hook_config.hooks.items()
+                                for event, groups in hook_config.hooks.items()
                             },
                         },
                         indent=2,
@@ -116,8 +118,8 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
     if harness is not Harness.CODEX:
         return outputs
 
-    values = context.hook_config.model_dump(by_alias=True, exclude_none=True)
-    description = context.hook_config.description
+    values = hook_config.model_dump(by_alias=True, exclude_none=True)
+    description = hook_config.description
     values["description"] = "\n\n".join(part for part in (GENERATED_FILE_NOTICE, description) if part)
 
     outputs.append(
