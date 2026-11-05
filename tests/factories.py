@@ -297,7 +297,7 @@ def run_adapter(
     adapter = harness.root(workspace.root) / "hooks/agent_sync_adapter.py"
 
     return subprocess.run(
-        ["python3", str(adapter), harness.value, command],
+        ["python3", "-I", str(adapter), harness.value, command],
         input=hook_input,
         cwd=cwd,
         capture_output=True,

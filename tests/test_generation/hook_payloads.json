@@ -145,21 +145,6 @@
     "tool_use_id": "tool-1",
     "duration": 12
   },
-  "cursor-after-file-edit": {
-    "conversation_id": "conversation-1",
-    "generation_id": "generation-1",
-    "hook_event_name": "afterFileEdit",
-    "workspace_roots": [
-      "<root>"
-    ],
-    "file_path": "<root>/sub/note.txt",
-    "edits": [
-      {
-        "old_string": "hello",
-        "new_string": "hello world"
-      }
-    ]
-  },
   "claude-session-start": {
     "session_id": "86684e3b-bfd4-40c0-b2bc-edb7526370c8",
     "transcript_path": "<home>/.claude/projects/<project>/86684e3b-bfd4-40c0-b2bc-edb7526370c8.jsonl",

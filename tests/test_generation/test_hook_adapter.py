@@ -36,7 +36,6 @@ class TestHookAdapter:
             ("claude-read", Harness.CLAUDE_CODE, []),
             ("codex-apply-patch", Harness.CODEX, ["sub/added.txt", "sub/note.txt", "moved/new.txt"]),
             ("cursor-post-tool-use", Harness.CURSOR, ["sub/note.txt"]),
-            ("cursor-after-file-edit", Harness.CURSOR, ["sub/note.txt"]),
         ],
         ids=[
             "claude-edit",
@@ -46,7 +45,6 @@ class TestHookAdapter:
             "claude-read",
             "codex-apply-patch",
             "cursor-post-tool-use",
-            "cursor-file-edit",
         ],
     )
     async def test_adds_shared_block_beside_original_input(

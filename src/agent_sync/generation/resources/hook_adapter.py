@@ -62,7 +62,7 @@ def read_edited_files(payload: dict[str, object], cwd: str) -> list[str]:
     fields = cast("dict[str, object]", tool_input)
     tool_name = payload.get("tool_name")
     patch = fields.get("command")
-    candidates = [payload.get("file_path")]
+    candidates: list[object] = []
 
     if tool_name in EDIT_TOOL_NAMES:
         candidates.extend([fields.get("file_path"), fields.get("notebook_path")])

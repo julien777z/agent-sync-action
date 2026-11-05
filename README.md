@@ -285,7 +285,7 @@ The adapter reads the harness's input JSON, keeps every key, and adds one `agent
 |---|---|
 | `harness` | `claude`, `codex` or `cursor`: the registration file that ran the hook. |
 | `project_dir` | The Git root of the input's `cwd`, or of the hook's working directory when the input has none; that directory itself outside a repository. |
-| `edited_files` | Absolute paths the tool call created or changed: `tool_input.file_path` and `tool_input.notebook_path` of Claude Code's `Edit`, `Write`, `MultiEdit` and `NotebookEdit` and of Cursor's `Write`, the `file_path` of Cursor's `afterFileEdit`, and the added, updated and moved-to files of a Codex `apply_patch`. Deleted files are left out. Empty for other tools and events. |
+| `edited_files` | Absolute paths the tool call created or changed: `tool_input.file_path` and `tool_input.notebook_path` of Claude Code's `Edit`, `Write`, `MultiEdit` and `NotebookEdit` and of Cursor's `Write`, and the added, updated and moved-to files of a Codex `apply_patch`. Deleted files are left out. Empty for other tools and events. |
 
 ```json
 {
