@@ -1,11 +1,20 @@
+import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Final
 
 import pytest
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 from agent_sync.models.settings import Workspace
+from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.workspace import agents_dir
+from tests.factories import HooksConfigFactory, materialize_hooks
+
+HOOK_PAYLOADS_PATH: Final[Path] = Path(__file__).parent / "test_generation/hook_payloads.json"
+
+type HookPayload = dict[str, JsonValue]
 
 
 def create_workspace(root: Path, output_dirname: str = "") -> Workspace:
@@ -29,6 +38,33 @@ def relocated_workspace(tmp_path: Path) -> Workspace:
     """Create a workspace whose generated harness trees live under a nested directory."""
 
     return create_workspace(tmp_path, ".agents/.auto_generated")
+
+
+@pytest.fixture
+def hooked_workspace(workspace: Workspace) -> Workspace:
+    """Create a Git workspace whose registered hooks are mirrored to every harness."""
+
+    subprocess.run(["git", "init", "--quiet", str(workspace.root)], check=True)
+    (workspace.root / "sub").mkdir()
+    materialize_hooks(workspace, HooksConfigFactory.build())
+
+    mirror_harnesses(workspace, dry_run=False)
+
+    return workspace
+
+
+@pytest.fixture
+def load_hook_payload() -> Callable[..., HookPayload]:
+    """Load a recorded harness hook input with its paths placed under a workspace root."""
+
+    def _build(*, name: str, root: Path) -> HookPayload:
+        payloads: dict[str, HookPayload] = json.loads(
+            HOOK_PAYLOADS_PATH.read_text().replace("<root>", str(root))
+        )
+
+        return payloads[name]
+
+    return _build
 
 
 class GitHubUpstream(BaseModel):

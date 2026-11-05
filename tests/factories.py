@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from shlex import quote
 from typing import Literal
 
 import pytest
@@ -13,10 +14,11 @@ from agent_sync.generation.context import load_generation_context
 from agent_sync.models.generation import GenerationContext
 from agent_sync.models.hooks import CommandHook, HookMatcher, HooksConfig
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
+from agent_sync.models.output import Harness
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
 from agent_sync.models.settings import Workspace
-from agent_sync.workspace import agents_dir
+from agent_sync.workspace import agents_dir, output_root
 
 ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
     kind="skill",
@@ -166,6 +168,17 @@ class HooksConfigFactory(ModelFactory[HooksConfig]):
                 )
             ]
         }
+
+
+def adapted_hook_command(workspace: Workspace, harness: Harness, command: str) -> str:
+    """Return the registered form of a canonical hook command for one harness."""
+
+    adapter = harness.root(output_root(workspace)) / "hooks/agent_sync_adapter.py"
+
+    return (
+        f'exec python3 "$(git rev-parse --show-toplevel)"/{quote(adapter.relative_to(workspace.root).as_posix())} '
+        f"{harness.value} {quote(command)}"
+    )
 
 
 def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:

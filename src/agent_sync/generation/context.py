@@ -4,6 +4,7 @@ from shlex import shlex
 from pydantic import BaseModel
 
 from agent_sync.document import parse_markdown
+from agent_sync.generation.artifact import HOOK_ADAPTER_FILENAME
 from agent_sync.models.document import (
     AgentFrontMatter,
     RuleFrontMatter,
@@ -156,6 +157,9 @@ def load_hooks(workspace: Workspace) -> tuple[list[HookSource], HooksConfig | No
             continue
 
         relative_path = path.relative_to(hooks_dir)
+
+        if relative_path.parts[0] == HOOK_ADAPTER_FILENAME:
+            raise AgentSyncError(f"Hook sources cannot use the reserved adapter name: {path}")
 
         if "__pycache__" in relative_path.parts or path.suffix in {".pyc", ".pyo"}:
             continue

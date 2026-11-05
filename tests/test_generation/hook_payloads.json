@@ -1,0 +1,170 @@
+{
+  "claude-edit": {
+    "session_id": "86684e3b-bfd4-40c0-b2bc-edb7526370c8",
+    "transcript_path": "<home>/.claude/projects/<project>/86684e3b-bfd4-40c0-b2bc-edb7526370c8.jsonl",
+    "cwd": "<root>",
+    "prompt_id": "6e026fc0-edb5-4cb1-b699-c766eb9d5ab3",
+    "permission_mode": "acceptEdits",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "tool_input": {
+      "file_path": "<root>/sub/note.txt",
+      "old_string": "hello",
+      "new_string": "hello world",
+      "replace_all": false
+    },
+    "tool_response": {
+      "filePath": "<root>/sub/note.txt",
+      "oldString": "hello",
+      "newString": "hello world",
+      "originalFile": "hello\n",
+      "structuredPatch": [
+        {
+          "oldStart": 1,
+          "oldLines": 1,
+          "newStart": 1,
+          "newLines": 1,
+          "lines": [
+            "-hello",
+            "+hello world"
+          ]
+        }
+      ],
+      "userModified": false,
+      "replaceAll": false,
+      "contentNotInModelContext": true,
+      "gitDiff": {
+        "filename": "sub/note.txt",
+        "status": "added",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1,
+        "patch": "@@ -0,0 +1,1 @@\n+hello world",
+        "repository": null
+      }
+    },
+    "tool_use_id": "toolu_01XFHBYznemyjDrpfCJVNKVf",
+    "duration_ms": 15
+  },
+  "claude-write": {
+    "session_id": "86684e3b-bfd4-40c0-b2bc-edb7526370c8",
+    "transcript_path": "<home>/.claude/projects/<project>/86684e3b-bfd4-40c0-b2bc-edb7526370c8.jsonl",
+    "cwd": "<root>",
+    "prompt_id": "6e026fc0-edb5-4cb1-b699-c766eb9d5ab3",
+    "permission_mode": "acceptEdits",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "<root>/sub/new.txt",
+      "content": "x"
+    },
+    "tool_response": {
+      "type": "create",
+      "filePath": "<root>/sub/new.txt",
+      "content": "x",
+      "structuredPatch": [],
+      "originalFile": null,
+      "userModified": false,
+      "gitDiff": {
+        "filename": "sub/new.txt",
+        "status": "added",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1,
+        "patch": "@@ -0,0 +1,1 @@\n+x",
+        "repository": null
+      }
+    },
+    "tool_use_id": "toolu_01XmJ4u7oNYULsAs3eTEUiYW",
+    "duration_ms": 22
+  },
+  "claude-notebook-edit": {
+    "session_id": "2d008a0d-2526-4efd-8994-03c3300f1b91",
+    "transcript_path": "<home>/.claude/projects/<project>/2d008a0d-2526-4efd-8994-03c3300f1b91.jsonl",
+    "cwd": "<root>",
+    "prompt_id": "458bff97-2b42-49f8-8c12-556894522c63",
+    "permission_mode": "acceptEdits",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "NotebookEdit",
+    "tool_input": {
+      "notebook_path": "<root>/sub/book.ipynb",
+      "cell_id": "c1",
+      "new_source": "x = 2"
+    },
+    "tool_response": {
+      "new_source": "x = 2",
+      "old_source": "x = 1",
+      "cell_type": "code",
+      "language": "python",
+      "edit_mode": "replace",
+      "cell_id": "c1",
+      "error": "",
+      "notebook_path": "<root>/sub/book.ipynb",
+      "original_file": "{\"cells\": [{\"cell_type\": \"code\", \"id\": \"c1\", \"metadata\": {}, \"execution_count\": null, \"outputs\": [], \"source\": [\"x = 1\"]}], \"metadata\": {}, \"nbformat\": 4, \"nbformat_minor\": 5}\n",
+      "updated_file": "{\n \"cells\": [\n  {\n   \"cell_type\": \"code\",\n   \"id\": \"c1\",\n   \"metadata\": {},\n   \"execution_count\": null,\n   \"outputs\": [],\n   \"source\": \"x = 2\"\n  }\n ],\n \"metadata\": {},\n \"nbformat\": 4,\n \"nbformat_minor\": 5\n}"
+    },
+    "tool_use_id": "toolu_01Ws8U1DrWNvK7SVctVuFnkh",
+    "duration_ms": 11
+  },
+  "codex-apply-patch": {
+    "session_id": "00000000-0000-4000-8000-000000000001",
+    "transcript_path": null,
+    "cwd": "<root>/sub",
+    "hook_event_name": "PostToolUse",
+    "model": "example-model",
+    "turn_id": "turn-1",
+    "tool_name": "apply_patch",
+    "tool_use_id": "call-1",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: added.txt\n+added\n*** Update File: note.txt\n@@\n-hello\n+hello world\n*** Update File: old.txt\n*** Move to: ../moved/new.txt\n@@\n-old\n+new\n*** Delete File: removed.txt\n*** Update File: ./note.txt\n@@\n-world\n+there\n*** End Patch\n"
+    },
+    "tool_response": "Success. Updated the following files:\nA added.txt\nM note.txt\nM ../moved/new.txt\nD removed.txt\n"
+  },
+  "cursor-post-tool-use": {
+    "conversation_id": "conversation-1",
+    "generation_id": "generation-1",
+    "hook_event_name": "postToolUse",
+    "workspace_roots": [
+      "<root>"
+    ],
+    "cwd": "<root>",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "<root>/sub/note.txt"
+    },
+    "tool_output": "{}",
+    "tool_use_id": "tool-1",
+    "duration": 12
+  },
+  "cursor-after-file-edit": {
+    "conversation_id": "conversation-1",
+    "generation_id": "generation-1",
+    "hook_event_name": "afterFileEdit",
+    "workspace_roots": [
+      "<root>"
+    ],
+    "file_path": "<root>/sub/note.txt",
+    "edits": [
+      {
+        "old_string": "hello",
+        "new_string": "hello world"
+      }
+    ]
+  },
+  "claude-session-start": {
+    "session_id": "86684e3b-bfd4-40c0-b2bc-edb7526370c8",
+    "transcript_path": "<home>/.claude/projects/<project>/86684e3b-bfd4-40c0-b2bc-edb7526370c8.jsonl",
+    "cwd": "<root>/sub",
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  }
+}

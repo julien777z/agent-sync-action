@@ -1,6 +1,6 @@
 import json
 
-from agent_sync.generation.artifact import GENERATED_FILE_NOTICE
+from agent_sync.generation.artifact import GENERATED_FILE_NOTICE, adapt_hook_commands
 from agent_sync.models.generation import GenerationContext
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedOutput, Harness
 from agent_sync.models.settings import CodexSettings, PlatformSettings
@@ -31,7 +31,8 @@ def generate_claude_code_settings(
         )
 
     if context.hook_config is not None:
-        values["hooks"] = context.hook_config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        hook_config = adapt_hook_commands(context.hook_config, context.workspace, harness)
+        values["hooks"] = hook_config.model_dump(by_alias=True, exclude_none=True)["hooks"]
 
     return [
         GeneratedFile(

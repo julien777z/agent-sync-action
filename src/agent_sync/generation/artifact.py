@@ -1,9 +1,15 @@
 import json
+from importlib.resources import files
+from importlib.resources.abc import Traversable
+from pathlib import Path
+from shlex import quote
 from typing import Final
 
 from agent_sync.document import render_front_matter
 from agent_sync.models.generation import GenerationContext
+from agent_sync.models.hooks import HooksConfig
 from agent_sync.models.output import ArtifactKind, GeneratedFile, GeneratedLink, GeneratedOutput, Harness
+from agent_sync.models.settings import Workspace
 from agent_sync.source import resolve_agent_model
 from agent_sync.utils import ensure_trailing_newline
 from agent_sync.workspace import agents_dir, output_root
@@ -23,6 +29,12 @@ CURSOR_HOOK_EVENTS: Final[dict[str, str]] = {
     "SubagentStop": "subagentStop",
     "Stop": "stop",
 }
+
+HOOK_ADAPTER_FILENAME: Final[str] = "agent_sync_adapter.py"
+HOOK_ADAPTER_SOURCE: Final[Traversable] = files("agent_sync.generation").joinpath("resources/hook_adapter.py")
+HOOK_ADAPTER_COMMAND: Final[str] = (
+    'exec python3 "$(git rev-parse --show-toplevel)"/{adapter} {harness} {command}'
+)
 
 
 def has_generated_notice(content: str) -> bool:
@@ -59,8 +71,26 @@ def generate_agents(context: GenerationContext, harness: Harness) -> list[Genera
     return outputs
 
 
+def adapt_hook_commands(hook_config: HooksConfig, workspace: Workspace, harness: Harness) -> HooksConfig:
+    """Return the hook registration with every command run through the harness's adapter."""
+
+    adapter = harness.root(output_root(workspace)) / "hooks" / HOOK_ADAPTER_FILENAME
+    adapted = hook_config.model_copy(deep=True)
+
+    for groups in adapted.hooks.values():
+        for group in groups:
+            for handler in group.hooks:
+                handler.command = HOOK_ADAPTER_COMMAND.format(
+                    adapter=quote(adapter.relative_to(workspace.root).as_posix()),
+                    harness=harness.value,
+                    command=quote(handler.command),
+                )
+
+    return adapted
+
+
 def generate_hooks(context: GenerationContext, harness: Harness) -> list[GeneratedOutput]:
-    """Generate one harness's hook files and standalone registration."""
+    """Generate one harness's hook files, adapter and standalone registration."""
 
     root = harness.root(output_root(context.workspace))
 
@@ -78,6 +108,19 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
 
     if context.hook_config is None:
         return outputs
+
+    outputs.append(
+        GeneratedFile(
+            target_path=root / "hooks" / HOOK_ADAPTER_FILENAME,
+            content=HOOK_ADAPTER_SOURCE.read_text(encoding="utf-8"),
+            artifact=ArtifactKind.HOOK,
+            source_path=Path(str(HOOK_ADAPTER_SOURCE)),
+            harness=harness,
+            executable=True,
+        )
+    )
+
+    hook_config = adapt_hook_commands(context.hook_config, context.workspace, harness)
 
     if harness is Harness.CURSOR:
         outputs.append(
@@ -101,7 +144,7 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
                                     for group in groups
                                     for handler in group.hooks
                                 ]
-                                for event, groups in context.hook_config.hooks.items()
+                                for event, groups in hook_config.hooks.items()
                             },
                         },
                         indent=2,
@@ -116,8 +159,8 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
     if harness is not Harness.CODEX:
         return outputs
 
-    values = context.hook_config.model_dump(by_alias=True, exclude_none=True)
-    description = context.hook_config.description
+    values = hook_config.model_dump(by_alias=True, exclude_none=True)
+    description = hook_config.description
     values["description"] = "\n\n".join(part for part in (GENERATED_FILE_NOTICE, description) if part)
 
     outputs.append(

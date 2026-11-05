@@ -13,6 +13,7 @@ from agent_sync.workspace import agents_dir, settings_dir
 from tests.factories import (
     HooksConfigFactory,
     RuleFrontMatterFactory,
+    adapted_hook_command,
     materialize_hooks,
     materialize_rule,
     load_context,
@@ -27,7 +28,20 @@ class TestSettingsGeneration:
         """Test that settings remain independent of shared hook registration."""
 
         config = HooksConfigFactory.build()
-        hooks = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        handler = config.hooks["SessionStart"][0].hooks[0]
+        hooks = {
+            "SessionStart": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": adapted_hook_command(workspace, Harness.CLAUDE_CODE, handler.command),
+                            "timeout": handler.timeout,
+                        }
+                    ]
+                }
+            ]
+        }
         values = {"model": "example"}
 
         if shared:
