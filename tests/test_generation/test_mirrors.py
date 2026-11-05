@@ -398,23 +398,18 @@ class TestMirrorIntegration:
 
         mirror_harnesses(workspace, dry_run=False)
 
-        registrations = {
-            Harness.CLAUDE_CODE: json.loads((workspace.root / ".claude/settings.json").read_text())["hooks"],
-            Harness.CODEX: json.loads((workspace.root / ".codex/hooks.json").read_text())["hooks"],
-            Harness.CURSOR: {
-                "SessionStart": [
-                    {
-                        "hooks": json.loads((workspace.root / ".cursor/hooks.json").read_text())["hooks"][
-                            "sessionStart"
-                        ]
-                    }
-                ]
-            },
-        }
+        claude_code = json.loads((workspace.root / ".claude/settings.json").read_text())
+        codex = json.loads((workspace.root / ".codex/hooks.json").read_text())
+        cursor = json.loads((workspace.root / ".cursor/hooks.json").read_text())
+        commands = [
+            claude_code["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+            codex["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+            cursor["hooks"]["sessionStart"][0]["command"],
+        ]
 
-        for registration in registrations.values():
+        for command in commands:
             execution = subprocess.run(
-                registration["SessionStart"][0]["hooks"][0]["command"],
+                command,
                 shell=True,
                 cwd=workspace.root,
                 input="",

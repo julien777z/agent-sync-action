@@ -2,9 +2,7 @@ import ast
 import json
 import os
 import shutil
-import signal
 import subprocess
-import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,70 +13,12 @@ from agent_sync.models.output import Harness
 from agent_sync.models.settings import Workspace
 from agent_sync.reconciliation import mirror_harnesses
 from tests.conftest import HookPayload
-from tests.factories import HooksConfigFactory, materialize_hooks
-
-
-def run_adapter(
-    workspace: Workspace, harness: Harness, command: str, hook_input: bytes, cwd: Path
-) -> subprocess.CompletedProcess[bytes]:
-    """Run one harness's generated adapter with a hook command and stdin."""
-
-    adapter = harness.root(workspace.root) / "hooks/agent_sync_adapter.py"
-
-    return subprocess.run(
-        ["python3", str(adapter), harness.value, command],
-        input=hook_input,
-        cwd=cwd,
-        capture_output=True,
-        timeout=20,
-        check=False,
-    )
-
-
-def find_processes(marker: str) -> list[int]:
-    """Return the IDs of running processes whose command line contains a marker."""
-
-    processes: list[int] = []
-
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit():
-            continue
-
-        try:
-            command_line = (entry / "cmdline").read_bytes()
-        except OSError:
-            continue
-
-        if marker.encode() in command_line:
-            processes.append(int(entry.name))
-
-    return processes
-
-
-def terminate_hook_command(shell_path: str, command: str, hook: Path, environment: dict[str, str]) -> int:
-    """Start a hook command as a harness does, terminate its shell and count the processes left."""
-
-    ready = Path(f"{hook}.ready")
-    ready.unlink(missing_ok=True)
-
-    process = subprocess.Popen(
-        [shell_path, "-c", command], stdin=subprocess.DEVNULL, cwd=hook.parent, env=environment
-    )
-
-    deadline = time.monotonic() + 20
-
-    while not ready.exists() and time.monotonic() < deadline:
-        time.sleep(0.05)
-
-    process.send_signal(signal.SIGTERM)
-    process.wait(timeout=20)
-
-    survivors = find_processes(str(hook))
-
-    for survivor in survivors:
-        os.kill(survivor, signal.SIGKILL)
-
-    return len(survivors)
+from tests.factories import (
+    HooksConfigFactory,
+    materialize_hooks,
+    run_adapter,
+    terminate_hook_command,
+)
 
 
 class TestHookAdapter:
