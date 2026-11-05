@@ -33,7 +33,7 @@ CURSOR_HOOK_EVENTS: Final[dict[str, str]] = {
 HOOK_ADAPTER_FILENAME: Final[str] = "agent_sync_adapter.py"
 HOOK_ADAPTER_SOURCE: Final[Traversable] = files("agent_sync.generation").joinpath("resources/hook_adapter.py")
 HOOK_ADAPTER_COMMAND: Final[str] = (
-    'exec python3 "$(git rev-parse --show-toplevel)"/{adapter} {harness} {command}'
+    'exec python3 -I "$(git rev-parse --show-toplevel)"/{adapter} {harness} {command}'
 )
 
 

@@ -179,7 +179,7 @@ def adapted_hook_command(workspace: Workspace, harness: Harness, command: str) -
     adapter = harness.root(output_root(workspace)) / "hooks/agent_sync_adapter.py"
 
     return (
-        f'exec python3 "$(git rev-parse --show-toplevel)"/{quote(adapter.relative_to(workspace.root).as_posix())} '
+        f'exec python3 -I "$(git rev-parse --show-toplevel)"/{quote(adapter.relative_to(workspace.root).as_posix())} '
         f"{harness.value} {quote(command)}"
     )
 

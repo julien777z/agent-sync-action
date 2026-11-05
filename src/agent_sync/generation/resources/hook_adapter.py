@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ from typing import Final, TypedDict, cast
 
 EDITED_FILE_HEADERS: Final[tuple[str, ...]] = ("*** Add File: ", "*** Update File: ")
 MOVED_FILE_HEADER: Final[str] = "*** Move to: "
+EDIT_TOOL_NAMES: Final[frozenset[str]] = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 
 
 class AgentSyncBlock(TypedDict):
@@ -58,10 +60,14 @@ def read_edited_files(payload: dict[str, object], cwd: str) -> list[str]:
         raise ValueError("tool_input must be an object")
 
     fields = cast("dict[str, object]", tool_input)
-    candidates = [fields.get("file_path"), fields.get("notebook_path"), payload.get("file_path")]
+    tool_name = payload.get("tool_name")
     patch = fields.get("command")
+    candidates = [payload.get("file_path")]
 
-    if payload.get("tool_name") == "apply_patch" and isinstance(patch, str):
+    if tool_name in EDIT_TOOL_NAMES:
+        candidates.extend([fields.get("file_path"), fields.get("notebook_path")])
+
+    if tool_name == "apply_patch" and isinstance(patch, str):
         candidates.extend(read_patch_paths(patch))
 
     paths = [
@@ -109,6 +115,9 @@ def run_hook(harness: str, command: str) -> None:
     stdin.seek(0)
 
     os.dup2(stdin.fileno(), 0)
+
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
 
     os.execvp("sh", ["sh", "-c", command])
 

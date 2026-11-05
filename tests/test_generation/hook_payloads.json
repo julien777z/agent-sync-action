@@ -166,5 +166,28 @@
     "cwd": "<root>/sub",
     "hook_event_name": "SessionStart",
     "source": "startup"
+  },
+  "claude-read": {
+    "session_id": "86684e3b-bfd4-40c0-b2bc-edb7526370c8",
+    "transcript_path": "<home>/.claude/projects/<project>/86684e3b-bfd4-40c0-b2bc-edb7526370c8.jsonl",
+    "cwd": "<root>",
+    "permission_mode": "acceptEdits",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "<root>/sub/note.txt"
+    },
+    "tool_response": {
+      "type": "text",
+      "file": {
+        "filePath": "<root>/sub/note.txt",
+        "content": "hello\n",
+        "numLines": 1,
+        "startLine": 1,
+        "totalLines": 1
+      }
+    },
+    "tool_use_id": "toolu_01ReadSyntheticToolUse0001",
+    "duration_ms": 4
   }
 }
