@@ -5,11 +5,10 @@ import os
 import subprocess
 import sys
 import tempfile
-from typing import TypedDict, cast
+from typing import Final, TypedDict, cast
 
-ADDED_FILE_HEADER = "*** Add File: "
-UPDATED_FILE_HEADER = "*** Update File: "
-MOVED_FILE_HEADER = "*** Move to: "
+EDITED_FILE_HEADERS: Final[tuple[str, ...]] = ("*** Add File: ", "*** Update File: ")
+MOVED_FILE_HEADER: Final[str] = "*** Move to: "
 
 
 class AgentSyncBlock(TypedDict):
@@ -21,7 +20,7 @@ class AgentSyncBlock(TypedDict):
 
 
 def read_project_dir(cwd: str) -> str:
-    """Return the Git root containing a directory, or the directory itself outside a repository."""
+    """Return the project directory containing a working directory."""
 
     result = subprocess.run(
         ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
@@ -37,21 +36,21 @@ def read_project_dir(cwd: str) -> str:
 
 
 def read_patch_paths(patch: str) -> list[str]:
-    """Return the files an apply_patch body adds, updates or moves to, excluding deletions."""
+    """Return the files an apply_patch body leaves edited."""
 
     paths: list[str] = []
 
     for line in patch.splitlines():
         if line.startswith(MOVED_FILE_HEADER) and paths:
-            paths[-1] = line[len(MOVED_FILE_HEADER) :].strip()
-        elif line.startswith(ADDED_FILE_HEADER) or line.startswith(UPDATED_FILE_HEADER):
-            paths.append(line.split(": ", 1)[1].strip())
+            paths[-1] = line.removeprefix(MOVED_FILE_HEADER).strip()
+        elif line.startswith(EDITED_FILE_HEADERS):
+            paths.append(line.partition(": ")[2].strip())
 
     return paths
 
 
 def read_edited_files(payload: dict[str, object], cwd: str) -> list[str]:
-    """Return the absolute, normalized and deduplicated files a tool call edited."""
+    """Return the files a tool call edited."""
 
     tool_input = payload.get("tool_input", {})
 
@@ -73,7 +72,7 @@ def read_edited_files(payload: dict[str, object], cwd: str) -> list[str]:
 
 
 def annotate_hook_input(raw_input: bytes, harness: str) -> bytes:
-    """Return the hook input with the agent_sync block added beside every original key."""
+    """Return the hook input with the agent_sync block added."""
 
     payload: object = json.loads(raw_input)
 
@@ -96,13 +95,13 @@ def annotate_hook_input(raw_input: bytes, harness: str) -> bytes:
 
 
 def run_hook(harness: str, command: str) -> None:
-    """Replace this process with the hook command, reading the annotated or original input."""
+    """Replace this process with the hook command."""
 
     raw_input = sys.stdin.buffer.read()
 
     try:
         hook_input = annotate_hook_input(raw_input, harness)
-    except (ValueError, RecursionError, OSError, subprocess.SubprocessError):
+    except (ValueError, RecursionError, OSError):
         hook_input = raw_input
 
     stdin = tempfile.TemporaryFile()

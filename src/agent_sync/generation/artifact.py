@@ -75,13 +75,14 @@ def adapt_hook_commands(hook_config: HooksConfig, workspace: Workspace, harness:
     """Return the hook registration with every command run through the harness's adapter."""
 
     adapter = harness.root(output_root(workspace)) / "hooks" / HOOK_ADAPTER_FILENAME
+    adapter_path = quote(adapter.relative_to(workspace.root).as_posix())
     adapted = hook_config.model_copy(deep=True)
 
     for groups in adapted.hooks.values():
         for group in groups:
             for handler in group.hooks:
                 handler.command = HOOK_ADAPTER_COMMAND.format(
-                    adapter=quote(adapter.relative_to(workspace.root).as_posix()),
+                    adapter=adapter_path,
                     harness=harness.value,
                     command=quote(handler.command),
                 )
