@@ -1,6 +1,10 @@
+import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
+from shlex import quote
 from typing import Literal
 
 import pytest
@@ -13,10 +17,11 @@ from agent_sync.generation.context import load_generation_context
 from agent_sync.models.generation import GenerationContext
 from agent_sync.models.hooks import CommandHook, HookMatcher, HooksConfig
 from agent_sync.models.document import RuleFrontMatter, SkillFrontMatter
+from agent_sync.models.output import Harness
 from agent_sync.models.registry import ExternalDirectory, ExternalSkill, ResourcesRegistry
 from agent_sync.source import load_source_config
 from agent_sync.models.settings import Workspace
-from agent_sync.workspace import agents_dir
+from agent_sync.workspace import agents_dir, output_root
 
 ROOT_LEVEL_SKILL: ExternalSkill = ExternalSkill(
     kind="skill",
@@ -168,6 +173,17 @@ class HooksConfigFactory(ModelFactory[HooksConfig]):
         }
 
 
+def adapted_hook_command(workspace: Workspace, harness: Harness, command: str) -> str:
+    """Return the registered form of a canonical hook command for one harness."""
+
+    adapter = harness.root(output_root(workspace)) / "hooks/agent_sync_adapter.py"
+
+    return (
+        f'exec python3 -I "$(git rev-parse --show-toplevel)"/{quote(adapter.relative_to(workspace.root).as_posix())} '
+        f"{harness.value} {quote(command)}"
+    )
+
+
 def materialize_hooks(workspace: Workspace, config: HooksConfig) -> None:
     """Write shared lifecycle registration and its nested script resources."""
 
@@ -271,6 +287,69 @@ def run_cli(arguments: list[str]) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def run_adapter(
+    workspace: Workspace, harness: Harness, command: str, hook_input: bytes, cwd: Path
+) -> subprocess.CompletedProcess[bytes]:
+    """Run one harness's generated adapter with a hook command and stdin."""
+
+    adapter = harness.root(workspace.root) / "hooks/agent_sync_adapter.py"
+
+    return subprocess.run(
+        ["python3", "-I", str(adapter), harness.value, command],
+        input=hook_input,
+        cwd=cwd,
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+
+
+def find_processes(marker: str) -> list[int]:
+    """Return the IDs of running processes whose command line contains a marker."""
+
+    processes: list[int] = []
+
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+
+        try:
+            command_line = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue
+
+        if marker.encode() in command_line:
+            processes.append(int(entry.name))
+
+    return processes
+
+
+def terminate_hook_command(shell_path: str, command: str, hook: Path, environment: dict[str, str]) -> int:
+    """Start a hook command as a harness does, terminate its shell and count the processes left."""
+
+    ready = Path(f"{hook}.ready")
+    ready.unlink(missing_ok=True)
+
+    process = subprocess.Popen(
+        [shell_path, "-c", command], stdin=subprocess.DEVNULL, cwd=hook.parent, env=environment
+    )
+
+    deadline = time.monotonic() + 20
+
+    while not ready.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    process.send_signal(signal.SIGTERM)
+    process.wait(timeout=20)
+
+    survivors = find_processes(str(hook))
+
+    for survivor in survivors:
+        os.kill(survivor, signal.SIGKILL)
+
+    return len(survivors)
 
 
 def materialize_tree(base: Path, files: dict[str, str]) -> None:

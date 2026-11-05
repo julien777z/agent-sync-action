@@ -5,6 +5,7 @@ from typing import get_args
 
 import pytest
 
+from agent_sync.generation.artifact import HOOK_ADAPTER_SOURCE
 from agent_sync.reconciliation import mirror_harnesses
 from agent_sync.models.settings import Workspace
 from agent_sync.models.output import Harness
@@ -15,6 +16,7 @@ from tests.factories import (
     RuleFrontMatterFactory,
     SkillFrontMatterFactory,
     HooksConfigFactory,
+    adapted_hook_command,
     materialize_hooks,
     materialize_rule,
     materialize_skill,
@@ -117,9 +119,18 @@ class TestMirrorIntegration:
         assert mirror_harnesses(workspace, dry_run=False) is False
 
         registered = json.loads((workspace.root / ".codex/hooks.json").read_text())
-        assert registered["hooks"]["SessionStart"][0]["hooks"][0]["command"] == command
+        registered_command = registered["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+
+        assert registered_command == adapted_hook_command(workspace, Harness.CODEX, command)
+
         execution = subprocess.run(
-            command, shell=True, cwd=workspace.root, check=True, text=True, capture_output=True
+            registered_command,
+            shell=True,
+            cwd=workspace.root,
+            input="",
+            check=True,
+            text=True,
+            capture_output=True,
         )
 
         assert execution.stdout.strip() == "registered"
@@ -145,12 +156,26 @@ class TestMirrorIntegration:
         assert not (generated / ".codex").exists()
         assert mirror_harnesses(workspace, dry_run=False) is False
 
-        expected = config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        handler = config.hooks[event][0].hooks[0]
         codex = json.loads((generated / ".codex/hooks.json").read_text())
         claude_code = json.loads((generated / ".claude/settings.json").read_text())
         cursor = json.loads((generated / ".cursor/hooks.json").read_text())
 
-        assert codex["hooks"] == claude_code["hooks"] == expected
+        for harness, registration in ((Harness.CODEX, codex), (Harness.CLAUDE_CODE, claude_code)):
+            assert registration["hooks"] == {
+                event: [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": adapted_hook_command(workspace, harness, handler.command),
+                                "timeout": handler.timeout,
+                            }
+                        ]
+                    }
+                ]
+            }
+
         assert type(codex["hooks"][event][0]["hooks"][0]["timeout"]) is int
         assert config.description in codex["description"]
         assert cursor == {
@@ -167,8 +192,8 @@ class TestMirrorIntegration:
                     "Stop": "stop",
                 }[event]: [
                     {
-                        "command": config.hooks[event][0].hooks[0].command,
-                        "timeout": config.hooks[event][0].hooks[0].timeout,
+                        "command": adapted_hook_command(workspace, Harness.CURSOR, handler.command),
+                        "timeout": handler.timeout,
                     }
                 ],
             },
@@ -177,6 +202,11 @@ class TestMirrorIntegration:
         assert not (generated / ".codex/hooks/hooks.json").exists()
 
         for harness in Harness:
+            adapter = harness.root(generated) / "hooks/agent_sync_adapter.py"
+
+            assert adapter.read_bytes() == HOOK_ADAPTER_SOURCE.read_bytes()
+            assert adapter.stat().st_mode & 0o111
+
             target = harness.root(generated) / "hooks/session/start.py"
             support = harness.root(generated) / "hooks/session/resources/context.md"
 
@@ -193,6 +223,7 @@ class TestMirrorIntegration:
             command,
             shell=True,
             cwd=canonical.parent / "session",
+            input="",
             check=True,
             text=True,
             capture_output=True,
@@ -216,6 +247,9 @@ class TestMirrorIntegration:
         assert not (generated / ".codex/hooks.json").exists()
         assert not (generated / ".claude/settings.json").exists()
         assert all(not (harness.root(generated) / "hooks/session").exists() for harness in Harness)
+        assert all(
+            not (harness.root(generated) / "hooks/agent_sync_adapter.py").exists() for harness in Harness
+        )
         assert mirror_harnesses(workspace, dry_run=True) is False
 
     async def test_cursor_registration_preserves_handler_fields(self, workspace: Workspace) -> None:
@@ -231,7 +265,9 @@ class TestMirrorIntegration:
         handler = cursor["hooks"]["sessionStart"][0]
 
         assert handler == {
-            "command": config.hooks["SessionStart"][0].hooks[0].command,
+            "command": adapted_hook_command(
+                workspace, Harness.CURSOR, config.hooks["SessionStart"][0].hooks[0].command
+            ),
             "matcher": "Read|Write",
             "timeout": 3,
         }
@@ -346,6 +382,65 @@ class TestMirrorIntegration:
             mirror_harnesses(workspace, dry_run=False)
 
         assert target.read_bytes() == original
+
+    async def test_adapted_commands_preserve_arguments(self, workspace: Workspace) -> None:
+        """Test that quotes, dollar signs and spaces in a hook command reach the hook unchanged."""
+
+        subprocess.run(["git", "init", "--quiet", str(workspace.root)], check=True)
+        source = agents_dir(workspace) / "hooks/arguments.py"
+        source.parent.mkdir(parents=True)
+        source.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n")
+        config = HooksConfigFactory.build()
+        config.hooks["SessionStart"][0].hooks[
+            0
+        ].command = 'python3 "$(git rev-parse --show-toplevel)/.agents/hooks/arguments.py" "it\'s" \'$HOME\' "two words"'
+        (agents_dir(workspace) / "hooks/hooks.json").write_text(config.model_dump_json(exclude_none=True))
+
+        mirror_harnesses(workspace, dry_run=False)
+
+        claude_code = json.loads((workspace.root / ".claude/settings.json").read_text())
+        codex = json.loads((workspace.root / ".codex/hooks.json").read_text())
+        cursor = json.loads((workspace.root / ".cursor/hooks.json").read_text())
+        commands = [
+            claude_code["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+            codex["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+            cursor["hooks"]["sessionStart"][0]["command"],
+        ]
+
+        for command in commands:
+            execution = subprocess.run(
+                command,
+                shell=True,
+                cwd=workspace.root,
+                input="",
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            assert json.loads(execution.stdout) == ["it's", "$HOME", "two words"]
+
+    @pytest.mark.parametrize("kind", ["file", "folder"])
+    async def test_reserved_adapter_name_fails(self, workspace: Workspace, kind: str) -> None:
+        """Test that a canonical hook named like the generated adapter fails before outputs change."""
+
+        materialize_hooks(workspace, HooksConfigFactory.build())
+        mirror_harnesses(workspace, dry_run=False)
+        target = workspace.root / ".codex/hooks/agent_sync_adapter.py"
+        original = target.read_bytes()
+        reserved = agents_dir(workspace) / "hooks/agent_sync_adapter.py"
+
+        if kind == "folder":
+            reserved.mkdir()
+            (reserved / "main.py").write_text("print('reserved')\n")
+        else:
+            reserved.write_text("print('reserved')\n")
+
+        for dry_run in (True, False):
+            with pytest.raises(AgentSyncError, match="reserved adapter name"):
+                mirror_harnesses(workspace, dry_run=dry_run)
+
+            assert target.read_bytes() == original
 
     async def test_dangling_registration_fails_before_writing_outputs(self, workspace: Workspace) -> None:
         """Test that every hook command names an existing canonical file."""

@@ -6,6 +6,7 @@ directory.
 ## Features
 
 - Mirrors skills, rules, agents, hooks, and settings to Claude Code, Cursor, and Codex.
+- Gives every hook the same harness, project directory and edited files, whichever harness runs it.
 - Supports the common skill and rule options, including explicit invocation and file scoping, in each harness's own format.
 - Installs registered [skills.sh](https://www.skills.sh/) skills and keeps them current.
 - Generates `AGENTS.md` from root guidance, always-on rules, and pointers to scoped rules.
@@ -70,7 +71,7 @@ jobs:
 | Path | Purpose |
 |---|---|
 | `agents/` | Agent definitions mirrored to supported harnesses. |
-| `hooks/` | Hook scripts and supporting text files mirrored recursively, with required event registration in `hooks.json`. |
+| `hooks/` | Hook scripts and supporting text files mirrored recursively, with required event registration in `hooks.json` run through a generated input adapter. |
 | `models/` | Per-agent harness model overrides. |
 | `global.md` | Optional guidance placed first in `AGENTS.md`. |
 | `project.md` | Optional project guidance placed after always-on rules in `AGENTS.md`. |
@@ -207,7 +208,8 @@ Register shared command hooks for the supported harnesses in `.agents/hooks/hook
 ```
 
 Agent Sync writes these registrations to `.codex/hooks.json`, `.cursor/hooks.json`, and the
-`hooks` field in `.claude/settings.json`. Other Claude Code settings come from
+`hooks` field in `.claude/settings.json`, each running its command through that harness's
+[input adapter](#hook-input). Other Claude Code settings come from
 `.agents/settings/claude.json`; that settings source must omit `hooks`. Hook registration belongs
 in the shared event map. Other harness settings remain independent of hook registration.
 
@@ -232,8 +234,8 @@ they do not run `sessionStart` or `sessionEnd`; self-hosted workers do.
 
 Command handlers accept `type: "command"`, `command`, and an optional positive integer `timeout` in
 seconds. A top-level `description` and group-level `matcher` are optional. The command selects the
-entrypoint and may include its interpreter and arguments. Cursor's native schema preserves commands,
-matchers, and timeouts; it omits the unsupported description field. The canonical schema accepts only
+entrypoint and may include its interpreter and arguments. Cursor's native schema carries the adapted
+command, the matcher and the timeout; it omits the unsupported description field. The canonical schema accepts only
 these documented shared events and fields; unknown or harness-specific options fail validation before
 outputs change. `SessionEnd` timeouts cannot exceed three seconds because Codex enforces that limit.
 Harness-only settings retain their native contracts.
@@ -245,7 +247,8 @@ fails before generated files change, including in dry runs.
 
 Commands must reference an existing canonical file using its repository-relative path, absolute
 path, or the quoted Git-root form shown above. Dynamic path variables and indirect launcher names
-cannot establish registration coverage. Commands and matchers are emitted without rewriting.
+cannot establish registration coverage. Coverage is checked against the canonical commands; matchers
+are emitted as written.
 
 A hook folder can contain its entrypoint, imported modules and resources:
 
@@ -262,17 +265,56 @@ relative to `__file__`. Choose any entrypoint filename in `command`; Agent Sync 
 folder without guessing which file to execute.
 Python bytecode caches are excluded from the source tree being mirrored.
 
-Registration is shared; input JSON, tool names, matcher semantics, outputs and lifecycle timing
-are owned by each harness. Write the entrypoint for the events it handles using the
-[Claude Code](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks), and
-[Cursor](https://cursor.com/docs/hooks) contracts. For example, Cursor session hooks apply to local
-IDE sessions, while its cloud agents do not expose that same session lifecycle. Agent Sync does
-not add a runtime wrapper or normalize hook payloads.
-
 Pointing commands to canonical scripts through the Git root keeps them usable from subdirectories
 and with custom source or output directories. Adjust the canonical path when using `agents-dir`.
 Relocated outputs must be installed where the harness discovers them. Codex project hooks require
 a trusted project and review of the hook definition; Agent Sync leaves native trust review to Codex.
+
+#### Hook Input
+
+Agent Sync writes `agent_sync_adapter.py` to each harness's `hooks/` folder and registers every
+canonical `command` through it:
+
+```sh
+exec python3 -I "$(git rev-parse --show-toplevel)"/.claude/hooks/agent_sync_adapter.py claude 'python3 "$(git rev-parse --show-toplevel)/.agents/hooks/session/start.py"'
+```
+
+The adapter reads the harness's input JSON, keeps every key, and adds one `agent_sync` object:
+
+| Field | Value |
+|---|---|
+| `harness` | `claude`, `codex` or `cursor`: the registration file that ran the hook. |
+| `project_dir` | The Git root of the input's `cwd`, or of the hook's working directory when the input has none; that directory itself outside a repository. |
+| `edited_files` | Absolute paths the tool call created or changed: `tool_input.file_path` and `tool_input.notebook_path` of Claude Code's `Edit`, `Write`, `MultiEdit` and `NotebookEdit` and of Cursor's `Write`, and the added, updated and moved-to files of a Codex `apply_patch`. Deleted files are left out. Empty for other tools and events. |
+
+```json
+{
+  "hook_event_name": "PostToolUse",
+  "tool_name": "apply_patch",
+  "cwd": "/work/example",
+  "tool_input": { "command": "*** Begin Patch\n*** Update File: src/app.py\n..." },
+  "agent_sync": {
+    "harness": "codex",
+    "project_dir": "/work/example",
+    "edited_files": ["/work/example/src/app.py"]
+  }
+}
+```
+
+The adapter then replaces itself with the hook command, so the hook's output, exit status and
+signals reach the harness unchanged and a harness timeout stops it like the command run directly. Input the adapter
+cannot read, such as empty or non-object JSON, reaches the hook unchanged without `agent_sync`.
+
+Hooks run on POSIX hosts with `sh` and `python3` (3.9 or newer) on `PATH`. `agent_sync_adapter.py`
+is reserved: a top-level hook file or folder with that name fails validation. A Cursor session that
+imports the generated Claude Code registration reports `harness: "claude"`.
+
+Tool names, matcher semantics, outputs and lifecycle timing remain owned by each harness. Write
+matchers and responses using the
+[Claude Code](https://code.claude.com/docs/en/hooks), [Codex](https://learn.chatgpt.com/docs/hooks), and
+[Cursor](https://cursor.com/docs/hooks) contracts. For example, a Codex `apply_patch` edit matches
+`apply_patch`, `Edit` or `Write`, and Cursor session hooks apply to local IDE sessions, while its
+cloud agents do not expose that same session lifecycle.
 
 ## External Skills
 
