@@ -2,9 +2,22 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import ModuleType
 
 import pytest
 import yaml
+
+from tests.conftest import RacingSyncCheckout
+
+
+def mirror_nothing(agents_dir: str, output_dir: str) -> None:
+    """Leave the harness mirrors as they are."""
+
+
+def stage_output_directory(action_path: Path, agents_dir: str, output_dir: str) -> None:
+    """Stage everything under the generated output directory."""
+
+    subprocess.run(["git", "add", "--all", output_dir], check=True)
 
 
 class TestAction:
@@ -151,6 +164,48 @@ class TestAction:
         )
 
         assert output.read_text() == "enabled=true\n"
+
+    @pytest.mark.parametrize(
+        ("races", "pushed"),
+        [(1, True), (99, False)],
+        ids=["overtaken-once", "overtaken-every-attempt"],
+    )
+    def test_overtaken_push_is_retried(
+        self,
+        persist_script: ModuleType,
+        racing_sync_checkout: RacingSyncCheckout,
+        monkeypatch: pytest.MonkeyPatch,
+        races: int,
+        pushed: bool,
+    ) -> None:
+        """Test that a sync push overtaken by a new commit on the branch is retried on top of it."""
+
+        monkeypatch.chdir(racing_sync_checkout.checkout)
+        monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_nothing)
+        monkeypatch.setattr(persist_script, "stage_generated_paths", stage_output_directory)
+
+        racing_sync_checkout.races.write_text(str(races))
+        output = racing_sync_checkout.checkout / "generated"
+        output.mkdir()
+        (output / "mirror.md").write_text("mirrored\n")
+
+        if not pushed:
+            with pytest.raises(RuntimeError):
+                persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+            return
+
+        persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+        subjects = subprocess.run(
+            ["git", "log", "--format=%s", "main"],
+            cwd=racing_sync_checkout.remote,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split("\n")
+
+        assert subjects[:3] == ["chore: run agent sync", "compete", "initial"]
 
     def test_both_persist_modes_call_the_staging_script(self) -> None:
         """Test that both commit paths use the same staging script."""

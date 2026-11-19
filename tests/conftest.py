@@ -1,5 +1,8 @@
+import importlib.util
 import subprocess
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from pydantic import BaseModel, ConfigDict
@@ -78,3 +81,85 @@ def github_upstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> GitHubUp
     monkeypatch.setenv("GIT_CONFIG_VALUE_1", "always")
 
     return GitHubUpstream(repository="example/skills", revision=revision)
+
+
+class RacingSyncCheckout(BaseModel):
+    """A checkout whose remote gains a competing commit just before each of its next pushes."""
+
+    model_config = ConfigDict(frozen=True)
+
+    checkout: Path
+    remote: Path
+    races: Path
+
+
+RACING_HOOK = """#!{interpreter}
+import subprocess
+from pathlib import Path
+
+races = Path({races!r})
+remaining = int(races.read_text())
+
+if remaining:
+    races.write_text(str(remaining - 1))
+    racer = Path({racer!r})
+    (racer / "competing.txt").write_text(str(remaining))
+    subprocess.run(["git", "add", "competing.txt"], cwd=racer, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Racer", "-c", "user.email=racer@example.invalid", "commit", "--quiet", "-m", "compete"],
+        cwd=racer,
+        check=True,
+    )
+    subprocess.run(["git", "push", "--quiet", "origin", "HEAD:main"], cwd=racer, check=True)
+"""
+
+
+@pytest.fixture
+def persist_script() -> ModuleType:
+    """Load the checked-in persistence script as a module."""
+
+    script = Path(".github/scripts/persist_changes.py").resolve()
+    spec = importlib.util.spec_from_file_location("persist_changes", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
+
+@pytest.fixture
+def racing_sync_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> RacingSyncCheckout:
+    """Create a synced checkout whose GitHub remote is a local bare repository another clone pushes to."""
+
+    served_root = tmp_path / "served"
+    remote = served_root / "example" / "sync.git"
+    remote.mkdir(parents=True)
+    subprocess.run(["git", "init", "--quiet", "--bare", "--initial-branch=main"], cwd=remote, check=True)
+
+    checkout = tmp_path / "checkout"
+    racer = tmp_path / "racer"
+    commit = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet"]
+
+    subprocess.run(["git", "clone", "--quiet", str(remote), str(checkout)], check=True)
+    (checkout / "README.md").write_text("Example\n")
+    subprocess.run(["git", "add", "README.md"], cwd=checkout, check=True)
+    subprocess.run([*commit, "-m", "initial"], cwd=checkout, check=True)
+    subprocess.run(["git", "push", "--quiet", "origin", "HEAD:main"], cwd=checkout, check=True)
+
+    subprocess.run(["git", "clone", "--quiet", str(remote), str(racer)], check=True)
+
+    races = tmp_path / "races"
+    races.write_text("0")
+    hook = checkout / ".git" / "hooks" / "pre-push"
+    hook.write_text(RACING_HOOK.format(interpreter=sys.executable, races=str(races), racer=str(racer)))
+    hook.chmod(0o755)
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example/sync")
+    monkeypatch.setenv("GH_TOKEN", "test-token")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "2")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{served_root.as_uri()}/.insteadOf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "https://x-access-token:test-token@github.com/")
+    monkeypatch.setenv("GIT_CONFIG_KEY_1", "protocol.file.allow")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_1", "always")
+
+    return RacingSyncCheckout(checkout=checkout, remote=remote, races=races)
