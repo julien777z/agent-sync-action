@@ -11,6 +11,7 @@ from agent_sync.config import ActionConfig
 logger: logging.Logger = logging.getLogger(__name__)
 
 PUSH_ATTEMPTS: Final[int] = 3
+SYNC_COMMIT_MESSAGE: Final[str] = "chore: run agent sync"
 
 
 def run_git(*arguments: str) -> None:
@@ -77,7 +78,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
         logger.info("No changes to commit.")
         return
 
-    run_git("commit", "-m", "chore: run agent sync")
+    run_git("commit", "-m", SYNC_COMMIT_MESSAGE)
 
     if mode == "pull-request":
         branch = f"agent-sync/{ref}"
@@ -137,7 +138,14 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
         stage_generated_paths(action_path, agents_dir, output_dir)
 
         if subprocess.run(["git", "diff", "--cached", "--quiet"], check=False).returncode != 0:
-            run_git("commit", "--amend", "--no-edit")
+            head_in_upstream = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"], check=False
+            )
+
+            if head_in_upstream.returncode == 0:
+                run_git("commit", "-m", SYNC_COMMIT_MESSAGE)
+            else:
+                run_git("commit", "--amend", "--no-edit")
 
         if subprocess.run(["git", "push", "origin", f"HEAD:{ref}"], check=False).returncode == 0:
             return
