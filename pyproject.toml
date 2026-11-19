@@ -30,6 +30,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
 asyncio_mode = "auto"
+filterwarnings = ["error"]
 env = [
     "GH_TOKEN=test-token",
     "GITHUB_REPOSITORY=example/sync",

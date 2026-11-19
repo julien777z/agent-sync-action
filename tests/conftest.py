@@ -44,13 +44,18 @@ if remaining:
     ).stdout.strip()
 
     if prepared == "0":
-        subprocess.run(["git", "pull", "--quiet", "--rebase", "origin", "main"], cwd=racer, check=True)
         (racer / "competing.txt").write_text(str(remaining))
         subprocess.run(["git", "add", "competing.txt"], cwd=racer, check=True)
         subprocess.run([*{racer_commit!r}, "--quiet", "-m", "compete"], cwd=racer, check=True)
 
     subprocess.run(["git", "push", "--quiet", "origin", "HEAD:main"], cwd=racer, check=True)
 """
+
+
+def stage_output_directory(action_path: Path, agents_dir: str, output_dir: str) -> None:
+    """Stage everything under the generated output directory."""
+
+    subprocess.run(["git", "add", "--all", output_dir], check=True)
 
 
 def create_workspace(root: Path, output_dirname: str = "") -> Workspace:
@@ -161,8 +166,10 @@ def persist_script() -> ModuleType:
 
 
 @pytest.fixture
-def racing_sync_checkout(tmp_path: Path, served_github: Path) -> RacingSyncCheckout:
-    """Create a synced checkout whose GitHub remote is a local bare repository another clone pushes to."""
+def racing_sync_checkout(
+    tmp_path: Path, served_github: Path, persist_script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> RacingSyncCheckout:
+    """Enter a synced checkout, with mirrored output to persist, whose GitHub remote another clone pushes to."""
 
     remote = served_github / f"{os.environ['GITHUB_REPOSITORY']}.git"
     remote.mkdir(parents=True)
@@ -190,5 +197,12 @@ def racing_sync_checkout(tmp_path: Path, served_github: Path) -> RacingSyncCheck
         )
     )
     hook.chmod(0o755)
+
+    output = checkout / "generated"
+    output.mkdir()
+    (output / "mirror.md").write_text((checkout / "README.md").read_text())
+
+    monkeypatch.chdir(checkout)
+    monkeypatch.setattr(persist_script, "stage_generated_paths", stage_output_directory)
 
     return RacingSyncCheckout(checkout=checkout, remote=remote, racer=racer, races=races)

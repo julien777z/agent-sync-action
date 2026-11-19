@@ -33,12 +33,6 @@ def remote_log(racing_sync_checkout: RacingSyncCheckout, log_format: str) -> lis
     ).stdout.splitlines()
 
 
-def stage_output_directory(action_path: Path, agents_dir: str, output_dir: str) -> None:
-    """Stage everything under the generated output directory."""
-
-    subprocess.run(["git", "add", "--all", output_dir], check=True)
-
-
 class TestAction:
     """Test that the reusable action and repository workflow keep their contract."""
 
@@ -192,14 +186,9 @@ class TestAction:
     ) -> None:
         """Test that a sync push overtaken by a new commit on the branch is retried on top of it."""
 
-        monkeypatch.chdir(racing_sync_checkout.checkout)
         monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_nothing)
-        monkeypatch.setattr(persist_script, "stage_generated_paths", stage_output_directory)
 
         racing_sync_checkout.races.write_text("1")
-        output = racing_sync_checkout.checkout / "generated"
-        output.mkdir()
-        (output / "mirror.md").write_text("mirrored\n")
 
         persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
 
@@ -217,14 +206,9 @@ class TestAction:
     ) -> None:
         """Test that a sync push overtaken on every attempt fails after the last one."""
 
-        monkeypatch.chdir(racing_sync_checkout.checkout)
         monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_nothing)
-        monkeypatch.setattr(persist_script, "stage_generated_paths", stage_output_directory)
 
         racing_sync_checkout.races.write_text("99")
-        output = racing_sync_checkout.checkout / "generated"
-        output.mkdir()
-        (output / "mirror.md").write_text("mirrored\n")
 
         with pytest.raises(RuntimeError, match="to main after 3 attempts"):
             persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
@@ -239,9 +223,7 @@ class TestAction:
     ) -> None:
         """Test that a sync commit the rebase drops is made again rather than amending the branch's tip."""
 
-        monkeypatch.chdir(racing_sync_checkout.checkout)
         monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_readme)
-        monkeypatch.setattr(persist_script, "stage_generated_paths", stage_output_directory)
 
         readme = (racing_sync_checkout.checkout / "README.md").read_text()
         racing_sync_checkout.prepare_race_commit(
@@ -249,10 +231,6 @@ class TestAction:
         )
         racing_sync_checkout.prepare_race_commit("README.md", "Changed\n", "source change")
         racing_sync_checkout.races.write_text("1")
-
-        output = racing_sync_checkout.checkout / "generated"
-        output.mkdir()
-        (output / "mirror.md").write_text(readme)
 
         persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
 
