@@ -4,10 +4,14 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import Final
 
 from agent_sync.config import ActionConfig
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+PUSH_ATTEMPTS: Final[int] = 3
+SYNC_COMMIT_MESSAGE: Final[str] = "chore: run agent sync"
 
 
 def run_git(*arguments: str) -> None:
@@ -74,7 +78,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
         logger.info("No changes to commit.")
         return
 
-    run_git("commit", "-m", "chore: run agent sync")
+    run_git("commit", "-m", SYNC_COMMIT_MESSAGE)
 
     if mode == "pull-request":
         branch = f"agent-sync/{ref}"
@@ -102,40 +106,53 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
 
         return
 
-    previous_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    run_git("pull", "--rebase", "origin", ref)
+    for attempt in range(1, PUSH_ATTEMPTS + 1):
+        previous_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        run_git("pull", "--rebase", "origin", ref)
 
-    registry = str(Path(agents_dir) / "external_resources.json")
-    changed = subprocess.run(
-        ["git", "diff", "--quiet", previous_head, "HEAD", "--", registry],
-        check=False,
-    )
-
-    if changed.returncode == 1:
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "agent_sync",
-                "refresh-external-resources",
-                "--root",
-                ".",
-                "--agents-dir",
-                agents_dir,
-            ],
-            check=True,
+        registry = str(Path(agents_dir) / "external_resources.json")
+        changed = subprocess.run(
+            ["git", "diff", "--quiet", previous_head, "HEAD", "--", registry],
+            check=False,
         )
-    elif changed.returncode != 0:
-        raise RuntimeError("Unable to compare external-resource registry revisions")
 
-    mirror_harnesses(agents_dir, output_dir)
+        if changed.returncode == 1:
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "agent_sync",
+                    "refresh-external-resources",
+                    "--root",
+                    ".",
+                    "--agents-dir",
+                    agents_dir,
+                ],
+                check=True,
+            )
+        elif changed.returncode != 0:
+            raise RuntimeError("Unable to compare external-resource registry revisions")
 
-    stage_generated_paths(action_path, agents_dir, output_dir)
+        mirror_harnesses(agents_dir, output_dir)
 
-    if subprocess.run(["git", "diff", "--cached", "--quiet"], check=False).returncode != 0:
-        run_git("commit", "--amend", "--no-edit")
+        stage_generated_paths(action_path, agents_dir, output_dir)
 
-    run_git("push", "origin", f"HEAD:{ref}")
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], check=False).returncode != 0:
+            head_in_upstream = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"], check=False
+            )
+
+            if head_in_upstream.returncode == 0:
+                run_git("commit", "-m", SYNC_COMMIT_MESSAGE)
+            else:
+                run_git("commit", "--amend", "--no-edit")
+
+        if subprocess.run(["git", "push", "origin", f"HEAD:{ref}"], check=False).returncode == 0:
+            return
+
+        logger.warning("Push to %s was rejected on attempt %d of %d", ref, attempt, PUSH_ATTEMPTS)
+
+    raise RuntimeError(f"Unable to push generated changes to {ref} after {PUSH_ATTEMPTS} attempts")
 
 
 if __name__ == "__main__":

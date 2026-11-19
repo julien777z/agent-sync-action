@@ -19,6 +19,7 @@ dev = [
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-env>=1.8.6",
 ]
 
 [tool.poetry]
@@ -29,6 +30,11 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
 asyncio_mode = "auto"
+filterwarnings = ["error"]
+env = [
+    "GH_TOKEN=test-token",
+    "GITHUB_REPOSITORY=example/sync",
+]
 
 [tool.black]
 line-length = 110

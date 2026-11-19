@@ -2,9 +2,35 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import ModuleType
 
 import pytest
 import yaml
+
+from agent_sync.config import ActionConfig
+from tests.conftest import RacingSyncCheckout
+
+
+def mirror_nothing(agents_dir: str, output_dir: str) -> None:
+    """Leave the harness mirrors as they are."""
+
+
+def mirror_readme(agents_dir: str, output_dir: str) -> None:
+    """Mirror the README into the generated output directory."""
+
+    (Path(output_dir) / "mirror.md").write_text(Path("README.md").read_text())
+
+
+def remote_log(racing_sync_checkout: RacingSyncCheckout, log_format: str) -> list[str]:
+    """Return the remote branch's commits, newest first, in one log format."""
+
+    return subprocess.run(
+        ["git", "log", f"--format={log_format}", "main"],
+        cwd=racing_sync_checkout.remote,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
 
 
 class TestAction:
@@ -151,6 +177,67 @@ class TestAction:
         )
 
         assert output.read_text() == "enabled=true\n"
+
+    def test_overtaken_push_is_retried(
+        self,
+        persist_script: ModuleType,
+        racing_sync_checkout: RacingSyncCheckout,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that a sync push overtaken by a new commit on the branch is retried on top of it."""
+
+        monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_nothing)
+
+        racing_sync_checkout.races.write_text("1")
+
+        persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+        assert remote_log(racing_sync_checkout, "%s")[:3] == [
+            persist_script.SYNC_COMMIT_MESSAGE,
+            "compete",
+            "initial",
+        ]
+
+    def test_push_overtaken_every_attempt_fails(
+        self,
+        persist_script: ModuleType,
+        racing_sync_checkout: RacingSyncCheckout,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that a sync push overtaken on every attempt fails after the last one."""
+
+        monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_nothing)
+
+        racing_sync_checkout.races.write_text("99")
+
+        with pytest.raises(RuntimeError, match="to main after 3 attempts"):
+            persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+        assert racing_sync_checkout.races.read_text() == str(99 - persist_script.PUSH_ATTEMPTS)
+
+    def test_dropped_sync_commit_is_recommitted(
+        self,
+        persist_script: ModuleType,
+        racing_sync_checkout: RacingSyncCheckout,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that a sync commit the rebase drops is made again rather than amending the branch's tip."""
+
+        monkeypatch.setattr(persist_script, "mirror_harnesses", mirror_readme)
+
+        readme = (racing_sync_checkout.checkout / "README.md").read_text()
+        racing_sync_checkout.prepare_race_commit(
+            "generated/mirror.md", readme, persist_script.SYNC_COMMIT_MESSAGE
+        )
+        racing_sync_checkout.prepare_race_commit("README.md", "Changed\n", "source change")
+        racing_sync_checkout.races.write_text("1")
+
+        persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+        assert remote_log(racing_sync_checkout, "%s by %an")[:2] == [
+            f"{persist_script.SYNC_COMMIT_MESSAGE} by {ActionConfig.COMMIT_AUTHOR_NAME}",
+            "source change by Racer",
+        ]
 
     def test_both_persist_modes_call_the_staging_script(self) -> None:
         """Test that both commit paths use the same staging script."""
