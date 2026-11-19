@@ -190,8 +190,10 @@ class TestAction:
         (output / "mirror.md").write_text("mirrored\n")
 
         if not pushed:
-            with pytest.raises(RuntimeError):
+            with pytest.raises(RuntimeError, match="to main after 3 attempts"):
                 persist_script.persist_changes(Path("."), ".agents", "generated", "commit", "main")
+
+            assert racing_sync_checkout.races.read_text() == str(races - persist_script.PUSH_ATTEMPTS)
 
             return
 

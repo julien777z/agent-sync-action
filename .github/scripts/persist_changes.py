@@ -142,9 +142,7 @@ def persist_changes(action_path: Path, agents_dir: str, output_dir: str, mode: s
         if subprocess.run(["git", "push", "origin", f"HEAD:{ref}"], check=False).returncode == 0:
             return
 
-        logger.warning(
-            "%s moved while syncing; incorporating it (attempt %d of %d)", ref, attempt, PUSH_ATTEMPTS
-        )
+        logger.warning("Push to %s was rejected on attempt %d of %d", ref, attempt, PUSH_ATTEMPTS)
 
     raise RuntimeError(f"Unable to push generated changes to {ref} after {PUSH_ATTEMPTS} attempts")
 
