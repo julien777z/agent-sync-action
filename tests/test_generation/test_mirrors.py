@@ -91,10 +91,11 @@ class TestMirrorIntegration:
                 not (harness.root(workspace.root) / "hooks/unregistered").exists() for harness in Harness
             )
 
+    @pytest.mark.parametrize("harness_argument", [False, True])
     @pytest.mark.parametrize("filename", ["check.py", "hook folder/main.py"])
     @pytest.mark.parametrize("path_form", ["relative", "absolute", "git-root"])
     async def test_registered_entrypoint_paths(
-        self, workspace: Workspace, filename: str, path_form: str
+        self, workspace: Workspace, filename: str, path_form: str, harness_argument: bool
     ) -> None:
         """Register standalone scripts and folder entrypoints from custom canonical paths."""
 
@@ -102,7 +103,7 @@ class TestMirrorIntegration:
         subprocess.run(["git", "init", "--quiet", str(workspace.root)], check=True)
         source = agents_dir(workspace) / "hooks" / filename
         source.parent.mkdir(parents=True)
-        source.write_text("print('registered')\n")
+        source.write_text("from sys import argv\nprint(argv[1] if argv[1:] else 'registered')\n")
         relative = source.relative_to(workspace.root).as_posix()
         reference = (
             str(source)
@@ -110,19 +111,28 @@ class TestMirrorIntegration:
             else f"$(git rev-parse --show-toplevel)/{relative}" if path_form == "git-root" else relative
         )
         config = HooksConfigFactory.build()
-        command = f'python3 "{reference}"'
+        command = f'python3 "{reference}"' + (" {{harness}}" if harness_argument else "")
         config.hooks["SessionStart"][0].hooks[0].command = command
         (agents_dir(workspace) / "hooks/hooks.json").write_text(config.model_dump_json(exclude_none=True))
 
         assert mirror_harnesses(workspace, dry_run=False) is False
 
-        registered = json.loads((workspace.root / ".codex/hooks.json").read_text())
-        assert registered["hooks"]["SessionStart"][0]["hooks"][0]["command"] == command
-        execution = subprocess.run(
-            command, shell=True, cwd=workspace.root, check=True, text=True, capture_output=True
-        )
+        for harness in Harness:
+            filename = "settings.json" if harness is Harness.CLAUDE_CODE else "hooks.json"
+            registered = json.loads((harness.root(workspace.root) / filename).read_text())
+            event = "sessionStart" if harness is Harness.CURSOR else "SessionStart"
+            group = registered["hooks"][event][0]
+            rendered = group["command"] if harness is Harness.CURSOR else group["hooks"][0]["command"]
 
-        assert execution.stdout.strip() == "registered"
+            assert rendered == command.replace("{{harness}}", harness.value)
+
+            execution = subprocess.run(
+                rendered, shell=True, cwd=workspace.root, check=True, text=True, capture_output=True
+            )
+
+            assert execution.stdout.strip() == (harness.value if harness_argument else "registered")
+
+        assert config.hooks["SessionStart"][0].hooks[0].command == command
         assert mirror_harnesses(workspace, dry_run=True) is False
 
     @pytest.mark.parametrize("output_dirname", ["", ".generated"], ids=["root", "relocated"])

@@ -31,7 +31,10 @@ def generate_claude_code_settings(
         )
 
     if context.hook_config is not None:
-        values["hooks"] = context.hook_config.model_dump(by_alias=True, exclude_none=True)["hooks"]
+        values["hooks"] = context.hook_config.for_harness(harness).model_dump(
+            by_alias=True,
+            exclude_none=True,
+        )["hooks"]
 
     return [
         GeneratedFile(
