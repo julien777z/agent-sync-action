@@ -189,7 +189,7 @@ class TestReconciliation:
         assert neighbour not in plan.stale_paths
         assert not any(stale_path in neighbour.parents for stale_path in plan.stale_paths)
 
-    def test_relocating_a_linked_skill_mirror_keeps_its_canonical_files(self, workspace: Workspace) -> None:
+    async def test_relocation_preserves_canonical_files(self, workspace: Workspace) -> None:
         """Test that relocation removes a root mirror link without deleting through it."""
 
         materialize_every_source_kind(workspace)

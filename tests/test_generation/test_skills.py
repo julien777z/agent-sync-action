@@ -32,15 +32,16 @@ class TestSkillGeneration:
             workspace.root / ".codex/skills/sample-skill": source.parent,
         }
 
-    def test_skill_tests_folder_stays_out_of_mirrors(
+    async def test_excluded_entries(
         self,
         workspace: Workspace,
     ) -> None:
-        """Test that a top-level tests folder is left out while SKILL.md is copied and other entries link."""
+        """Test that a skill mirror copies SKILL.md and links only the entries it mirrors."""
 
         front_matter = SkillFrontMatterFactory.build()
         source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
         materialize_skill(source, front_matter)
+
         skill_dir = source.parent
         (skill_dir / "tests").mkdir()
         (skill_dir / "tests/scenario.md").write_text("Scenario.\n")
@@ -63,6 +64,7 @@ class TestSkillGeneration:
             }
 
             assert files == {mirror / "SKILL.md": source.read_text(encoding="utf-8")}
+
             assert links == {
                 mirror / ".env.example": skill_dir / ".env.example",
                 mirror / "scripts": skill_dir / "scripts",

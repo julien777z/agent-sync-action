@@ -541,11 +541,12 @@ class TestMirrorIntegration:
             assert "disable-model-invocation: true" in (skill / "SKILL.md").read_text()
         assert mirror_harnesses(workspace, dry_run=True) is False
 
-    def test_a_skill_mirror_tracks_its_tests_folder(self, workspace: Workspace) -> None:
-        """Test that each sync rebuilds a skill mirror as its top-level tests folder appears, changes and goes."""
+    async def test_canonical_changes_reconcile(self, workspace: Workspace) -> None:
+        """Test that each sync reconciles a selectively mirrored skill with its canonical changes."""
 
         source = agents_dir(workspace) / "skills/review/SKILL.md"
         materialize_skill(source, SkillFrontMatterFactory.build(name="review"))
+
         skill_dir = source.parent
         (skill_dir / "references").mkdir()
 
@@ -559,6 +560,7 @@ class TestMirrorIntegration:
 
         for harness in Harness:
             mirror = harness.root(workspace.root) / "skills/review"
+
             assert mirror.is_dir() and not mirror.is_symlink()
             assert sorted(path.name for path in mirror.iterdir()) == ["SKILL.md", "references"]
             assert (mirror / "SKILL.md").is_file() and not (mirror / "SKILL.md").is_symlink()
@@ -574,6 +576,7 @@ class TestMirrorIntegration:
 
         for harness in Harness:
             mirror = harness.root(workspace.root) / "skills/review"
+
             assert sorted(path.name for path in mirror.iterdir()) == [".notes", "SKILL.md"]
             assert "Revised body." in (mirror / "SKILL.md").read_text()
 
