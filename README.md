@@ -109,6 +109,12 @@ anything else is a grouping folder and is searched for skills. The folders never
 each skill still mirrors to `skills/<name>`, so its name stays unique across the whole tree and a
 grouping folder cannot namespace two skills apart.
 
+A skill's top-level `tests/` folder stays in `.agents/` and never reaches a harness, so a skill can
+keep regression scenarios and their expected answers beside it. A skill without one mirrors as a
+single link to its canonical directory. A skill with one mirrors as a directory holding a copy of
+`SKILL.md` and a link to every other top-level entry, and each sync rebuilds it to match. Nested
+folders such as `scripts/tests` are mirrored like any other content.
+
 ## Inputs
 
 | Input | Default | Purpose |

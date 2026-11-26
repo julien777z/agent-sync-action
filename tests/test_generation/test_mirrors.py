@@ -540,3 +540,46 @@ class TestMirrorIntegration:
             assert skill.is_symlink()
             assert "disable-model-invocation: true" in (skill / "SKILL.md").read_text()
         assert mirror_harnesses(workspace, dry_run=True) is False
+
+    def test_a_skill_mirror_tracks_its_tests_folder(self, workspace: Workspace) -> None:
+        """Test that each sync rebuilds a skill mirror as its top-level tests folder appears, changes and goes."""
+
+        source = agents_dir(workspace) / "skills/review/SKILL.md"
+        materialize_skill(source, SkillFrontMatterFactory.build(name="review"))
+        skill_dir = source.parent
+        (skill_dir / "references").mkdir()
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        (skill_dir / "tests").mkdir()
+        (skill_dir / "tests/scenario.md").write_text("Scenario.\n")
+        assert mirror_harnesses(workspace, dry_run=True) is True
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        for harness in Harness:
+            mirror = harness.root(workspace.root) / "skills/review"
+            assert mirror.is_dir() and not mirror.is_symlink()
+            assert sorted(path.name for path in mirror.iterdir()) == ["SKILL.md", "references"]
+            assert (mirror / "SKILL.md").is_file() and not (mirror / "SKILL.md").is_symlink()
+            assert os.readlink(mirror / "references") == "../../../.agents/skills/review/references"
+        assert mirror_harnesses(workspace, dry_run=True) is False
+
+        materialize_skill(source, SkillFrontMatterFactory.build(name="review"), body="Revised body.")
+        (skill_dir / "references").rmdir()
+        (skill_dir / ".notes").write_text("Notes.\n")
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        for harness in Harness:
+            mirror = harness.root(workspace.root) / "skills/review"
+            assert sorted(path.name for path in mirror.iterdir()) == [".notes", "SKILL.md"]
+            assert "Revised body." in (mirror / "SKILL.md").read_text()
+        assert mirror_harnesses(workspace, dry_run=True) is False
+
+        (skill_dir / "tests/scenario.md").unlink()
+        (skill_dir / "tests").rmdir()
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        for harness in Harness:
+            assert (
+                os.readlink(harness.root(workspace.root) / "skills/review") == "../../.agents/skills/review"
+            )
+        assert mirror_harnesses(workspace, dry_run=True) is False
