@@ -136,7 +136,7 @@ def generate_hooks(context: GenerationContext, harness: Harness) -> list[Generat
 
 
 def generate_skills(context: GenerationContext, harness: Harness) -> list[GeneratedOutput]:
-    """Mirror each skill to one harness, leaving out its top-level tests folder."""
+    """Mirror each skill to one harness."""
 
     root = harness.root(output_root(context.workspace))
     outputs: list[GeneratedOutput] = []
