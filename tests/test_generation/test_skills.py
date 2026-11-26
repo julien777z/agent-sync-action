@@ -32,7 +32,7 @@ class TestSkillGeneration:
             workspace.root / ".codex/skills/sample-skill": source.parent,
         }
 
-    def test_a_skill_with_a_tests_folder_mirrors_without_it(
+    def test_skill_tests_folder_stays_out_of_mirrors(
         self,
         workspace: Workspace,
     ) -> None:
@@ -46,6 +46,7 @@ class TestSkillGeneration:
         (skill_dir / "tests/scenario.md").write_text("Scenario.\n")
         (skill_dir / "scripts/tests").mkdir(parents=True)
         (skill_dir / ".env.example").write_text("KEY=value\n")
+
         context = load_context(workspace)
 
         for harness in Harness:
@@ -54,6 +55,7 @@ class TestSkillGeneration:
             files = {
                 output.target_path: output.content for output in outputs if isinstance(output, GeneratedFile)
             }
+
             links = {
                 output.target_path: output.link_target
                 for output in outputs

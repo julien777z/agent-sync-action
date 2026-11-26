@@ -167,6 +167,7 @@ def generate_skills(context: GenerationContext, harness: Harness) -> list[Genera
                 harness=harness,
             )
         )
+
         outputs.extend(
             GeneratedLink(
                 target_path=mirror / entry.name,

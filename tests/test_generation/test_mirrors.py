@@ -548,10 +548,12 @@ class TestMirrorIntegration:
         materialize_skill(source, SkillFrontMatterFactory.build(name="review"))
         skill_dir = source.parent
         (skill_dir / "references").mkdir()
+
         assert mirror_harnesses(workspace, dry_run=False) is False
 
         (skill_dir / "tests").mkdir()
         (skill_dir / "tests/scenario.md").write_text("Scenario.\n")
+
         assert mirror_harnesses(workspace, dry_run=True) is True
         assert mirror_harnesses(workspace, dry_run=False) is False
 
@@ -561,25 +563,30 @@ class TestMirrorIntegration:
             assert sorted(path.name for path in mirror.iterdir()) == ["SKILL.md", "references"]
             assert (mirror / "SKILL.md").is_file() and not (mirror / "SKILL.md").is_symlink()
             assert os.readlink(mirror / "references") == "../../../.agents/skills/review/references"
+
         assert mirror_harnesses(workspace, dry_run=True) is False
 
         materialize_skill(source, SkillFrontMatterFactory.build(name="review"), body="Revised body.")
         (skill_dir / "references").rmdir()
         (skill_dir / ".notes").write_text("Notes.\n")
+
         assert mirror_harnesses(workspace, dry_run=False) is False
 
         for harness in Harness:
             mirror = harness.root(workspace.root) / "skills/review"
             assert sorted(path.name for path in mirror.iterdir()) == [".notes", "SKILL.md"]
             assert "Revised body." in (mirror / "SKILL.md").read_text()
+
         assert mirror_harnesses(workspace, dry_run=True) is False
 
         (skill_dir / "tests/scenario.md").unlink()
         (skill_dir / "tests").rmdir()
+
         assert mirror_harnesses(workspace, dry_run=False) is False
 
         for harness in Harness:
             assert (
                 os.readlink(harness.root(workspace.root) / "skills/review") == "../../.agents/skills/review"
             )
+
         assert mirror_harnesses(workspace, dry_run=True) is False
