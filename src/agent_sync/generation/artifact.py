@@ -157,7 +157,7 @@ def generate_skills(context: GenerationContext, harness: Harness) -> list[Genera
 
             continue
 
-        # Codex skips a symlinked SKILL.md, so the document is copied while other entries link.
+        # Codex skips a symlinked SKILL.md.
         outputs.append(
             GeneratedFile(
                 target_path=mirror / source.path.name,

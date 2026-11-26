@@ -143,12 +143,27 @@ def find_abandoned_outputs(workspace: Workspace, manifest: Manifest) -> set[Path
         for output in manifest.outputs
         if output.target_path.is_relative_to(output_root(workspace))
     }
-    abandoned = {path for path in relocated if path.is_symlink() or path.exists()}
 
-    for harness in {output.harness for output in manifest.outputs if output.harness is not None}:
+    harnesses = {output.harness for output in manifest.outputs if output.harness is not None}
+    abandoned: set[Path] = set()
+
+    for path in relocated:
+        blockers = find_parent_blockers(workspace, path)
+
+        if not blockers:
+            if path.is_symlink() or path.exists():
+                abandoned.add(path)
+        elif any(harness.root(workspace.root) in blockers[0].parents for harness in harnesses):
+            abandoned.add(blockers[0])
+
+    for harness in harnesses:
         harness_root = harness.root(workspace.root)
 
-        if harness_root.is_dir() and not harness_root.is_symlink() and holds_only(harness_root, relocated):
+        if (
+            harness_root.is_dir()
+            and not harness_root.is_symlink()
+            and holds_only(harness_root, relocated | abandoned)
+        ):
             abandoned.add(harness_root)
 
     return abandoned
