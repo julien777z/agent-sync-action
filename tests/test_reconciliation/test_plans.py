@@ -199,6 +199,7 @@ class TestReconciliation:
         skill_dir = agents_dir(workspace) / "skills/sample"
         (skill_dir / "references").mkdir()
         (skill_dir / "tests").mkdir()
+
         relocated = Workspace(root=workspace.root, output_dirname=".agents/.auto_generated")
 
         assert mirror_harnesses(relocated, dry_run=False) is False
