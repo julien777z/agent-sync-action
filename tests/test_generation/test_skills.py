@@ -2,7 +2,7 @@ import pytest
 
 from agent_sync.utils import AgentSyncError
 from agent_sync.generation.artifact import generate_skills
-from agent_sync.models.output import GeneratedLink, Harness
+from agent_sync.models.output import GeneratedFile, GeneratedLink, Harness
 from agent_sync.models.settings import Workspace
 from agent_sync.workspace import agents_dir
 from tests.factories import SkillFrontMatterFactory, load_context, materialize_skill
@@ -31,6 +31,44 @@ class TestSkillGeneration:
             workspace.root / ".cursor/skills/sample-skill": source.parent,
             workspace.root / ".codex/skills/sample-skill": source.parent,
         }
+
+    async def test_excluded_entries(
+        self,
+        workspace: Workspace,
+    ) -> None:
+        """Test that a skill mirror copies SKILL.md and links only the entries it mirrors."""
+
+        front_matter = SkillFrontMatterFactory.build()
+        source = agents_dir(workspace) / "skills" / front_matter.name / "SKILL.md"
+        materialize_skill(source, front_matter)
+
+        skill_dir = source.parent
+        (skill_dir / "tests").mkdir()
+        (skill_dir / "tests/scenario.md").write_text("Scenario.\n")
+        (skill_dir / "scripts/tests").mkdir(parents=True)
+        (skill_dir / ".env.example").write_text("KEY=value\n")
+
+        context = load_context(workspace)
+
+        for harness in Harness:
+            mirror = harness.root(workspace.root) / "skills" / front_matter.name
+            outputs = generate_skills(context, harness)
+            files = {
+                output.target_path: output.content for output in outputs if isinstance(output, GeneratedFile)
+            }
+
+            links = {
+                output.target_path: output.link_target
+                for output in outputs
+                if isinstance(output, GeneratedLink)
+            }
+
+            assert files == {mirror / "SKILL.md": source.read_text(encoding="utf-8")}
+
+            assert links == {
+                mirror / ".env.example": skill_dir / ".env.example",
+                mirror / "scripts": skill_dir / "scripts",
+            }
 
     def test_a_grouped_skill_still_mirrors_at_its_slug(
         self,

@@ -189,6 +189,26 @@ class TestReconciliation:
         assert neighbour not in plan.stale_paths
         assert not any(stale_path in neighbour.parents for stale_path in plan.stale_paths)
 
+    async def test_relocation_preserves_canonical_files(self, workspace: Workspace) -> None:
+        """Test that relocation removes a root mirror link without deleting through it."""
+
+        materialize_every_source_kind(workspace)
+
+        assert mirror_harnesses(workspace, dry_run=False) is False
+
+        skill_dir = agents_dir(workspace) / "skills/sample"
+        (skill_dir / "references").mkdir()
+        (skill_dir / "tests").mkdir()
+
+        relocated = Workspace(root=workspace.root, output_dirname=".agents/.auto_generated")
+
+        assert mirror_harnesses(relocated, dry_run=False) is False
+
+        assert (skill_dir / "SKILL.md").is_file()
+        assert (skill_dir / "references").is_dir()
+        assert not (workspace.root / ".claude").exists()
+        assert mirror_harnesses(relocated, dry_run=True) is False
+
     def test_relocated_output_keeps_what_it_does_not_write(
         self,
         relocated_workspace: Workspace,

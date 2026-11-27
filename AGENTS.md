@@ -151,7 +151,7 @@ Canonical guidance lives in `.agents/`.
 ## Skill Files
 
 - Agent Sync must reject `agents/openai.yaml` in canonical skill content and never generate it
-  for any provider. Link the same canonical skill directory into each provider.
+  for any provider. Mirror the same canonical skill into each provider.
 
 # Agent Sync Action
 
